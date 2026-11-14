@@ -191,7 +191,11 @@ export function FocusSessionProvider({
   const storedRef = useRef(true);
   /** The database has no session functions (older database): device-only for this page's life. */
   const serverMissingRef = useRef(false);
-  const syncingRef = useRef<Promise<boolean> | null>(null);
+  /** The sync running now and the account it is for (another account starts its own). */
+  const syncingRef = useRef<{ uid: string; run: Promise<boolean> } | null>(null);
+  /** A sync was asked for while one ran: after it, run once more if an action is still queued. */
+  const syncAgainRef = useRef(false);
+  const syncNowRef = useRef<() => Promise<boolean>>(() => Promise.resolve(false));
 
   const persist = useCallback((next: FocusSession | null) => {
     storedRef.current = writeStoredSession(userRef.current, next);
@@ -296,7 +300,12 @@ export function FocusSessionProvider({
     if (!uid || !readyRef.current || serverMissingRef.current || !isSupabaseConfigured || isDeviceOffline()) {
       return Promise.resolve(false);
     }
-    if (syncingRef.current) return syncingRef.current;
+    const pending = syncingRef.current;
+    if (pending && pending.uid === uid) {
+      // Its last send may already be behind it (an action queued meanwhile): checked when it ends.
+      syncAgainRef.current = true;
+      return pending.run;
+    }
     const transport = supabaseFocusTransport;
     const run = withSyncLock(async (): Promise<boolean> => {
       for (let round = 0; round < 3; round++) {
@@ -357,12 +366,19 @@ export function FocusSessionProvider({
       console.error('[focus] syncing the session failed', error);
       return false;
     });
-    syncingRef.current = run;
-    void run.finally(() => {
-      if (syncingRef.current === run) syncingRef.current = null;
+    const entry = { uid, run };
+    syncingRef.current = entry;
+    syncAgainRef.current = false;
+    void run.then((synced) => {
+      if (syncingRef.current !== entry) return;
+      syncingRef.current = null;
+      const again = syncAgainRef.current;
+      syncAgainRef.current = false;
+      if (again && synced && userRef.current === uid && readFocusOps(uid).length > 0) void syncNowRef.current();
     });
     return run;
   }, [logServerClose, persist, readCurrent]);
+  syncNowRef.current = syncNow;
 
   /** Server first; the device-only rules when the server cannot be reached. */
   const settle = useCallback(() => {
@@ -432,6 +448,7 @@ export function FocusSessionProvider({
     if (deadline === null) return;
     let timer = 0;
     const check = () => {
+      window.clearTimeout(timer);
       const left = deadline - trustedNowMs();
       if (left < 0) {
         settle();
