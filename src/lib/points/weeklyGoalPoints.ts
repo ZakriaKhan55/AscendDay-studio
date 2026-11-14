@@ -69,8 +69,10 @@ export function extractWeekKeyFromWeeklyGoalEntry(entry: PointsEntry | null | un
     return entry.metadata.weekKey;
   }
   if (typeof entry.id === 'string') {
-    const match = entry.id.match(/\b\d{4}-W\d{2}\b/);
-    if (match) return match[0];
+    // `_` is a word character, so `\b` never matches inside `weekly_goal_2026-W46`: the week key is
+    // bounded by `_` or the id's ends instead (also `weekly_goal_<week>_s<n>`).
+    const match = entry.id.match(/(?:^|_)(\d{4}-W\d{2})(?=_|$)/);
+    if (match) return match[1];
   }
   if (entry.reason) {
     const match = entry.reason.match(/\b\d{4}-W\d{2}\b/);
