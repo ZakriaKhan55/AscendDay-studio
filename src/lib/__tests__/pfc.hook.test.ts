@@ -36,6 +36,7 @@ await story('pfc.hook (focus, decision, emotion actions)', async () => {
   await until(() => decision()?.isReflected === true, 'T22: decision reflected');
   await h.s().updateDecisionText(decisionId, { title: 'HookDecisionEdited', rationale: 'because', expectedOutcome: 'better', reflection: 'it worked' });
   await until(() => decision()?.title === 'HookDecisionEdited', 'T22: decision text edited');
+  await until(() => rows('decision_logs').some((r) => r.id === decisionId && r.title === 'HookDecisionEdited' && r.is_reflected === true), 'T22: decision edit and reflection reached the row', 5000);
 
   h.s().logEmotion('calm', 4, 'HookContext');
   const emotion = () => h.s().state.emotionLogs.find((e) => e.context.startsWith('HookContext') || e.context === 'HookNote');
@@ -44,6 +45,7 @@ await story('pfc.hook (focus, decision, emotion actions)', async () => {
   await until(() => rows('emotion_logs').some((r) => r.id === emotionId), 'T22: emotion reached emotion_logs', 5000);
   await h.s().updateEmotionNote(emotionId, 'HookNote');
   await until(() => emotion()?.context === 'HookNote', 'T22: emotion note edited');
+  await until(() => rows('emotion_logs').some((r) => r.id === emotionId && r.context === 'HookNote'), 'T22: emotion note edit reached the row', 5000);
 
   h.s().deleteEmotionLog(emotionId);
   h.s().deleteDecisionLog(decisionId);

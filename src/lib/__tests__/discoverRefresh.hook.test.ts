@@ -62,8 +62,14 @@ await story('discoverRefresh.hook (Discover refresh)', async () => {
   pass('DR1 pull-to-refresh refetches Discover; the list stays while it loads and when it fails');
 
   // DR2: still failing. Refresh (desktop button) and a filter change keep the list, flagged.
+  // The flag is already up from DR1, so wait for THIS Refresh: its read is held until it shows as
+  // loading, then released; it has ended once it no longer shows as loading.
+  const heldRead = fake.hold((r) => r.method === 'GET' && r.table === 'improvement_plans' && /is_public=eq\.true/.test(r.search));
   d().refresh();
-  await until(() => d().refreshFailed && !d().refreshing, 'DR2: failed Refresh flags the list');
+  await until(() => heldRead.hits > 0 && d().refreshing, 'DR2: this Refresh is loading');
+  eq(`${d().status}:${d().plans.length}`, 'ready:2', 'DR2: the list stays while Refresh loads');
+  heldRead.release();
+  await until(() => !d().refreshing && d().refreshFailed, 'DR2: failed Refresh flags the list');
   eq(`${d().status}:${d().plans.length}`, 'ready:2', 'DR2: failed Refresh keeps the list (no error screen)');
   d().updateFilters({ category: 'Health' });
   await quiet(1200);

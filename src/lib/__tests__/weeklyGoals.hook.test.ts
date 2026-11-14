@@ -38,6 +38,9 @@ await story('weeklyGoals.hook (weekly goal actions)', async () => {
 
   h.s().carryOverGoal(lastWeek, week, 'g-last');
   await until(() => thisWeek()?.goals.some((g) => g.carriedOverFromGoalId === 'g-last'), 'T24: last week goal carried over');
+  // What another device loads: the carried copy is in this week's row.
+  const rowGoals = (r: ReturnType<typeof weekRow>) => ((r?.data?.goals ?? []) as { id: string; carriedOverFromGoalId?: string; carryOverDismissed?: boolean }[]);
+  await until(() => rowGoals(weekRow()).some((g) => g.carriedOverFromGoalId === 'g-last'), 'T24: the carried-over goal reached this week\'s row', 5000);
 
   h.s().syncLinkedWeeklyGoals();
   h.s().deleteWeeklyGoalItem(week, goalId);
@@ -48,5 +51,9 @@ await story('weeklyGoals.hook (weekly goal actions)', async () => {
   // Deleting a carried-over goal settles its source in last week (marked dismissed).
   h.s().deleteWeeklyGoalItem(week, carried.id);
   await until(() => h.s().state.weeklyGoals.find((w) => w.weekKey === lastWeek)?.goals.find((g) => g.id === 'g-last')?.carryOverDismissed === true, 'T24: last week source marked dismissed');
+  // ...and in the rows: the copy is gone from this week's row, its source is dismissed in last week's.
+  await until(() => !rowGoals(weekRow()).some((g) => g.id === carried.id), 'T24: the carried-over goal gone from this week\'s row', 5000);
+  const lastWeekRow = () => rows('weekly_goals').find((r) => r.id === lastWeek);
+  await until(() => rowGoals(lastWeekRow()).find((g) => g.id === 'g-last')?.carryOverDismissed === true, 'T24: last week\'s row marks the source dismissed', 5000);
   pass('T24 weekly goal add, edit, carry-over and delete saved');
 });

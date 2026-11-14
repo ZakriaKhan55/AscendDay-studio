@@ -2,7 +2,8 @@
 // signed-in account. Written for C2 (moving the workout actions out of useAppState).
 //   T19  logging a workout puts it in state and in the workouts table with today's points entry;
 //        editing it reads current state and saves the new type; deleting it removes it from state and
-//        the table and leaves a tombstone; "clear older" removes an earlier day's workout only.
+//        the table and leaves a tombstone; "clear older" removes an earlier day's workout only (a
+//        workout of today stays in state and in the table).
 import { bootHook, story, until, quiet, rows, eq, assert, pass, server, UID } from './harness/bootHook';
 
 const blobAt = 'Sun 2026-11-01 5:00 AM PKT (UTC+05:00)';
@@ -35,9 +36,18 @@ await story('workouts.hook (workout actions)', async () => {
   assert((h.s().state.deletedEntityIds || []).includes(id), 'T19: deleted workout has a tombstone');
   await until(() => !rows('workouts').some((r) => r.id === id), 'T19: workout row deleted', 5000);
 
+  // "Clear older" must stop at the cutoff: a workout of today is logged first and has to stay.
+  h.s().logWorkout('HookKeep', 15);
+  const kept = () => h.s().state.workouts.find((w) => w.date === today && w.type === 'HookKeep');
+  await until(kept, 'T19: today\'s workout to keep in state');
+  const keptId = kept()!.id;
+  await until(() => rows('workouts').some((r) => r.id === keptId), 'T19: today\'s workout to keep reached the table', 5000);
   h.s().clearWorkoutsBefore(today);
   await until(() => !h.s().state.workouts.some((w) => w.id === 'w-old'), 'T19: earlier workout cleared from state');
   await until(() => !rows('workouts').some((r) => r.id === 'w-old'), 'T19: earlier workout row deleted', 5000);
-  eq(h.s().state.workouts.filter((w) => w.date === today).length, 0, 'T19: nothing of today left over');
+  await quiet(1500);
+  eq(h.s().state.workouts.filter((w) => w.date === today).map((w) => w.id), [keptId], 'T19: today\'s workout stays in state');
+  assert(rows('workouts').some((r) => r.id === keptId), 'T19: today\'s workout row stays');
+  assert(!(h.s().state.deletedEntityIds || []).includes(keptId), 'T19: today\'s workout has no tombstone');
   pass('T19 workout log, edit, delete and clear-older saved');
 });

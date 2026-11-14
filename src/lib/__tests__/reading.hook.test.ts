@@ -90,10 +90,14 @@ await story('reading.hook (reading actions)', async () => {
   eq([book('HookBook2')!.currentAmount, book('HookBook2')!.reflection], [0, 'HookTakeaway'], 'T29: restarting reopens the book and keeps its takeaway');
 
   const finishLogIds = todayLogs().map((l) => l.id);
+  assert(finishLogIds.length > 0, 'T29: the finished book has logs of today');
+  const logRowIds = () => rows('reading_logs').map((r) => r.id);
+  await until(() => finishLogIds.every((id) => logRowIds().includes(id)), 'T29: the finish logs reached reading_logs', 5000);
   h.s().deleteBook(bookId);
   await until(() => !book('HookBook2'), 'T29: deleted book gone from state');
   assert([bookId, ...finishLogIds].every((id) => (h.s().state.deletedEntityIds || []).includes(id)), 'T29: deleted book and its logs have tombstones');
   await until(() => !rows('reading_books').some((r) => r.id === bookId), 'T29: deleted book row removed', 5000);
+  await until(() => ![logId, ...finishLogIds].some((id) => logRowIds().includes(id)), 'T29: the deleted book\'s log rows removed from reading_logs', 5000);
   await until(() => !habitDone(), 'T29: deleting the only book read today unticks the Reading habit');
   await until(() => !pactRowDone(), 'T29: the delete untick reached shared_challenges', 5000);
   // I3: a chapter book logs in tenths; 1.1 -> 1.3 stores exactly 0.2 (1.3 - 1.1 = 0.19999999999999996 unsnapped).

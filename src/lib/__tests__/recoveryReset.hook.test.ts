@@ -36,8 +36,12 @@ await story('recoveryReset.hook (a reset takes back today, never yesterday)', as
   eq(point(today)?.amount, 1, "T34: today's preview point");
   eq(point(yesterday)?.amount, 1, "T34: yesterday's preview point");
   await quiet(1500);
+  // A soft delete of TODAY's row: a PATCH whose id filter names today and whose body sets deleted_at.
+  const idFilter = new RegExp(`(^|[?&])id=(eq\\.${today}(&|$)|in\\.\\([^)]*\\b${today}\\b)`);
   const deletesOfToday = () =>
-    fake.requests({ table: 'recovery_checkins' }).filter((r: any) => r.method === 'PATCH' && JSON.stringify(r).includes(today)).length;
+    fake
+      .requests({ table: 'recovery_checkins' })
+      .filter((r: any) => r.method === 'PATCH' && idFilter.test(decodeURIComponent(r.search)) && r.body && typeof r.body === 'object' && !Array.isArray(r.body) && r.body.deleted_at != null).length;
   const deletesBefore = deletesOfToday();
 
   const startBefore = state().addictionTracker!.startDate;
@@ -47,6 +51,8 @@ await story('recoveryReset.hook (a reset takes back today, never yesterday)', as
   assert(!point(today), "T34: today's preview point is gone");
   eq(point(yesterday)?.amount, 1, "T34: yesterday's point stays");
   await until(() => deletesOfToday() > deletesBefore, "T34: the soft delete of today's check-in is sent", 5000);
+  await until(() => server.row('recovery_checkins', UID, today)?.deleted_at != null, "T34: today's check-in row is soft-deleted", 5000);
+  eq(server.row('recovery_checkins', UID, yesterday)?.deleted_at ?? null, null, "T34: yesterday's check-in row stays active");
 
   // Slipped without Clean today: the streak restarts again, no check-in or point changes.
   await quiet(500);
