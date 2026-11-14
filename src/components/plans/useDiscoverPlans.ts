@@ -62,9 +62,10 @@ export function useDiscoverPlans(store: AppStore, active: boolean) {
 
     if (!result) {
       // A list on screen stays (marked as not refreshed). With none, a requested load says it
-      // failed; a quiet one leaves the screen as it is.
+      // failed; a quiet one leaves the screen as it is, unless it replaced the first load still
+      // showing skeletons (that load's answer is dropped, so nothing else would end them).
       if (hasListRef.current) setRefreshFailed(true);
-      else if (!quiet) setStatus('error');
+      else setStatus((current) => (quiet && current !== 'loading' ? current : 'error'));
       return;
     }
     hasListRef.current = result.length > 0;

@@ -6,6 +6,9 @@
 //   DR2 a requested load (Refresh, a filter change) that fails while a list is shown keeps the list
 //       with the "Couldn't refresh" flag (no error screen), even for a new filter; the next good load
 //       clears the flag. With no list on screen a failed requested load still shows the error state.
+//   DR3 (CR-02-7) a quiet load (pull-to-refresh) that replaces the first load while it still shows
+//       skeletons and then fails ends the skeletons with the error state (the first load's answer
+//       is dropped, so nothing else would).
 import { bootHook, story, until, quiet, eq, assert, pass, fake, server, UID } from './harness/bootHook';
 import { doc } from './harness/dom';
 
@@ -77,4 +80,31 @@ await story('discoverRefresh.hook (Discover refresh)', async () => {
   d().updateFilters({ category: 'All' });
   await until(() => d().status === 'ready' && d().plans.length === 2, 'DR2: back to the full list');
   pass('DR2 a failed requested load keeps a shown list with the couldn\'t-refresh flag; error only with no list');
+
+  // DR3: Discover opens while the server fails; its first load is still out when a pull starts a
+  // quiet one, which fails first.
+  fake.fail('improvement_plans', 500, ['GET']);
+  let firstSeen = false;
+  const gate = fake.hold((r) => {
+    if (firstSeen || r.method !== 'GET' || r.table !== 'improvement_plans' || !/is_public=eq\.true/.test(r.search)) return false;
+    firstSeen = true;
+    return true;
+  });
+  let opened: ReturnType<typeof useDiscoverPlans> | null = null;
+  function OpenedDiscover() {
+    opened = useDiscoverPlans(h.s(), true);
+    return null;
+  }
+  createRoot((doc.createElement as () => Element)()).render(React.createElement(OpenedDiscover));
+  await until(() => gate.hits === 1 && opened?.status === 'loading', 'DR3: first load on its way, skeletons shown');
+  await h.s().refreshNow();
+  await until(() => opened?.status !== 'loading', 'DR3: the failed quiet load ends the skeletons', 5000);
+  eq(`${opened!.status}:${opened!.plans.length}`, 'error:0', 'DR3: error state (with Retry), not endless skeletons');
+  gate.release();
+  await quiet(300);
+  eq(opened!.status, 'error', 'DR3: the first load\'s late answer is still dropped');
+  fake.unfail('improvement_plans');
+  opened!.retry();
+  await until(() => opened?.status === 'ready' && opened.plans.length === 2, 'DR3: Retry loads the list');
+  pass('DR3 a failed quiet load that replaced the first load ends its skeletons with the error state');
 }, 60_000);
