@@ -433,6 +433,11 @@ eq(K.focusSkillLogFor(focusLog, skills, [], ['skill_focus_a1'], '2026-11-05'), n
 eq(K.focusSkillLogFor({ ...focusLog, skillId: undefined }, skills, [], [], '2026-11-05'), null, '10: no skill, no log');
 eq(K.focusSkillLogFor({ ...focusLog, skillId: 'gone' }, skills, [], [], '2026-11-05'), null, '10: deleted skill, no log');
 eq(K.focusSkillLogFor({ ...focusLog, startedAt: '2026-11-05T09:30:00.000Z' }, skills, [], [], '2026-11-05')?.durationMinutes, 30, '10: never more than the wall time');
+// CR-05-4: a planned session whose times do not fit credits 0 focus minutes, so it adds no skill
+// minutes either; only a session without a plan (stored before plans) falls back to its minutes.
+eq(K.focusSkillLogFor({ ...focusLog, startedAt: 'Thu 2026-11-05 3:10 PM PKT (UTC+05:00)' }, skills, [], [], '2026-11-05'), null, '10: planned session crediting 0 adds no skill log');
+eq(K.focusSkillLogFor({ ...focusLog, startedAt: undefined }, skills, [], [], '2026-11-05'), null, '10: planned session without a start time adds no skill log');
+eq(K.focusSkillLogFor({ ...focusLog, plannedMinutes: undefined, startedAt: undefined }, skills, [], [], '2026-11-05')?.durationMinutes, 50, '10: session without a plan keeps its minutes');
 // A session closed 2+ days late adds no skill log (skill_logs_guard_today keeps only today and a new yesterday).
 eq(K.focusSkillLogFor(focusLog, skills, [], [], '2026-11-06')?.id, 'skill_focus_a1', '10: a session of yesterday still adds its log');
 eq(K.focusSkillLogFor(focusLog, skills, [], [], '2026-11-07'), null, '10: a session of 2 days ago adds none');
@@ -441,6 +446,9 @@ const logs: SkillSessionLog[] = [{ ...sl!, note: '' }];
 eq(K.withReflectionNote(logs, 'focus_a1', undefined, 'later')[0].note, 'later', '10: reflection saved after Complete goes on the note');
 eq(K.withReflectionNote([{ ...sl!, note: 'my edit' }], 'focus_a1', 'major scales', 'new')[0].note, 'my edit', '10: an edited note is kept');
 eq(K.withReflectionNote([{ ...sl!, note: 'major scales' }], 'focus_a1', 'major scales', 'v2')[0].note, 'v2', '10: unchanged copy follows the reflection');
+// CR-05-5: a skill note the user cleared on purpose stays cleared when the reflection is edited.
+eq(K.withReflectionNote([{ ...sl!, note: '' }], 'focus_a1', 'major scales', 'edited')[0].note, '', '10: a cleared note is kept');
+eq(K.withReflectionNote([{ ...sl!, note: '  ' }], 'focus_a1', 'major scales', 'edited')[0].note, '  ', '10: a note cleared to spaces is kept');
 const same = [{ ...sl! }];
 assert(K.withReflectionNote(same, 'focus_zz', undefined, 'x') === same, '10: no skill log: nothing changes');
 

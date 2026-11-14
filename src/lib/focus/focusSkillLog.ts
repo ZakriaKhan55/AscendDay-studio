@@ -30,7 +30,10 @@ export function focusSkillLogFor(
   const id = focusSkillLogId(focusLog.id);
   if (skillLogs.some((l) => l && l.id === id) || deletedIds.includes(id)) return null;
   // Credited minutes: the active minutes, never more than the plan or the wall time between start and end.
-  const minutes = creditedFocusMinutes(focusLog) || Math.max(0, Math.floor(Number(focusLog.durationMinutes) || 0));
+  // Only a session without a plan (before the plan was stored) falls back to its minutes, as the focus award does.
+  const minutes = Number.isFinite(focusLog.plannedMinutes)
+    ? creditedFocusMinutes(focusLog)
+    : Math.max(0, Math.floor(Number(focusLog.durationMinutes) || 0));
   if (minutes <= 0) return null;
   return {
     id,
@@ -45,7 +48,8 @@ export function focusSkillLogFor(
 
 /**
  * The reflection saved after Complete goes onto the session's skill log note, unless the note was
- * already changed to something else (then it is left as it is). Returns the same array when nothing changes.
+ * already changed on its own (to other words, or cleared): then it is left as it is. Returns the same
+ * array when nothing changes.
  */
 export function withReflectionNote(
   skillLogs: SkillSessionLog[],
@@ -58,7 +62,7 @@ export function withReflectionNote(
   if (idx === -1) return skillLogs;
   const current = (skillLogs[idx].note || '').trim();
   const next = newReflection.trim();
-  if (current === next || (current !== '' && current !== (oldReflection || '').trim())) return skillLogs;
+  if (current === next || current !== (oldReflection || '').trim()) return skillLogs;
   const out = [...skillLogs];
   out[idx] = { ...skillLogs[idx], note: next };
   return out;
