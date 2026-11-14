@@ -7,6 +7,7 @@
  * the publishable key. Only the session tokens go back; the app hands them to `supabase.auth.setSession`.
  *
  * - A wrong password and an unknown username get the same 401 { error: 'invalid_credentials' }.
+ * - Auth being down or unreachable is 503 { error: 'auth_unavailable' } and is not counted as a failure.
  * - Failed attempts are counted per username and per caller IP (public.ascend_sign_in_blocked /
  *   ascend_sign_in_result, migration 20261019230100). One rpc, ascend_sign_in_lookup (migration
  *   20261024130000), answers the brake and the account's email together, so the database is reached
@@ -176,6 +177,9 @@ Deno.serve(async (req) => {
       if (error.code === 'captcha_failed') return reply(400, { error: 'captcha_failed' });
       // Auth checks the password before confirmation, so this tells only someone who has it.
       if (error.code === 'email_not_confirmed') return reply(403, { error: 'email_not_confirmed' });
+      // Auth itself failed (unreachable, timed out or 5xx: no status, or 500+): not a wrong
+      // password, so nothing is counted against the username or IP and the app says "try again".
+      if (!error.status || error.status >= 500) return reply(503, { error: 'auth_unavailable' });
       recordLater(name, ip, true);
       return invalid();
     }
