@@ -207,6 +207,17 @@ runFixtures();
   const none = tickLinkedPacts([unlinked], sideOf, reading, true);
   assert(none.ticks.length === 0 && none.challenges[0] === unlinked, 'nothing linked, nothing sent');
 
+  // One clock read per call (like CR-05-10): the day the start check used is the day ticked. A tick
+  // at 23:59:59.9 lands on that day; the device's later "today" is never used.
+  const lateNight = new Date(2026, 9, 21, 23, 59, 59, 900);
+  const runningSince20th = pact('t6', 'Reading (Books)', 'Run', { startDate: '2026-10-20' });
+  const late = tickLinkedPacts([runningSince20th], sideOf, reading, true, lateNight);
+  assert(late.ticks.length === 1, 'late tick: sent once');
+  assert((late.challenges[0].user1DoneDates || []).join() === '2026-10-21', `late tick: lands on the checked day (${late.challenges[0].user1DoneDates})`);
+  const startsNextDay = pact('t7', 'Reading (Books)', 'Run', { startDate: '2026-10-22' });
+  const early = tickLinkedPacts([startsNextDay], sideOf, reading, true, lateNight);
+  assert(early.ticks.length === 0 && early.challenges[0] === startsNextDay, 'day 1 still to come on the checked day: nothing sent');
+
   assert(pactUnlinkNote(0) === '', 'no running pacts, no note');
   assert(pactUnlinkNote(1) === ' 1 running challenge uses this habit; it keeps going and you tick it by hand.', 'one pact note');
   assert(pactUnlinkNote(3) === ' 3 running challenges use this habit; they keep going and you tick them by hand.', 'several pacts note');

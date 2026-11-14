@@ -375,17 +375,21 @@ export function tickLinkedPacts(
   /** The viewer's side of a pact, or null when its partnership is not known here. */
   sideOf: (challenge: SharedChallenge) => boolean | null,
   habit: Habit,
-  done: boolean
+  done: boolean,
+  now: Date = trustedNow()
 ): { challenges: SharedChallenge[]; ticks: LinkedPactTick[] } {
   const ticks: LinkedPactTick[] = [];
+  // One clock read for the whole call: the day checked below is the day ticked, even when the
+  // clock passes midnight in between.
+  const today = todayKey(now);
   const next = challenges.map((challenge) => {
     // A finished pact takes no more ticks.
     if (challenge.status !== 'active') return challenge;
     const isUser1 = sideOf(challenge);
     if (isUser1 === null || !linkedHabitFor(challenge, isUser1, [habit])) return challenge;
     // Day 1 still to come for this viewer: the server takes no tick yet.
-    if (pactNotStartedYet(challenge)) return challenge;
-    const { updated } = applyPledgeToggle(challenge, isUser1, done);
+    if (pactNotStartedYet(challenge, today)) return challenge;
+    const { updated } = applyPledgeToggle(challenge, isUser1, done, now);
     ticks.push({ updated, isUser1 });
     return updated;
   });
