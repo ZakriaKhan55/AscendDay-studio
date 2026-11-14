@@ -61,13 +61,17 @@ function pick<T extends string>(value: unknown, allowed: readonly T[], fallback:
 }
 
 let cached: { raw: string | null; prefs: FeedbackPrefs } | null = null;
+/** A choice whose save failed (storage blocked or full): it wins over storage until a save works. */
+let unsaved: string | null = null;
 
 export function getFeedbackPrefs(): FeedbackPrefs {
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(STORAGE_KEY);
-  } catch {
-    /* storage blocked: defaults */
+  let raw: string | null = unsaved;
+  if (raw === null) {
+    try {
+      raw = localStorage.getItem(STORAGE_KEY);
+    } catch {
+      /* storage blocked: defaults */
+    }
   }
   if (cached && cached.raw === raw) return cached.prefs;
   const fallback = defaultPrefs();
@@ -89,12 +93,13 @@ export function getFeedbackPrefs(): FeedbackPrefs {
 }
 
 export function setFeedbackPrefs(change: Partial<FeedbackPrefs>): void {
-  const next = { ...getFeedbackPrefs(), ...change };
+  const next = JSON.stringify({ ...getFeedbackPrefs(), ...change });
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(STORAGE_KEY, next);
+    unsaved = null;
   } catch {
-    /* storage blocked: the choice lasts until reload */
-    cached = { raw: null, prefs: next };
+    /* storage blocked or full: the choice lasts until reload */
+    unsaved = next;
   }
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }

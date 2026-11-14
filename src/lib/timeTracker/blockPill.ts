@@ -211,15 +211,17 @@ const CHANGE_EVENT = 'ascend:block-pill';
 
 const DEFAULT_PREFS: BlockPillPrefs = { enabled: true, pos: {} };
 
-// Used only where storage is blocked, so a choice still lasts until reload.
+// A value whose write failed (storage blocked or full), so the choice still lasts until reload. It
+// wins over storage, which may still hold the old value; a later write that works clears it.
 const memory = new Map<string, string | null>();
 const cache = new Map<string, { raw: string | null; value: unknown }>();
 
 function readRaw(key: string): string | null {
+  if (memory.has(key)) return memory.get(key) ?? null;
   try {
     return localStorage.getItem(key);
   } catch {
-    return memory.get(key) ?? null;
+    return null;
   }
 }
 
@@ -276,6 +278,7 @@ function write(key: string, value: object | null): void {
   try {
     if (raw === null) localStorage.removeItem(key);
     else localStorage.setItem(key, raw);
+    memory.delete(key);
   } catch {
     memory.set(key, raw);
   }
