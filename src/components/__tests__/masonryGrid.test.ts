@@ -58,7 +58,7 @@ function Card({ id }: { id: string }) {
 }
 
 const root = createRoot(container());
-const render = () => flushSync(() => root.render(h(MasonryGrid, { minColumnRem: 20 }, ...['a', 'b', 'c', 'd'].map((id) => h(Card, { key: id, id })))));
+const render = () => flushSync(() => root.render(h(MasonryGrid, { minColumnRem: 20, children: ['a', 'b', 'c', 'd'].map((id) => h(Card, { key: id, id })) })));
 render();
 await wait();
 

@@ -35,11 +35,11 @@ const tab = (shiftKey = false) => {
 // --- CR-03-22: Dialog with a new contentKey on open ------------------------------------------
 {
   const opener = (document as unknown as { createElement: (t: string) => El }).createElement('button');
-  body.appendChild(opener as never);
+  (body as unknown as { appendChild: (c: El) => void }).appendChild(opener);
   opener.focus();
   const root = createRoot(container());
   const dialog = (open: boolean, contentKey: string) =>
-    React.createElement(Dialog, { open, onClose: () => undefined, title: 'Guide', contentKey }, React.createElement('p', null, contentKey));
+    React.createElement(Dialog, { open, onClose: () => undefined, title: 'Guide', contentKey, children: React.createElement('p', null, contentKey) });
   flushSync(() => root.render(dialog(false, 'steps')));
   // Opened at another section (HowItWorks at Points, LessonReader on another lesson).
   flushSync(() => root.render(dialog(true, 'points')));

@@ -147,7 +147,7 @@ doc.createElementNS = (ns: string, tag: string) => Object.assign((doc.createElem
 doc.createTextNode = (text: string) => ({ nodeType: 3, nodeValue: text, textContent: text, parentNode: null });
 track(d.body, 'body');
 d.documentElement = track(d.documentElement, 'html');
-d.documentElement.appendChild(d.body);
+(d.documentElement as unknown as { appendChild: (c: El) => void }).appendChild(d.body);
 d.activeElement = d.body;
 doc.getElementById = (id: string) => descendants(d.documentElement).find((el) => el.getAttribute('id') === id) ?? null;
 
