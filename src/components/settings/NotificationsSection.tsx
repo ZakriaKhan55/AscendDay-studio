@@ -6,9 +6,10 @@ import { Switch } from '@/components/ui/primitives';
 import { useAsyncAction, useAsyncActionKey } from '@/lib/actions/useAsyncAction';
 import { toUserMessage } from '@/lib/app/userMessage';
 import { useToast } from '@/components/ui/Toast';
-import { disablePush, enablePush, getPushStatus, markPushPromptDone, type PushStatus } from '@/lib/app/push';
+import { disablePush, enablePush, markPushPromptDone } from '@/lib/app/push';
 import { FOCUS_NOTIFS_PREF_KEY } from '@/components/pfc/focusSession';
 import { SettingRow, SettingsCard } from './SettingRow';
+import { usePushStatus } from './usePushStatus';
 
 /** Server-sent notification types the user can switch off; off means the server never creates them. */
 const NOTIFICATION_PREFERENCES: { key: NotificationPreferenceKey; title: string; description: string }[] = [
@@ -48,19 +49,17 @@ export function NotificationsSection({ store }: { store: AppStore }) {
 
   const [focusAlerts, setFocusAlerts] = useState(readFocusAlerts);
   const [permission, setPermission] = useState<NotificationPermission>(browserPermission);
-  const [pushStatus, setPushStatus] = useState<PushStatus>('off');
   const { isLoading: isPushSaving, executeFn: executePushToggle } = useAsyncAction();
 
   const userId = currentUser?.id;
+  const { pushStatus, setPushStatus, readPushStatus } = usePushStatus(userId);
 
   // Read again when the user comes back to the tab: permission may have changed in the browser's
   // own settings meanwhile (S13).
   useEffect(() => {
     const refresh = () => {
       setPermission(browserPermission());
-      getPushStatus(userId)
-        .then(setPushStatus)
-        .catch(() => setPushStatus('off'));
+      readPushStatus('off');
     };
     refresh();
     const onVisibility = () => {
@@ -68,7 +67,7 @@ export function NotificationsSection({ store }: { store: AppStore }) {
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [userId]);
+  }, [readPushStatus]);
 
   const handlePushToggle = () =>
     executePushToggle(async () => {
@@ -87,9 +86,7 @@ export function NotificationsSection({ store }: { store: AppStore }) {
         // Off at once (a service worker that never got ready must not keep the switch spinning),
         // then the real state in the background.
         setPushStatus('off');
-        getPushStatus(userId)
-          .then(setPushStatus)
-          .catch(() => undefined);
+        readPushStatus();
       }
     });
 
