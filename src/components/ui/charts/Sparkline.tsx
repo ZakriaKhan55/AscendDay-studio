@@ -68,7 +68,9 @@ export function Sparkline({
   };
 
   const last = points.length - 1;
-  const dotIndex = active ?? last;
+  // A hover index can outlive a series that shrank under the pointer: ignore it when out of range.
+  const hoverIndex = active !== null && active <= last ? active : null;
+  const dotIndex = hoverIndex ?? last;
 
   return (
     <div
@@ -120,7 +122,7 @@ export function Sparkline({
           style={{ left: `${xPercent(dotIndex)}%`, top: toY(points[dotIndex].value) }}
         />
       )}
-      {active !== null && <ChartTooltip x={xPercent(active)}>{formatTooltip(points[active])}</ChartTooltip>}
+      {hoverIndex !== null && <ChartTooltip x={xPercent(hoverIndex)}>{formatTooltip(points[hoverIndex])}</ChartTooltip>}
     </div>
   );
 }

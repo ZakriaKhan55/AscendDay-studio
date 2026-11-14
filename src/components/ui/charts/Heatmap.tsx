@@ -47,7 +47,9 @@ export function Heatmap({ cells, label, tone = 'brand', max, className }: Heatma
   const top = max ?? Math.max(1, ...cells.map((c) => c?.value ?? 0));
 
   const onPointer = (event: PointerEvent<HTMLDivElement>) => {
-    const index = Number((event.target as HTMLElement).dataset.index);
+    // The pointer hits a painted inner span; the cell that owns data-index is its ancestor.
+    const cell = (event.target as HTMLElement).closest?.<HTMLElement>('[data-index]');
+    const index = Number(cell?.dataset.index);
     if (Number.isInteger(index) && cells[index]) setActive(index);
     else clear();
   };
