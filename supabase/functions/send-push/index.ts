@@ -24,7 +24,10 @@ const MAX_AGE_MS = 60 * 60 * 1000;
 const READ_RETRY_DELAYS_MS = [400, 1500];
 // Push options: 'high' so Android delivers at once instead of holding it until the phone wakes
 // from Doze; a phone that is offline longer than TTL drops it (a reminder that late is stale).
-const PUSH_OPTIONS = { TTL: 4 * 60 * 60, urgency: 'high' as const };
+// timeout (ms of socket silence): a push service that stops answering fails that one device
+// (logged and stamped like any delivery error) instead of holding every device's send until the
+// function's own time limit.
+const PUSH_OPTIONS = { TTL: 4 * 60 * 60, urgency: 'high' as const, timeout: 10_000 };
 // The page a tap opens, by notification type. Mirrors `link` in src/lib/notificationMeta.ts with
 // the paths of src/lib/routes.ts (change them together); any other type opens the dashboard.
 const PAGE_BY_TYPE: Record<string, string> = {
