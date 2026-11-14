@@ -608,7 +608,8 @@ export function useReadingActions(setState: StoreSetState, afterCommit: (fn: () 
               currentAmount: nextCurrent,
               currentPage: nextCurrent,
               targetFinishDate: finished ? b.targetFinishDate : details.targetFinishDate?.trim() || undefined,
-              reflection: finished ? details.reflection?.trim() || b.reflection : b.reflection,
+              // A finished book's takeaway is what the form sent: emptied means removed. Left out = unchanged.
+              reflection: finished && details.reflection !== undefined ? details.reflection.trim() || undefined : b.reflection,
               updatedAt: now,
             };
           }),
