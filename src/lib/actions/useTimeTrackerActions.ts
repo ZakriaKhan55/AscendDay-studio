@@ -896,9 +896,11 @@ export function useTimeTrackerActions(setState: StoreSetState, get: () => AppSta
           })
           .sort((a, b) => timeStringToMinutes(a.startTime) - timeStringToMinutes(b.startTime));
 
+        // The undone block is no longer done or skipped: today's routine points preview follows, like every other block change.
         return {
           ...prev,
           timeTracker: commitTimeTrackerDays(prevTT, { [dateKey]: updatedBlocks }, trustedNow().toISOString()),
+          ...recomputeTimeTrackerDailyPointsForState(prev, dateKey, updatedBlocks),
         };
       });
     },
