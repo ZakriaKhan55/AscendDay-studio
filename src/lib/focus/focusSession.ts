@@ -98,6 +98,23 @@ export const FOCUS_PRESETS: FocusPreset[] = [
   { focus: 120, break: 20 },
 ];
 
+/**
+ * Custom lengths: focus from the minimum that saves a session (a shorter one could never earn) up to
+ * what the server keeps (ascend_focus_session_start: least(600, …) focus, least(120, …) break).
+ */
+export const CUSTOM_FOCUS_MAX = 600;
+export const CUSTOM_BREAK_MAX = 120;
+
+/** The first problem with a custom length (shown under the fields, blocks Start), or null. */
+export const customLengthProblem = (focus: number, brk: number): string | null =>
+  !(focus >= FOCUS_MIN_MINUTES)
+    ? `Focus needs at least ${FOCUS_MIN_MINUTES} min.`
+    : focus > CUSTOM_FOCUS_MAX
+      ? `Focus can be up to ${CUSTOM_FOCUS_MAX} min.`
+      : brk > CUSTOM_BREAK_MAX
+        ? `Break can be up to ${CUSTOM_BREAK_MAX} min.`
+        : null;
+
 /** Points a finished session of this planned length earns on its own (a day with nothing else; rule 2). */
 export const focusFinishedPoints = (minutes: number): number => focusSessionAlonePoints(minutes);
 

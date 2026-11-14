@@ -4,11 +4,13 @@ import type { AppStore } from '@/lib/store/store';
 import { Dialog, FieldErrorBubble, Input, NumberField, ProgressBar, Select } from '@/components/ui/primitives';
 import { cx } from '@/components/ui/primitives/shared';
 import { trustedNowMs } from '@/lib/time/clock';
-import { FOCUS_DAILY_CAP, FOCUS_RULE_SHORT, focusDayGain, focusDayPoints, nextFocusReward, type FocusDayTally } from '@/lib/points/focusPoints';
+import { FOCUS_DAILY_CAP, FOCUS_MIN_MINUTES, FOCUS_RULE_SHORT, focusDayGain, focusDayPoints, nextFocusReward, type FocusDayTally } from '@/lib/points/focusPoints';
 import { focusDayTally } from '@/lib/points/focusAwards';
 import { todayKey } from '@/lib/time/dates';
 import { useOpenFor } from '@/lib/ui/useOpenFor';
 import {
+  CUSTOM_BREAK_MAX,
+  CUSTOM_FOCUS_MAX,
   FOCUS_BREAK_AFTER_MINUTES,
   FOCUS_BREAK_GRACE_MINUTES,
   FOCUS_BREAK_MINUTES_TEXT,
@@ -20,6 +22,7 @@ import {
   activeMinutesAt,
   breakBlock,
   breakSecondsLeft,
+  customLengthProblem,
   focusAlertsEnabled,
   focusFinishedPoints,
   formatClock,
@@ -47,18 +50,6 @@ function pendingTask(): string | null {
 const pts = (n: number) => `${n} ${n === 1 ? 'pt' : 'pts'}`;
 
 const CAP_REACHED = `Today's ${FOCUS_DAILY_CAP} pts are reached`;
-
-/** Custom lengths the server keeps (ascend_focus_session_start: least(600, …) focus, least(120, …) break). */
-const CUSTOM_FOCUS_MAX = 600;
-const CUSTOM_BREAK_MAX = 120;
-const customProblem = (focus: number, brk: number): string | null =>
-  !(focus >= 1)
-    ? 'Enter 1 or more.'
-    : focus > CUSTOM_FOCUS_MAX
-      ? `Focus can be up to ${CUSTOM_FOCUS_MAX} min.`
-      : brk > CUSTOM_BREAK_MAX
-        ? `Break can be up to ${CUSTOM_BREAK_MAX} min.`
-        : null;
 
 /** Re-renders the caller once a second while `on` (pause countdown, points so far). */
 function useSecondTick(on: boolean): number {
@@ -226,7 +217,8 @@ function ManualTimer({ store }: { store: AppStore }) {
       ? { focus: session.focusMinutes, brk: session.breakMinutes, custom: session.isCustom }
       : { focus: 25, brk: 5, custom: false }
   );
-  const [customFocus, setCustomFocus] = useState(() => (preset.custom ? preset.focus : 25));
+  // A custom session shorter than the minimum (started before it existed) is not offered again.
+  const [customFocus, setCustomFocus] = useState(() => (preset.custom ? Math.max(FOCUS_MIN_MINUTES, preset.focus) : 25));
   const [customBreak, setCustomBreak] = useState(() => (preset.custom ? preset.brk : 5));
   const [customError, setCustomError] = useState<string | null>(null);
   const [taskName, setTaskName] = useState(() => pendingTask() || 'Deep Work');
@@ -259,7 +251,7 @@ function ManualTimer({ store }: { store: AppStore }) {
   }, []);
 
   const handleStart = () => {
-    const problem = preset.custom ? customProblem(focusMinutes, breakMinutes) : null;
+    const problem = preset.custom ? customLengthProblem(focusMinutes, breakMinutes) : null;
     if (problem) {
       setCustomError(problem);
       return;
@@ -320,7 +312,7 @@ function ManualTimer({ store }: { store: AppStore }) {
             )}
           >
             <span className="text-sm">Custom</span>
-            <span className="text-2xs opacity-80">{preset.custom ? pts(focusFinishedPoints(customFocus)) : 'any length'}</span>
+            <span className="text-2xs opacity-80">{preset.custom ? pts(focusFinishedPoints(customFocus)) : `${FOCUS_MIN_MINUTES}+ min`}</span>
           </button>
         </div>
       )}
@@ -343,13 +335,13 @@ function ManualTimer({ store }: { store: AppStore }) {
             <NumberField
               id="pfc-custom-focus-mins"
               label="Focus (min)"
-              min={1}
+              min={FOCUS_MIN_MINUTES}
               max={CUSTOM_FOCUS_MAX}
               value={customFocus}
               onValueChange={(v) => {
                 const m = Math.floor(v);
                 setCustomFocus(m);
-                setCustomError(customProblem(m, customBreak));
+                setCustomError(customLengthProblem(m, customBreak));
               }}
               className="tabular-nums"
             />
@@ -362,13 +354,13 @@ function ManualTimer({ store }: { store: AppStore }) {
               onValueChange={(v) => {
                 const b = Math.max(1, Math.floor(v));
                 setCustomBreak(b);
-                setCustomError(customProblem(customFocus, b));
+                setCustomError(customLengthProblem(customFocus, b));
               }}
               className="tabular-nums"
             />
           </div>
           <p className="text-2xs text-content-muted">
-            Focus 1 to {CUSTOM_FOCUS_MAX} min, break 1 to {CUSTOM_BREAK_MAX} min. {FOCUS_RULE_SHORT}.
+            Focus {FOCUS_MIN_MINUTES} to {CUSTOM_FOCUS_MAX} min, break 1 to {CUSTOM_BREAK_MAX} min. {FOCUS_RULE_SHORT}.
           </p>
           {customError && <FieldErrorBubble message={customError} attached={false} />}
         </div>
