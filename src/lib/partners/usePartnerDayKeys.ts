@@ -25,7 +25,8 @@ const sameKeys = (a: DayKeys, b: DayKeys) =>
 /**
  * Each partner's own "today" (YYYY-MM-DD in their server timezone, the day their challenge ticks are
  * stored under), by partner user id. Re-read when the partner list changes, when the tab is shown
- * and on pull-to-refresh (a failed read keeps the zones it had); re-checked every 30 s so it rolls
+ * and on pull-to-refresh (a failed read keeps the zones it had; an older read answering last is
+ * dropped); re-checked every 30 s so it rolls
  * over at each partner's own midnight. A partner missing from the result (guest, failed read, the
  * server function not deployed yet) has no entry: callers fall back to the viewer's day.
  */
@@ -40,9 +41,15 @@ export function usePartnerDayKeys(partnerIds: readonly string[]): DayKeys {
       return;
     }
     let active = true;
+    // Reads overlap (tab return, back online, pull-to-refresh): one that answers after a newer
+    // read's answer was used is older news and is dropped.
+    let started = 0;
+    let used = 0;
     const read = async () => {
+      const seq = ++started;
       const { data, error } = await supabase.rpc('ascend_partner_timezones');
-      if (!active || error || !Array.isArray(data)) return;
+      if (!active || seq < used || error || !Array.isArray(data)) return;
+      used = seq;
       const next: Record<string, string> = {};
       for (const row of data as { user_id?: string; timezone?: string }[]) {
         if (row?.user_id && row.timezone) next[row.user_id] = row.timezone;
