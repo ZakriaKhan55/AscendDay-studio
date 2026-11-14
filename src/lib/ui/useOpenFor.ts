@@ -14,3 +14,15 @@ export function useOpenFor(current: string | null | undefined) {
   const hide = useCallback(() => setOpenFor(null), []);
   return [openFor !== null && openFor === current, show, hide] as const;
 }
+
+/**
+ * useOpenFor that also holds what the dialog is about (the block to delete on a day). The value
+ * shows only while the thing it was opened for is on screen, and is dropped for good when it changes.
+ */
+export function useOpenForWith<T>(current: string | null | undefined) {
+  const [openFor, setOpenFor] = useState<{ key: string; value: T } | null>(null);
+  if (openFor !== null && openFor.key !== current) setOpenFor(null);
+  const show = useCallback((value: T | null) => setOpenFor(value !== null && current ? { key: current, value } : null), [current]);
+  const hide = useCallback(() => setOpenFor(null), []);
+  return [openFor !== null && openFor.key === current ? openFor.value : null, show, hide] as const;
+}

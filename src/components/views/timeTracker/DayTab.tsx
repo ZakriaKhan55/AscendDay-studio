@@ -30,7 +30,7 @@ import { NowCard } from './NowCard';
 import { DayTimeline, type TimelineBlock } from './DayTimeline';
 import { blockName, blockRange, ledgerDayPoints, nextTierHint, useNowTick } from './dayMeta';
 import { actionFeedback } from '@/lib/ui/actionFeedback';
-import { useOpenFor } from '@/lib/ui/useOpenFor';
+import { useOpenFor, useOpenForWith } from '@/lib/ui/useOpenFor';
 import { groupMinutes } from '@/lib/timeTracker/timeTrackerGroups';
 import { TimeGroups } from './TimeGroups';
 
@@ -100,7 +100,8 @@ export function DayTab({
     [blocks, timeTracker, selectedDateKey]
   );
 
-  const [deleting, setDeleting] = useState<TimeTrackerBlock | null>(null);
+  // Bound to its day like Clear day: across midnight the confirm closes instead of acting on the new day.
+  const [deleting, setDeleting] = useOpenForWith<TimeTrackerBlock>(selectedDateKey);
   // Bound to the day it was opened for: the page moving to the new day at midnight closes it, never clearing that day.
   const [clearing, showClearing, hideClearing] = useOpenFor(selectedDateKey);
   const deletingPartner = deleting && timeTracker ? findSplitPartner(timeTracker, selectedDateKey, deleting) : null;

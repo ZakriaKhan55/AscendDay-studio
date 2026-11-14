@@ -5,6 +5,7 @@
 // checks against and saves to. The store side (a past day refuses the save with "Past days can't
 // change.") is the existing addDailyTimeBlock / updateDailyTimeBlock guard.
 import src from '../views/TimeTrackerView.tsx?raw';
+import dayTabSrc from '../views/timeTracker/DayTab.tsx?raw';
 
 function assert(condition: boolean, msg: string) {
   if (!condition) throw new Error(`Assertion failed: ${msg}`);
@@ -25,5 +26,8 @@ assert(save.includes('store.addDailyTimeBlock(blockDateKey,'), 'a new block save
 assert(!save.includes('selectedDateKey'), 'saving never reads the day on screen');
 assert(/context=\{\{ kind: 'day', dateKey: blockDateKey, dayBlocks: blockDayBlocks, nextDayBlocks \}\}/.test(src), 'the dialog shows and checks the captured day');
 assert(/addDays\(blockDateKey, 1\)/.test(src), 'the next-day overlap check follows the captured day');
+
+// Delete block confirm (deferred P2 finding): bound to its day like Clear day (useOpenForWith).
+assert(/const \[deleting, setDeleting\] = useOpenForWith<TimeTrackerBlock>\(selectedDateKey\)/.test(dayTabSrc), 'the Delete block confirm is bound to its day');
 
 console.log('timeBlockDialogDay: all checks passed');

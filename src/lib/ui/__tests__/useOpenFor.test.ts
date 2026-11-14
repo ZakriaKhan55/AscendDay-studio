@@ -10,7 +10,7 @@ import { doc } from '../../__tests__/harness/dom';
 const React = await import('react');
 const { createRoot } = await import('react-dom/client');
 const { flushSync } = await import('react-dom');
-const { useOpenFor } = await import('../useOpenFor');
+const { useOpenFor, useOpenForWith } = await import('../useOpenFor');
 
 function assert(condition: boolean, msg: string) {
   if (!condition) throw new Error(`Assertion failed: ${msg}`);
@@ -67,4 +67,37 @@ flushSync(() => api![1]());
 eq(open(), false, 'no session / day: does not open');
 
 flushSync(() => root.unmount());
+
+// 6. useOpenForWith (Time Tracker Delete block confirm): holds the block, bound to its day.
+let withApi: readonly [string | null, (v: string | null) => void, () => void] | null = null;
+const held: (string | null)[] = [];
+function ProbeWith({ current }: { current: string | null | undefined }) {
+  withApi = useOpenForWith<string>(current);
+  held.push(withApi[0]);
+  return null;
+}
+const root2 = createRoot((doc.createElement as () => Element)());
+const showDay = (current: string | null | undefined) => flushSync(() => root2.render(React.createElement(ProbeWith, { current })));
+showDay('2026-11-14');
+eq(withApi![0], null, 'with: nothing at first');
+flushSync(() => withApi![1]('b1'));
+eq(withApi![0], 'b1', 'with: holds b1 on its day');
+showDay('2026-11-14');
+eq(withApi![0], 'b1', 'with: still b1 while the day shows');
+flushSync(() => withApi![1](null));
+eq(withApi![0], null, 'with: show(null) closes');
+flushSync(() => withApi![1]('b2'));
+held.length = 0;
+showDay('2026-11-15');
+eq(withApi![0], null, 'with: new day at midnight drops the block');
+assert(!held.includes('b2'), 'with: no render holds the block on the new day');
+showDay('2026-11-14');
+eq(withApi![0], null, 'with: back on the first day: stays closed');
+flushSync(() => withApi![1]('b3'));
+flushSync(() => withApi![2]());
+eq(withApi![0], null, 'with: hide closes');
+showDay(null);
+flushSync(() => withApi![1]('b4'));
+eq(withApi![0], null, 'with: no day: does not open');
+flushSync(() => root2.unmount());
 console.log('useOpenFor: all checks passed');
