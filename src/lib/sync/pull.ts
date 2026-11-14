@@ -456,49 +456,70 @@ export async function pullSyncedRows(userId: string, full: boolean): Promise<Pul
   let everyTableRead = true;
   const perTable = await Promise.all(
     SYNCED_COLLECTIONS.map(async (collection) => {
-      const cursor = localStorage.getItem(cursorKey(userId, collection.table));
-      const since = cursor && !full ? new Date(Date.parse(cursor) - CURSOR_OVERLAP_MS).toISOString() : null;
-      // Rows the server refused to store from this device's upserts: their server copy did not
-      // change, so it can sit behind the cursor. Read by id below (a full pull reads them anyway).
-      const refused = refusedRowIds(userId, collection.table);
-      const rows = await fetchRows(collection.table, userId, since);
-      if (!rows) {
+      try {
+        const cursor = localStorage.getItem(cursorKey(userId, collection.table));
+        const since = cursor && !full ? new Date(Date.parse(cursor) - CURSOR_OVERLAP_MS).toISOString() : null;
+        // Rows the server refused to store from this device's upserts: their server copy did not
+        // change, so it can sit behind the cursor. Read by id below (a full pull reads them anyway).
+        const refused = refusedRowIds(userId, collection.table);
+        const rows = await fetchRows(collection.table, userId, since);
+        if (!rows) {
+          everyTableRead = false;
+          return [];
+        }
+        let refusedRead = true;
+        // Rows another tab already pulled past this tab's version sit behind the shared cursor:
+        // read them by id, so this tab catches up too.
+        if (since) {
+          const fetched = new Set(rows.map((row) => String(row.id)));
+          const behind = Array.from(new Set([...behindIds(userId, collection), ...refused])).filter((id) => !fetched.has(id));
+          const extra = behind.length > 0 ? await fetchRowsById(collection.table, userId, behind) : [];
+          if (!extra) {
+            everyTableRead = false;
+            refusedRead = false;
+          } else {
+            rows.push(...extra);
+          }
+        }
+        if (refusedRead) clearRefusedRows(userId, collection.table, refused);
+
+        // Read before prepareRemoteRows, which skips the rows these ops are waiting to replace.
+        const waiting = collection.mergeConflict ? new Set<string>() : pendingOpIds(userId, collection.table);
+        const changes = prepareRemoteRows(userId, collection, rows, full, stale);
+        let latest = rows.reduce<number>(
+          (max, row) => Math.max(max, Date.parse(String(row.server_updated_at)) || 0),
+          cursor ? Date.parse(cursor) : 0
+        );
+        // A skipped row stays ahead of the cursor: if the server then refuses the waiting op as older
+        // (keep-newer returns no error), the next pull still reads the row instead of passing it.
+        for (const row of rows) {
+          const at = Date.parse(String(row.server_updated_at));
+          if (at && waiting.has(String(row.id))) latest = Math.min(latest, at - 1);
+        }
+        if (latest > 0) {
+          try {
+            localStorage.setItem(cursorKey(userId, collection.table), new Date(latest).toISOString());
+          } catch {
+            // Storage full: the cursor stays, so these rows are read again next time. The changes
+            // are still returned: the baseline already took them, and dropping them would hide the rows.
+          }
+        }
+        return changes;
+      } catch (err) {
+        // A throw (device storage full while this table's baseline was written) must not reject the
+        // whole pull and throw away every other table's changes. This table keeps its cursor.
+        console.error(`[SYNC PULL] ${collection.table} failed, keeping local data:`, err);
         everyTableRead = false;
         return [];
       }
-      let refusedRead = true;
-      // Rows another tab already pulled past this tab's version sit behind the shared cursor:
-      // read them by id, so this tab catches up too.
-      if (since) {
-        const fetched = new Set(rows.map((row) => String(row.id)));
-        const behind = Array.from(new Set([...behindIds(userId, collection), ...refused])).filter((id) => !fetched.has(id));
-        const extra = behind.length > 0 ? await fetchRowsById(collection.table, userId, behind) : [];
-        if (!extra) {
-          everyTableRead = false;
-          refusedRead = false;
-        } else {
-          rows.push(...extra);
-        }
-      }
-      if (refusedRead) clearRefusedRows(userId, collection.table, refused);
-
-      // Read before prepareRemoteRows, which skips the rows these ops are waiting to replace.
-      const waiting = collection.mergeConflict ? new Set<string>() : pendingOpIds(userId, collection.table);
-      const changes = prepareRemoteRows(userId, collection, rows, full, stale);
-      let latest = rows.reduce<number>(
-        (max, row) => Math.max(max, Date.parse(String(row.server_updated_at)) || 0),
-        cursor ? Date.parse(cursor) : 0
-      );
-      // A skipped row stays ahead of the cursor: if the server then refuses the waiting op as older
-      // (keep-newer returns no error), the next pull still reads the row instead of passing it.
-      for (const row of rows) {
-        const at = Date.parse(String(row.server_updated_at));
-        if (at && waiting.has(String(row.id))) latest = Math.min(latest, at - 1);
-      }
-      if (latest > 0) localStorage.setItem(cursorKey(userId, collection.table), new Date(latest).toISOString());
-      return changes;
     })
   );
-  if (full && everyTableRead) localStorage.setItem(lastFullPullKey(userId), new Date(trustedNowMs()).toISOString());
+  if (full && everyTableRead) {
+    try {
+      localStorage.setItem(lastFullPullKey(userId), new Date(trustedNowMs()).toISOString());
+    } catch {
+      /* storage full: the next full pull records it */
+    }
+  }
   return { changes: perTable.flat(), everyTableRead };
 }

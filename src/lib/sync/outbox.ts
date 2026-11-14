@@ -197,7 +197,13 @@ export function diffSyncedCollections(
         continue;
       }
       const deletes = tombstones.has(id) || (collection.mirrorRemovals && !massRemoval);
-      if (!deletes) continue;
+      if (!deletes) {
+        // Missing without a delete (a bad merge, a refused mass removal): the server still has the
+        // row, so the baseline keeps it. A delete arriving later (in any tab: the baseline is shared)
+        // still finds it and is sent.
+        next[id] = prev[id];
+        continue;
+      }
       nextOutbox[opKey(collection.table, id)] = { kind: 'delete', table: collection.table, id };
       next[id] = DELETED;
       tabNext[id] = DELETED;
