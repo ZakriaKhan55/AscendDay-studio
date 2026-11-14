@@ -63,22 +63,28 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   if (url.pathname.startsWith('/assets/')) {
-    event.respondWith(cacheFirstAsset(request));
+    event.respondWith(cacheFirstAsset(event, request));
   } else if (request.mode === 'navigate') {
-    event.respondWith(MARKETING_PAGE.test(url.pathname) ? marketingPage(request, url.pathname) : appPage(request));
+    event.respondWith(MARKETING_PAGE.test(url.pathname) ? marketingPage(event, request, url.pathname) : appPage(event, request));
   } else if (!url.search && STATIC_FILE.test(url.pathname)) {
-    event.respondWith(networkFirst(request, STATIC_CACHE_NAME, request));
+    event.respondWith(networkFirst(event, request, STATIC_CACHE_NAME, request));
   }
   // Anything else (version.json polls, dev-server modules) goes straight to the network, uncached.
 });
 
+// A cache write after the answer is sent: tied to the fetch event (waitUntil), so the browser does
+// not stop the worker before the copy is saved; a failed write (storage full) is only a missed copy.
+function keepInBackground(event, work) {
+  event.waitUntil(work.catch(() => undefined));
+}
+
 // Network first, so a new deployment shows at once; the cached copy only when offline.
-async function networkFirst(request, cacheName, cacheKey) {
+async function networkFirst(event, request, cacheName, cacheKey) {
   try {
     const response = await fetch(request);
     if (response.ok) {
       const copy = response.clone();
-      caches.open(cacheName).then((cache) => cache.put(cacheKey, copy)).catch(() => undefined);
+      keepInBackground(event, caches.open(cacheName).then((cache) => cache.put(cacheKey, copy)));
     }
     return response;
   } catch (error) {
@@ -88,13 +94,15 @@ async function networkFirst(request, cacheName, cacheKey) {
   }
 }
 
-// An app page: network first; a good answer is the shell to keep; offline, the kept shell.
-async function appPage(request) {
+// An app page: network first; a good HTML answer is the shell to keep; offline, the kept shell.
+// Only HTML is kept: an address typed in the bar that is not a page (/manifest.json, /robots.txt,
+// /sitemap.xml, an icon) also arrives here, and its file must not replace the offline app.
+async function appPage(event, request) {
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    if (response.ok && (response.headers.get('content-type') || '').includes('text/html')) {
       const copy = response.clone();
-      caches.open(SHELL_CACHE_NAME).then((cache) => cache.put(SHELL_KEY, copy)).catch(() => undefined);
+      keepInBackground(event, caches.open(SHELL_CACHE_NAME).then((cache) => cache.put(SHELL_KEY, copy)));
     }
     return response;
   } catch (error) {
@@ -106,12 +114,12 @@ async function appPage(request) {
 
 // A public page: network first, kept per address; offline, its copy, else the app (so `/` still
 // opens the installed app: inside the app it is the dashboard).
-async function marketingPage(request, path) {
+async function marketingPage(event, request, path) {
   try {
     const response = await fetch(request);
     if (response.ok) {
       const copy = response.clone();
-      caches.open(MARKETING_CACHE_NAME).then((cache) => cache.put(path, copy)).catch(() => undefined);
+      keepInBackground(event, caches.open(MARKETING_CACHE_NAME).then((cache) => cache.put(path, copy)));
     }
     return response;
   } catch (error) {
@@ -124,15 +132,15 @@ async function marketingPage(request, path) {
 }
 
 // Cache first for immutable build files: a page's code opens at once instead of waiting on the
-// network (a slow or waking phone connection can stall a request for seconds).
-async function cacheFirstAsset(request) {
+// network (a slow or waking phone connection can stall a request for seconds). The file is
+// answered even when keeping its copy fails (storage full): a missed copy, never a missing script.
+async function cacheFirstAsset(event, request) {
   const cache = await caches.open(ASSET_CACHE_NAME);
   const cached = await cache.match(request);
   if (cached) return cached;
   const response = await fetch(request);
   if (response.ok && hasAssetType(request, response)) {
-    await cache.put(request, response.clone());
-    trimAssetCache(cache).catch(() => undefined);
+    keepInBackground(event, cache.put(request, response.clone()).then(() => trimAssetCache(cache)));
   }
   return response;
 }
