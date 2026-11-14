@@ -188,8 +188,11 @@ export function AppShell({ currentView, navigationKind, pendingView = null, onVi
 
   // iOS tab bar: choosing the page you are already on glides back to its top. Stable across
   // renders (reads the page from a ref), so the memoized nav below keeps its props.
+  // Written after commit, so a tap always reads the page on screen, never one still rendering.
   const currentViewRef = useRef(currentView);
-  currentViewRef.current = currentView;
+  useLayoutEffect(() => {
+    currentViewRef.current = currentView;
+  }, [currentView]);
   const goTo = useCallback(
     (view: View, search?: string) => {
       // The page on show with a query (`?week=`): handed on, the page reads it in place.
@@ -463,7 +466,7 @@ export function AppShell({ currentView, navigationKind, pendingView = null, onVi
       <Dialog
         open={accountOpen}
         onClose={() => setAccountOpen(false)}
-        title={currentUser ? username : 'Account'}
+        title={currentUser ? username || 'You' : 'Account'}
       >
         <div className="space-y-2">
           {currentUser && (
