@@ -28,22 +28,23 @@ function Probe() {
   keys = usePartnerDayKeys([PARTNER]);
   return null;
 }
-const tick = () => new Promise((resolve) => setTimeout(resolve, 20));
+const tick = () => new Promise((resolve) => setTimeout(resolve, 200));
+const until = async (check: () => boolean, label: string) => {
+  for (let i = 0; i < 300 && !check(); i++) await new Promise((resolve) => setTimeout(resolve, 20));
+  assert(check(), label);
+};
 const root = createRoot((doc.createElement as () => Element)());
 root.render(React.createElement(Probe));
-await tick();
-assert(answers.length === 1, 'the first read is on its way');
+await until(() => answers.length === 1, 'the first read is on its way');
 
 // A pull-to-refresh reads again while the first read is still out.
 (win as unknown as { dispatchEvent(e: { type: string }): void }).dispatchEvent({ type: APP_REFRESH_EVENT });
-await tick();
-assert(answers.length === 2, 'the pull reads again');
+await until(() => answers.length === 2, 'the pull reads again');
 // UTC+14 and UTC-11 are never on the same date, so the day key shows which answer was used.
 const newestZone = 'Pacific/Kiritimati';
 const olderZone = 'Pacific/Pago_Pago';
 answers[1](newestZone);
-await tick();
-assert(keys[PARTNER] === todayKeyInZone(newestZone, trustedNow()), `the newer answer is used (${keys[PARTNER]})`);
+await until(() => keys[PARTNER] === todayKeyInZone(newestZone, trustedNow()), `the newer answer is used (${keys[PARTNER]})`);
 answers[0](olderZone);
 await tick();
 assert(

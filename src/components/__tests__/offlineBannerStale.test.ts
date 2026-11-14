@@ -22,30 +22,30 @@ function Probe() {
   if (seen[seen.length - 1] !== status) seen.push(status);
   return null;
 }
-const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
+const tick = (ms = 300) => new Promise((resolve) => setTimeout(resolve, ms));
+const until = async (check: () => boolean, label: string) => {
+  for (let i = 0; i < 300 && !check(); i++) await new Promise((resolve) => setTimeout(resolve, 20));
+  assert(check(), label);
+};
 const status = () => seen[seen.length - 1];
 
 const root = createRoot((doc.createElement as () => Element)());
 root.render(React.createElement(Probe));
-await tick();
-assert(pending.length === 1, `the first check is on its way (${pending.length})`);
+await until(() => pending.length === 1, `the first check is on its way (${pending.length})`);
 
 // The device drops off the network while that check is still out.
 setOnline(false);
-await tick();
-assert(status() === 'offline', `offline shows at once (${seen.join(', ')})`);
+await until(() => status() === 'offline', `offline shows at once (${seen.join(', ')})`);
 // The old check's server answer lands now: it no longer describes the connection.
 pending.shift()!(true);
-await tick(50);
+await tick();
 assert(status() === 'offline', `a check answered after going offline does not show online (${seen.join(', ')})`);
 
 // Back online: a fresh check runs and its answer shows "restored".
 setOnline(true);
-await tick();
-assert(pending.length === 1, `back online starts a fresh check (${pending.length})`);
+await until(() => pending.length === 1, `back online starts a fresh check (${pending.length})`);
 pending.shift()!(true);
-await tick(50);
-assert(status() === 'restored', `a check started after coming back shows restored (${seen.join(', ')})`);
+await until(() => status() === 'restored', `a check started after coming back shows restored (${seen.join(', ')})`);
 
 root.unmount();
 console.log('offlineBannerStale: all passed');

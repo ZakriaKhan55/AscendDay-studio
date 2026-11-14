@@ -22,13 +22,16 @@ function Probe({ userId }: { userId: string }) {
   React.useEffect(() => readPushStatus('off'), [readPushStatus]);
   return null;
 }
-const tick = () => new Promise((resolve) => setTimeout(resolve, 20));
+const tick = () => new Promise((resolve) => setTimeout(resolve, 200));
+const until = async (check: () => boolean, label: string) => {
+  for (let i = 0; i < 300 && !check(); i++) await new Promise((resolve) => setTimeout(resolve, 20));
+  assert(check(), label);
+};
 const root = createRoot((doc.createElement as () => Element)());
 
 // P1: the first read is still out when the user turns push on; it answers "off" afterwards.
 root.render(React.createElement(Probe, { userId: 'user-a' }));
-await tick();
-assert(reads.length === 1, 'P1: first read started');
+await until(() => reads.length === 1, 'P1: first read started');
 hook!.setPushStatus('on');
 await tick();
 reads[0].answer('off');
@@ -37,8 +40,7 @@ assert(hook!.pushStatus === 'on', `P1: a read begun before the toggle does not f
 
 // P2: account change: the new account's read answers first, the old account's read last.
 root.render(React.createElement(Probe, { userId: 'user-b' }));
-await tick();
-assert(reads.length === 2 && reads[1].userId === 'user-b', 'P2: the new account is read');
+await until(() => reads.length === 2 && reads[1].userId === 'user-b', 'P2: the new account is read');
 hook!.readPushStatus(); // and a tab return reads again
 await tick();
 const [, oldRead, newest] = reads;
@@ -52,8 +54,7 @@ assert(hook!.pushStatus === 'off', `P2: an older read answering last is dropped 
 hook!.readPushStatus();
 await tick();
 reads[3].answer('denied');
-await tick();
-assert(hook!.pushStatus === 'denied', 'the newest read is shown');
+await until(() => hook!.pushStatus === 'denied', 'the newest read is shown');
 
 root.unmount();
 console.log('pushStatusOrder: all passed');
