@@ -264,6 +264,8 @@ export class FakeSocket {
     sockets.add(this);
     this.sub = { send: (table: string, row: any, type: string) => this.push(table, row, type) };
     setTimeout(() => {
+      // Closed before it opened: stay closed (no subscriber, no onopen).
+      if (this.readyState !== FakeSocket.CONNECTING) return;
       if (fake.offline) {
         this.close(1006);
         return;

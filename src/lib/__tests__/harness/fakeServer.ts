@@ -180,9 +180,18 @@ export class FakeServer {
     return { status: 201, body: stored };
   }
   update(table: string, uid: string, ids: string[], patch: any, who: string): { status: number; body: any } {
+    // The live date guards are BEFORE INSERT OR UPDATE triggers, so a PATCH meets them too: a
+    // future date refuses the whole statement (nothing is written), guard_today skips the row.
     for (const id of ids) {
       const OLD = this.row(table, uid, id);
       if (!OLD) continue;
+      const err = this.guardFuture(table, { ...OLD, ...patch }, OLD);
+      if (err) { this.note('refused-23514', table, id, err, who); return { status: 400, body: { code: '23514', message: err } }; }
+    }
+    for (const id of ids) {
+      const OLD = this.row(table, uid, id);
+      if (!OLD) continue;
+      if (!this.guardToday(table, { ...OLD, ...patch }, OLD)) { this.note('dropped', table, id, `guard_today ${patch?.data?.date ?? OLD.data?.date}`, who); continue; }
       const NEW = this.keepNewer(table, { ...OLD, ...patch }, OLD);
       if (!NEW) { this.note('dropped', table, id, `update refused by keep_newer ${JSON.stringify(patch)}`, who); continue; }
       const row = this.capFuture({ ...NEW, server_updated_at: this.stamp() });
