@@ -87,6 +87,7 @@ function track(el: El, tag: string): El {
     querySelectorAll: (selector: string) => descendants(el).filter((node) => matches(node, selector)),
     querySelector: (selector: string) => descendants(el).find((node) => matches(node, selector)) ?? null,
   });
+  Object.defineProperty(el, 'children', { configurable: true, get: () => el.childNodes.filter((n) => n.nodeType === 1) });
   Object.defineProperty(el, 'id', { configurable: true, get: () => attrs.get('id') ?? '', set: (v: string) => void attrs.set('id', String(v)) });
   // react-dom marks the chosen <option> of a <select> through select.options.
   if (tag.toLowerCase() === 'select') Object.defineProperty(el, 'options', { get: () => descendants(el).filter((n) => n.tagName === 'OPTION') });
