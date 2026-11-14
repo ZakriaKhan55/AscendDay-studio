@@ -30,6 +30,7 @@ import { NowCard } from './NowCard';
 import { DayTimeline, type TimelineBlock } from './DayTimeline';
 import { blockName, blockRange, ledgerDayPoints, nextTierHint, useNowTick } from './dayMeta';
 import { actionFeedback } from '@/lib/ui/actionFeedback';
+import { useOpenFor } from '@/lib/ui/useOpenFor';
 import { groupMinutes } from '@/lib/timeTracker/timeTrackerGroups';
 import { TimeGroups } from './TimeGroups';
 
@@ -100,7 +101,8 @@ export function DayTab({
   );
 
   const [deleting, setDeleting] = useState<TimeTrackerBlock | null>(null);
-  const [clearing, setClearing] = useState(false);
+  // Bound to the day it was opened for: the page moving to the new day at midnight closes it, never clearing that day.
+  const [clearing, showClearing, hideClearing] = useOpenFor(selectedDateKey);
   const deletingPartner = deleting && timeTracker ? findSplitPartner(timeTracker, selectedDateKey, deleting) : null;
   const partnerCanChange = Boolean(deletingPartner && deletingPartner.dateKey >= today);
 
@@ -165,7 +167,7 @@ export function DayTab({
   const confirmClear = () => {
     store.clearDailyTimeBlocks(selectedDateKey);
     showSuccessToast('Day cleared', undefined, `clear_day_${selectedDateKey}`);
-    setClearing(false);
+    hideClearing();
   };
 
   const dayText = mode === 'today' ? 'today' : formatWeekdayDate(selectedDateKey);
@@ -319,7 +321,7 @@ export function DayTab({
 
         {mode !== 'past' && planned.source === 'saved' && blocks.length > 0 && (
           <div className="flex justify-end border-t border-overlay-subtle pt-3">
-            <button type="button" onClick={() => setClearing(true)} className="btn-danger text-xs">
+            <button type="button" onClick={showClearing} className="btn-danger text-xs">
               Clear day
             </button>
           </div>
@@ -364,7 +366,7 @@ export function DayTab({
 
       <ConfirmDeleteModal
         open={clearing}
-        onClose={() => setClearing(false)}
+        onClose={hideClearing}
         onConfirm={confirmClear}
         title="Clear this day?"
         description={`Removes all ${blocks.length} block${blocks.length === 1 ? '' : 's'}${doneCount > 0 ? `, ${doneCount} of them done` : ''}.${mode === 'today' && doneCount > 0 ? " Today's points are worked out again." : ''} Its template won't fill it again.`}
