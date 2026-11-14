@@ -317,6 +317,10 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
   }, []);
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  // Each request (submit, guest, resend, reset email) takes a number; a mode switch moves it on,
+  // so a request from the screen left behind can neither show its error on the new screen nor end
+  // the busy state of a request started there.
+  const requestRef = useRef(0);
   // True once the current request has run for SLOW_HINT_MS; reset when it ends.
   const [slow, setSlow] = useState(false);
   const [successTitle, setSuccessTitle] = useState('');
@@ -357,6 +361,9 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
   // "Resend" button knows where to send; `confirmResendIn` = seconds before it can be resent.
   const [confirmPending, setConfirmPending] = useState<{ email: string; kind: 'signup' | 'email_change' } | null>(null);
   const [confirmResendIn, setConfirmResendIn] = useState(0);
+  // A failed resend, shown under its button (the button sits outside the forms). Tied to the
+  // pending email it was for, so a new one never shows an old failure.
+  const [confirmResendError, setConfirmResendError] = useState<{ for: typeof confirmPending; message: string } | null>(null);
   useEffect(() => {
     if (confirmResendIn <= 0) return;
     const timer = window.setTimeout(() => setConfirmResendIn((s) => s - 1), 1000);
@@ -409,6 +416,7 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
   }, [isAnonymousUser, guestState.currentUser]);
 
   useEffect(() => {
+    requestRef.current++;
     setErrorMsg('');
     setSuccessMsg('');
     setConfirmPending(null);
@@ -646,6 +654,7 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
   );
 
   const handleGuestSignIn = async () => {
+    const request = ++requestRef.current;
     setErrorMsg('');
     setSuccessMsg('');
     setLoading(true);
@@ -656,6 +665,7 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
       onDone();
     } catch (err: unknown) {
       console.error('Guest sign-in failed:', err);
+      if (request !== requestRef.current) return;
       const authErr = err as { code?: string; status?: number };
       // Supabase caps guest sign-ins per network; its own text ("Request rate limit reached") is unclear.
       const rateLimited = authErr.status === 429 || authErr.code === 'over_request_rate_limit';
@@ -666,7 +676,7 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
       );
       noteError();
     } finally {
-      setLoading(false);
+      if (request === requestRef.current) setLoading(false);
     }
   };
 
@@ -683,7 +693,9 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
 
   const resendConfirmation = async () => {
     if (!confirmPending) return;
-    setErrorMsg('');
+    const request = ++requestRef.current;
+    const pending = confirmPending;
+    setConfirmResendError(null);
     setLoading(true);
     try {
       await withCaptcha('sign_up', (captchaToken) =>
@@ -693,20 +705,25 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
       setConfirmResendIn(RESET_RESEND_SECONDS);
     } catch (err: unknown) {
       console.error('Confirmation email resend failed:', err);
+      if (request !== requestRef.current) return;
       const authErr = err as { code?: string; status?: number; message?: string };
-      setErrorMsg(
-        authErr.code === 'over_email_send_rate_limit' || authErr.status === 429 || authErr.message?.includes('rate limit')
-          ? 'Too many emails right now. Try again in about an hour.'
-          : toUserMessage(err, 'Couldn’t send the email. Try again.')
-      );
+      setConfirmResendError({
+        for: pending,
+        message:
+          authErr.code === 'over_email_send_rate_limit' || authErr.status === 429 || authErr.message?.includes('rate limit')
+            ? 'Too many emails right now. Try again in about an hour.'
+            : toUserMessage(err, 'Couldn’t send the email. Try again.'),
+      });
       noteError();
     } finally {
-      setLoading(false);
+      if (request === requestRef.current) setLoading(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const request = ++requestRef.current;
+    const stale = () => request !== requestRef.current;
     setErrorMsg('');
     setSuccessMsg('');
     setConfirmPending(null);
@@ -718,6 +735,7 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
         if (username.trim()) {
           const check = await isUsernameAvailable(username, guestState.currentUser?.id);
           if (!check.available && username.trim() !== guestState.currentUser?.username) {
+            if (stale()) return;
             showError(check.reason || 'Pick a valid username that isn’t taken.', 'auth-username');
             return;
           }
@@ -737,6 +755,7 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
       } else if (mode === 'signup') {
         const check = await isUsernameAvailable(username);
         if (!check.available) {
+          if (stale()) return;
           showError(check.reason || 'Pick a valid username that isn’t taken.', 'auth-username');
           return;
         }
@@ -771,6 +790,7 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
         await finishWithSuccess('Welcome back', onDone);
       }
     } catch (err: unknown) {
+      if (stale()) return;
       const authErr = err as { code?: string; status?: number; message?: string };
       if (err instanceof EmailNotConfirmedError) {
         showError(err.message);
@@ -790,7 +810,7 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
         showError(toUserMessage(err, 'Something went wrong. Try again.'));
       }
     } finally {
-      setLoading(false);
+      if (!stale()) setLoading(false);
     }
   };
 
@@ -799,6 +819,7 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
    * (saying "no account" would let anyone check who uses Ascend), so the sent screen is the same for both.
    */
   const sendResetEmail = async (to: string, showError: (message: string) => void) => {
+    const request = ++requestRef.current;
     setLoading(true);
     try {
       await withCaptcha('password_reset', (captchaToken) => withTimeout(requestPasswordReset(to, captchaToken)));
@@ -806,6 +827,7 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
       setResendIn(RESET_RESEND_SECONDS);
     } catch (err: unknown) {
       console.error('Password reset email failed:', err);
+      if (request !== requestRef.current) return;
       const authErr = err as { code?: string; status?: number; message?: string };
       if (authErr.code === 'over_email_send_rate_limit' || authErr.status === 429 || authErr.message?.includes('rate limit')) {
         // Supabase's hourly cap for auth emails.
@@ -818,7 +840,7 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
         showError(toUserMessage(err, 'Couldn’t send the email. Try again.'));
       }
     } finally {
-      setLoading(false);
+      if (request === requestRef.current) setLoading(false);
     }
   };
   const handleForgotSubmit = (e: React.FormEvent) => {
@@ -899,14 +921,17 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
           </div>
         )}
         {confirmPending && !successTitle && (
-          <button
-            type="button"
-            onClick={resendConfirmation}
-            disabled={loading || confirmResendIn > 0}
-            className="btn-ghost w-full min-h-11 text-xs disabled:opacity-60 disabled:cursor-default"
-          >
-            {loading ? 'Sending…' : confirmResendIn > 0 ? `Resend email in ${confirmResendIn}s` : 'Resend confirmation email'}
-          </button>
+          <div>
+            <button
+              type="button"
+              onClick={resendConfirmation}
+              disabled={loading || confirmResendIn > 0}
+              className="btn-ghost w-full min-h-11 text-xs disabled:opacity-60 disabled:cursor-default"
+            >
+              {loading ? 'Sending…' : confirmResendIn > 0 ? `Resend email in ${confirmResendIn}s` : 'Resend confirmation email'}
+            </button>
+            {confirmResendError?.for === confirmPending && <FieldErrorBubble message={confirmResendError.message} attached={false} />}
+          </div>
         )}
 
         {/* Success screen after sign-in / sign-up / upgrade, shown until the modal closes */}

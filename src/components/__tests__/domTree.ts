@@ -168,3 +168,10 @@ export function activeElement(): El | null {
 }
 
 export const body = d.body;
+
+/** A container in the document for createRoot. */
+export function container(): Element {
+  const el = (doc.createElement as (tag: string) => El)('div');
+  (d.body as unknown as { appendChild: (c: El) => void }).appendChild(el);
+  return el as unknown as Element;
+}

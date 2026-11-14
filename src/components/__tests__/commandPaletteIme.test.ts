@@ -1,7 +1,7 @@
 // CR-01-14: in the Go to search (nav/CommandPalette.tsx), Enter and the arrows that confirm or pick
 // IME text (Chinese, Japanese, … isComposing, or Safari's keyCode 229) never open a page; the same
 // keys outside composition still do. Renders the palette with react-dom in the dom harness.
-import { find, propsOf } from './domTree';
+import { container, find, propsOf } from './domTree';
 
 function assert(condition: boolean, msg: string) {
   if (!condition) throw new Error(`Assertion failed: ${msg}`);
@@ -14,7 +14,7 @@ const { CommandPalette } = await import('../nav/CommandPalette');
 
 const went: string[] = [];
 let closed = 0;
-const root = createRoot((document as unknown as { createElement: (t: string) => Element }).createElement('div'));
+const root = createRoot(container());
 flushSync(() =>
   root.render(
     React.createElement(CommandPalette, {
