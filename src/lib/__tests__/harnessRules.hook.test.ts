@@ -5,6 +5,8 @@
 //   H2  a PATCH that moves today's reading log to yesterday is dropped (reading_logs_guard_today is
 //       BEFORE INSERT OR UPDATE); a soft delete of it still goes through.
 //   H3  a socket closed before its open timer ran stays closed: no onopen, no realtime subscriber.
+//   H4  a PATCH on a server-owned table (point_entries, league_archives) changes nothing, a soft
+//       delete included (their *_guard_server_owned triggers are BEFORE INSERT OR UPDATE, RETURN NULL).
 import { story, assert, eq, pass, server, sockets, UID } from './harness/bootHook';
 import { FakeSocket, REF } from './harness/fakeSupabase';
 
@@ -46,4 +48,16 @@ await story('harnessRules.hook (fake database and socket rules)', async () => {
   eq(server.subscribers.size, subscribersBefore, 'H3: no realtime subscriber left behind');
   assert(!sockets.has(socket), 'H3: not listed as an open socket');
   pass('H3 a socket closed before it opened never opens');
+
+  // H4 (rows seeded directly: the server writes these tables, the app never can)
+  for (const table of ['point_entries', 'league_archives']) {
+    const id = `h-${table}`;
+    const at = stampIn(-60_000);
+    server.t(table).set(`${UID}:${id}`, { user_id: UID, id, data: { id, amount: 5 }, created_at: at, updated_at: at, deleted_at: null, server_updated_at: server.stamp() });
+    const edit = server.update(table, UID, [id], { data: { id, amount: 500 }, updated_at: stampIn(1000) }, 'test');
+    server.update(table, UID, [id], { deleted_at: stampIn(2000), updated_at: stampIn(2000) }, 'test');
+    const row = server.row(table, UID, id);
+    eq([edit.status, row?.data?.amount, row?.deleted_at, row?.updated_at], [204, 5, null, at], `H4: a PATCH on ${table} changes nothing`);
+  }
+  pass('H4 PATCH meets the server-owned table guards');
 });
