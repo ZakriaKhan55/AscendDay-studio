@@ -7,6 +7,7 @@ import { trustedNowMs } from '@/lib/time/clock';
 import { FOCUS_DAILY_CAP, FOCUS_RULE_SHORT, focusDayGain, focusDayPoints, nextFocusReward, type FocusDayTally } from '@/lib/points/focusPoints';
 import { focusDayTally } from '@/lib/points/focusAwards';
 import { todayKey } from '@/lib/time/dates';
+import { useOpenFor } from '@/lib/ui/useOpenFor';
 import {
   FOCUS_BREAK_AFTER_MINUTES,
   FOCUS_BREAK_GRACE_MINUTES,
@@ -230,8 +231,9 @@ function ManualTimer({ store }: { store: AppStore }) {
   const [customError, setCustomError] = useState<string | null>(null);
   const [taskName, setTaskName] = useState(() => pendingTask() || 'Deep Work');
   const [skillId, setSkillId] = useState('');
-  const [confirmStop, setConfirmStop] = useState(false);
-  const [confirmComplete, setConfirmComplete] = useState(false);
+  // Both confirms belong to the session they were opened for: one that ends or another that starts closes them.
+  const [confirmStop, showConfirmStop, hideConfirmStop] = useOpenFor(session?.id);
+  const [confirmComplete, showConfirmComplete, hideConfirmComplete] = useOpenFor(session?.id);
   const [pickBreak, setPickBreak] = useState(false);
   // Discard turns into Complete at 25 active minutes; re-checked each second while it runs.
   const nowMs = useSecondTick(Boolean(session && session.mode === 'focus'));
@@ -444,14 +446,14 @@ function ManualTimer({ store }: { store: AppStore }) {
               )
             )}
             {canComplete ? (
-              <button type="button" onClick={() => setConfirmComplete(true)} className="btn-secondary w-full min-[420px]:w-auto min-h-11 px-5">
+              <button type="button" onClick={showConfirmComplete} className="btn-secondary w-full min-[420px]:w-auto min-h-11 px-5">
                 <Check size={16} aria-hidden="true" />
                 <span>Complete</span>
               </button>
             ) : (
               <button
                 type="button"
-                onClick={() => setConfirmStop(true)}
+                onClick={showConfirmStop}
                 className="btn-ghost w-full min-[420px]:w-auto min-h-11 text-xs text-content-muted hover:text-rose-theme"
               >
                 <Square size={14} aria-hidden="true" />
@@ -486,12 +488,12 @@ function ManualTimer({ store }: { store: AppStore }) {
 
       <Dialog
         open={confirmStop}
-        onClose={() => setConfirmStop(false)}
+        onClose={hideConfirmStop}
         title="Discard focus session?"
         description={`The timer stops. Nothing is saved and no points are earned. From ${FOCUS_MIN_MINUTES_TO_SAVE} min a session is completed instead.`}
         footer={
           <>
-            <button type="button" onClick={() => setConfirmStop(false)} className="btn-secondary">
+            <button type="button" onClick={hideConfirmStop} className="btn-secondary">
               Keep going
             </button>
             <button
@@ -500,7 +502,7 @@ function ManualTimer({ store }: { store: AppStore }) {
                 // A session that already ran out is ended (and logged) by the provider, not discarded;
                 // from 25 active minutes the provider refuses to discard.
                 if (session && remainingSeconds(session) > 0) stop();
-                setConfirmStop(false);
+                hideConfirmStop();
               }}
               className="btn-danger-solid"
             >
@@ -514,7 +516,7 @@ function ManualTimer({ store }: { store: AppStore }) {
 
       <Dialog
         open={confirmComplete && Boolean(session) && !isBreak}
-        onClose={() => setConfirmComplete(false)}
+        onClose={hideConfirmComplete}
         title="Complete focus session?"
         description={
           todayCapFull
@@ -523,14 +525,14 @@ function ManualTimer({ store }: { store: AppStore }) {
         }
         footer={
           <>
-            <button type="button" onClick={() => setConfirmComplete(false)} className="btn-secondary">
+            <button type="button" onClick={hideConfirmComplete} className="btn-secondary">
               Keep going
             </button>
             <button
               type="button"
               onClick={() => {
                 complete();
-                setConfirmComplete(false);
+                hideConfirmComplete();
               }}
               className="btn-primary"
             >
