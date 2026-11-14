@@ -57,6 +57,9 @@ export function TimeTrackerView({ store, onNavigate }: TimeTrackerViewProps) {
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<TimeTrackerBlock | null>(null);
   const [blockDefaults, setBlockDefaults] = useState<{ start: string; end: string }>({ start: '09:00', end: '10:00' });
+  // The day the block dialog was opened for: a midnight with it open never moves the draft to the new
+  // day (a day that turned past refuses the save in the form).
+  const [blockDateKey, setBlockDateKey] = useState(selectedDateKey);
 
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TimeTrackerTemplate | null>(null);
@@ -90,30 +93,41 @@ export function TimeTrackerView({ store, onNavigate }: TimeTrackerViewProps) {
     () => (timeTracker ? plannedBlocksForDate(timeTracker, selectedDateKey, today) : { blocks: [], source: 'none' as const }),
     [timeTracker, selectedDateKey, today]
   );
+  const blockDayBlocks = useMemo(
+    () =>
+      blockDateKey === selectedDateKey
+        ? planned.blocks
+        : timeTracker
+          ? plannedBlocksForDate(timeTracker, blockDateKey, today).blocks
+          : [],
+    [planned, timeTracker, blockDateKey, selectedDateKey, today]
+  );
   const nextDayBlocks = useMemo(
-    () => (timeTracker ? plannedBlocksForDate(timeTracker, addDays(selectedDateKey, 1), today).blocks : []),
-    [timeTracker, selectedDateKey, today]
+    () => (timeTracker ? plannedBlocksForDate(timeTracker, addDays(blockDateKey, 1), today).blocks : []),
+    [timeTracker, blockDateKey, today]
   );
   const openToday = (timeTracker?.dailyLogs?.[today] || []).filter((b) => !b.completed && !b.skipped).length;
 
   const openAddBlock = (start: string, end: string) => {
     setEditingBlock(null);
+    setBlockDateKey(selectedDateKey);
     setBlockDefaults({ start, end });
     setBlockModalOpen(true);
   };
 
   const openEditBlock = (block: TimeTrackerBlock) => {
     setEditingBlock(block);
+    setBlockDateKey(selectedDateKey);
     setBlockModalOpen(true);
   };
 
   const saveBlock = (draft: BlockDraft) => {
     // A failure reaches the dialog, which shows it in the form and stays open.
     if (editingBlock) {
-      store.updateDailyTimeBlock(selectedDateKey, editingBlock.id, draft);
+      store.updateDailyTimeBlock(blockDateKey, editingBlock.id, draft);
       showSuccessToast('Block saved');
     } else {
-      store.addDailyTimeBlock(selectedDateKey, draft);
+      store.addDailyTimeBlock(blockDateKey, draft);
       showSuccessToast('Block added');
     }
   };
@@ -250,7 +264,7 @@ export function TimeTrackerView({ store, onNavigate }: TimeTrackerViewProps) {
         onClose={() => setBlockModalOpen(false)}
         onSave={saveBlock}
         activities={activities}
-        context={{ kind: 'day', dateKey: selectedDateKey, dayBlocks: planned.blocks, nextDayBlocks }}
+        context={{ kind: 'day', dateKey: blockDateKey, dayBlocks: blockDayBlocks, nextDayBlocks }}
         editingBlock={editingBlock}
         defaultStartTime={blockDefaults.start}
         defaultEndTime={blockDefaults.end}
