@@ -96,3 +96,4 @@ await wait(300);
 eq(deadlineChecks(), 0, 'no deadline check left after unmount');
 
 console.log('focusPausedTimer: all checks passed');
+(globalThis as unknown as { process: { exit: (code: number) => never } }).process.exit(0);
