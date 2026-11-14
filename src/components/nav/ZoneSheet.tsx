@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type { NavGroup } from './navConfig';
 import { cx, FOCUS_RING } from '@/components/ui/primitives/shared';
@@ -38,6 +38,12 @@ export const ZoneSheet = memo(function ZoneSheet({ open, group, currentView, sta
   const [dragging, setDragging] = useState(false);
   const [sheetHeight, setSheetHeight] = useState(1);
   const drag = useRef<{ id: number; startY: number; lastY: number; lastT: number; velocity: number; moved: boolean } | null>(null);
+  // Rows taller than the sheet (short landscape phone): the rows scroll by touch, and the drag to
+  // close starts only on the handle and title.
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [scrollable, setScrollable] = useState(false);
+  // Without a zone (the Dashboard) nothing renders, so nothing may lock the page either.
+  const shown = open && group !== undefined;
 
   const requestClose = useCallback(() => {
     if (prefersReducedMotion()) {
@@ -57,8 +63,19 @@ export const ZoneSheet = memo(function ZoneSheet({ open, group, currentView, sta
     return () => clearTimeout(timer);
   }, [closing, onClose]);
 
+  useLayoutEffect(() => {
+    if (!shown) return;
+    const measure = () => {
+      const sheet = sheetRef.current;
+      setScrollable(!!sheet && sheet.scrollHeight > sheet.clientHeight + 1);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [shown]);
+
   useEffect(() => {
-    if (!open) return;
+    if (!shown) return;
     const previous = document.activeElement as HTMLElement | null;
     sheetRef.current?.querySelector<HTMLElement>('[aria-current="page"], a, button')?.focus({ preventScroll: true });
     // Scroll lock: the window is the scroller on phones. overflow on <html> (not a fixed body) keeps
@@ -94,10 +111,14 @@ export const ZoneSheet = memo(function ZoneSheet({ open, group, currentView, sta
       document.removeEventListener('keydown', onKeyDown);
       root.style.overflow = previousOverflow;
       previous?.focus({ preventScroll: true });
+      // Hidden mid-drag (Back while a finger is on it): the next opening starts in place.
+      drag.current = null;
+      setDragging(false);
+      setDragY(0);
     };
-  }, [open, requestClose]);
+  }, [shown, requestClose]);
 
-  if (!open || !group) return null;
+  if (!shown) return null;
 
   const go = (view: View) => {
     onNavigate(view);
@@ -106,6 +127,7 @@ export const ZoneSheet = memo(function ZoneSheet({ open, group, currentView, sta
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (closing || event.button !== 0) return;
+    if (scrollable && !headerRef.current?.contains(event.target as Node)) return;
     drag.current = { id: event.pointerId, startY: event.clientY, lastY: event.clientY, lastT: event.timeStamp, velocity: 0, moved: false };
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -167,15 +189,18 @@ export const ZoneSheet = memo(function ZoneSheet({ open, group, currentView, sta
         onClickCapture={onClickCapture}
         style={{ transform: `translateY(${dragY}px)` }}
         className={cx(
-          'zone-sheet absolute inset-x-0 bottom-0 max-h-[88dvh] touch-none select-none overflow-y-auto overscroll-contain rounded-t-2xl border-t border-overlay-default bg-bg-800 px-4 pt-3 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))]',
+          'zone-sheet absolute inset-x-0 bottom-0 max-h-[88dvh] select-none overflow-y-auto overscroll-contain rounded-t-2xl border-t border-overlay-default bg-bg-800 px-4 pt-3 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))]',
+          scrollable ? 'touch-pan-y' : 'touch-none',
           closing && 'zone-sheet-closing',
           !dragging && !closing && 'zone-sheet-settle'
         )}
       >
-        <div aria-hidden="true" className="mx-auto mb-4 h-1 w-10 rounded-full bg-overlay-strong" />
-        <div className="mb-3 flex items-baseline justify-between px-1">
-          <h2 className="text-xl font-semibold leading-tight text-content-primary">{group.label}</h2>
-          <span className="text-xs text-content-muted tabular-nums">{group.items.length} pages</span>
+        <div ref={headerRef} className="touch-none">
+          <div aria-hidden="true" className="mx-auto mb-4 h-1 w-10 rounded-full bg-overlay-strong" />
+          <div className="mb-3 flex items-baseline justify-between px-1">
+            <h2 className="text-xl font-semibold leading-tight text-content-primary">{group.label}</h2>
+            <span className="text-xs text-content-muted tabular-nums">{group.items.length} pages</span>
+          </div>
         </div>
 
 

@@ -20,6 +20,7 @@ import { Sidebar } from './nav/Sidebar';
 import { AccountMenu } from './nav/AccountMenu';
 import { MobileZoneBar } from './nav/MobileZoneBar';
 import { ZoneSheet } from './nav/ZoneSheet';
+import { useZoneSheetOpen } from './nav/useZoneSheetOpen';
 import { QuickLog } from './nav/QuickLog';
 import { useNavShortcuts } from './nav/useNavShortcuts';
 import { useSidebarCollapsed } from './nav/useSidebarCollapsed';
@@ -92,8 +93,6 @@ interface AppShellProps {
 }
 
 export function AppShell({ currentView, navigationKind, pendingView = null, onViewChange, store, onOpenAuth, openQuickLog = false, children }: AppShellProps) {
-  const [zoneSheetOpen, setZoneSheetOpen] = useState(false);
-  const closeZoneSheet = useCallback(() => setZoneSheetOpen(false), []);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   // Derived during render (no frame without the dialog): opens on each rise of `openQuickLog`.
   const [quickLogLaunchSeen, setQuickLogLaunchSeen] = useState(false);
@@ -110,6 +109,8 @@ export function AppShell({ currentView, navigationKind, pendingView = null, onVi
 
   const [lastByGroup, setLastByGroup] = useState(DEFAULT_GROUP_VIEWS);
   const activeGroupId = getGroupForView(currentView);
+  // Closes by itself when Back leaves the zone (CR-01-15).
+  const [zoneSheetOpen, setZoneSheetOpen, closeZoneSheet] = useZoneSheetOpen(activeGroupId);
   // What the nav marks as current: the page a tap is heading to, so the tap answers at once.
   const navView = pendingView ?? currentView;
   useEffect(() => { if (activeGroupId) setLastByGroup(prev => prev[activeGroupId] === currentView ? prev : { ...prev, [activeGroupId]: currentView }); }, [currentView, activeGroupId]);
