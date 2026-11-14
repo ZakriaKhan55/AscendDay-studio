@@ -41,6 +41,13 @@ function assert(condition: boolean, msg: string) {
 }
 const eq = (a: unknown, b: unknown, msg: string) => assert(a === b, `${msg} (got ${JSON.stringify(a)}, want ${JSON.stringify(b)})`);
 const wait = (ms: number) => new Promise((resolve) => baseSet(resolve, ms));
+/** Polls (the machine may be slow): fails with `what` after `ms`. */
+async function until(pred: () => unknown, what: string, ms = 5000) {
+  for (let waited = 0; !pred(); waited += 20) {
+    if (waited > ms) throw new Error(`Assertion failed: timed out waiting for ${what}`);
+    await wait(20);
+  }
+}
 const UID = 'u-paused';
 const KEY = S.focusStorageKey(UID);
 /** The paused-session check waits at most a minute at a time (MAX_WAIT_MS); its deadline is 30 min away. */
@@ -60,7 +67,7 @@ function Probe() {
 }
 const root = createRoot((doc.createElement as () => Element)());
 root.render(React.createElement(FocusSessionProvider, { store, onOpenFocus: () => undefined, children: React.createElement(Probe) }));
-await wait(100);
+await until(() => ctx, 'provider rendered');
 
 // A session paused by a logout a moment ago (another tab wrote it): resumable for 30 minutes.
 const now = trustedNowMs();
@@ -71,19 +78,21 @@ const paused: import('../focus/focusSession').FocusSession = {
 };
 localStorage.setItem(KEY, JSON.stringify(paused));
 (win as unknown as { dispatchEvent: (e: unknown) => void }).dispatchEvent({ type: 'storage', key: KEY, newValue: JSON.stringify(paused) });
-await wait(100);
-assert(Boolean(ctx!.session?.isPaused), 'paused session on screen');
+await until(() => ctx!.session?.isPaused, 'paused session on screen');
+await until(() => deadlineChecks() > 0, 'deadline check armed');
+await wait(200);
 eq(deadlineChecks(), 1, 'one deadline check waiting');
 
 // The page comes back into view three times before the minute is up.
 for (let i = 0; i < 3; i++) {
   (doc as unknown as { dispatchEvent: (e: unknown) => void }).dispatchEvent({ type: 'visibilitychange' });
-  await wait(20);
+  await wait(50);
 }
+await wait(300);
 eq(deadlineChecks(), 1, 'still one deadline check after the page came back three times');
 
 root.unmount();
-await wait(50);
+await wait(300);
 eq(deadlineChecks(), 0, 'no deadline check left after unmount');
 
 console.log('focusPausedTimer: all checks passed');
