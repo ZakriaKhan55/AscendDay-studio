@@ -32,6 +32,26 @@ export type SignUpDefaults = {
   avatar: string;
 };
 
+/**
+ * The private profile columns as this device last held them (its account cache), for a load whose
+ * private read failed. Empty when there is no cache: the defaults stand, as before.
+ */
+function cachedPrivateProfile(userId: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  try {
+    const raw = localStorage.getItem(`ascend_user_cache_${userId}`);
+    const cachedUser = raw ? (JSON.parse(raw) as Partial<AppState> | null)?.currentUser : null;
+    if (!cachedUser || cachedUser.id !== userId) return out;
+    if (typeof cachedUser.notifDailyReminder === 'boolean') out.notif_daily_reminder = cachedUser.notifDailyReminder;
+    if (typeof cachedUser.notifPartnerActivity === 'boolean') out.notif_partner_activity = cachedUser.notifPartnerActivity;
+    if (typeof cachedUser.notifSundayPlanning === 'boolean') out.notif_sunday_planning = cachedUser.notifSundayPlanning;
+    if (cachedUser.lastUsernameChangeAt) out.last_username_change_at = cachedUser.lastUsernameChangeAt;
+  } catch {
+    // Storage blocked or a broken cache: the defaults stand.
+  }
+  return out;
+}
+
 export async function fetchProfileForUser(userId: string): Promise<{ data: Record<string, unknown> | null; error: any | null }> {
   try {
     // Private columns (notification settings, last username change) come from ascend_my_profile.
@@ -49,7 +69,10 @@ export async function fetchProfileForUser(userId: string): Promise<{ data: Recor
       return { data: null, error };
     }
     if (!data) return { data: null, error: null };
-    return { data: { ...privateCols, ...(data as Record<string, unknown>) }, error: null };
+    // The row exists, so ascend_my_profile has one too: null means that read failed. Then the
+    // notification switches keep this device's last known values instead of all showing on.
+    const privatePart = privateCols ?? cachedPrivateProfile(userId);
+    return { data: { ...privatePart, ...(data as Record<string, unknown>) }, error: null };
   } catch (e) {
     console.error('Error fetching profile from Supabase:', e);
     return { data: null, error: e };
@@ -92,8 +115,9 @@ async function insertInitialProfile(userId: string, user: UserProfile): Promise<
       }
       return candidate;
     }
-    // Another tab or an earlier boot created it already: use the row as it is.
-    if (error.code === '23505' && /profiles_pkey/.test(error.message)) return candidate;
+    // Another tab or an earlier boot created it already: use the row as it is (its uid and name,
+    // which can differ from this candidate's), so the app shows what other members see.
+    if (error.code === '23505' && /profiles_pkey/.test(error.message)) return storedProfileOr(userId, candidate);
     if (error.code !== '23505' || attempt === PROFILE_INSERT_ATTEMPTS) {
       throw new Error(`Failed to create profile for ${userId}: ${error.message}`);
     }
@@ -111,6 +135,37 @@ async function insertInitialProfile(userId: string, user: UserProfile): Promise<
     }
   }
   return candidate;
+}
+
+/** The profile row as stored, over `candidate`; `candidate` as it is when the read fails. */
+async function storedProfileOr(userId: string, candidate: UserProfile): Promise<UserProfile> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('uid, username, avatar, created_at, is_profile_public')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error || !data) return candidate;
+    const row = data as Record<string, unknown>;
+    const uid = typeof row.uid === 'string' && row.uid ? row.uid : candidate.uid;
+    if (uid !== candidate.uid) {
+      try {
+        localStorage.setItem(`ascend_uid_${userId}`, uid);
+      } catch {
+        /* ignore */
+      }
+    }
+    return {
+      ...candidate,
+      uid,
+      username: (row.username as string | undefined) || candidate.username,
+      avatar: (row.avatar as string | undefined) || candidate.avatar,
+      createdAt: (row.created_at as string | undefined) || candidate.createdAt,
+      isProfilePublic: (row.is_profile_public as boolean | undefined) ?? candidate.isProfilePublic,
+    };
+  } catch {
+    return candidate;
+  }
 }
 
 export function buildUserProfile(
@@ -282,12 +337,17 @@ export async function hydrateUserSession(
     setUserDataWatermark(userId, state);
   } else {
     // A new account starts empty. A guest keeps their data by upgrading their anonymous
-    // account (same id), so nothing local is carried over here.
+    // account (same id), so nothing local is carried over here. Rows already in the synced tables
+    // (and this account's own device copy of them) still apply when the settings row is missing,
+    // so a lost user_data row never hides saved activity.
     state = {
       ...DEFAULT_STATE,
+      ...cachedSyncedCollections(userId),
+      ...cachedDeviceLocalState(userId),
       currentUser: user,
       username: user.username,
     };
+    state = applyRemoteChanges(state, tablePull.changes, userId);
   }
 
   // Authoritative real-time fetch in parallel for partner invites, active partnerships, notifications, improvement plans, and followed plans
