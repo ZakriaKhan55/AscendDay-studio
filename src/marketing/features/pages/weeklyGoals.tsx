@@ -141,8 +141,8 @@ export const weeklyGoals: FeatureContent = {
         />
         <Note title="A few goals, not many.">
           With points on {G.maxGoalsCounted} goals, splitting one goal into ten small ones earns nothing extra. You get the
-          most out of the week by choosing a few that matter. Only the current week earns points; past weeks are kept to
-          look back on and can’t be edited.
+          most out of the week by choosing a few that matter. Only the current week’s goals earn points. Past weeks’ goals
+          are kept to look back on and can’t be edited; last week’s reflection stays open until Monday ends.
         </Note>
       </Block>
 
