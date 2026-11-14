@@ -26,7 +26,8 @@ const MAX_ROUND_TRIP_MS = 10_000;
 const SLEEP_DRIFT_MS = 2000;
 
 // deviceMs: the device clock at the read, used only to notice that performance.now() paused.
-type Anchor = { serverMs: number; perfMs: number; deviceMs: number };
+// caughtUp: moved forward by the device clock (caughtUpAnchor), not yet confirmed by a server read.
+type Anchor = { serverMs: number; perfMs: number; deviceMs: number; caughtUp?: true };
 let anchor: Anchor | null = null;
 let syncing: Promise<void> | null = null;
 let readyPromise: Promise<void> | null = null;
@@ -53,7 +54,7 @@ const lastTrustedAtStart = readLastTrusted();
 export function caughtUpAnchor(current: Anchor, perfNow: number, deviceNow: number): Anchor | null {
   const deviceElapsed = deviceNow - current.deviceMs;
   if (deviceElapsed - (perfNow - current.perfMs) <= SLEEP_DRIFT_MS) return null;
-  return { serverMs: current.serverMs + deviceElapsed, perfMs: perfNow, deviceMs: deviceNow };
+  return { serverMs: current.serverMs + deviceElapsed, perfMs: perfNow, deviceMs: deviceNow, caughtUp: true };
 }
 
 /** Moves a slept anchor forward at once and asks the server for the real time. */
@@ -82,9 +83,13 @@ export function trustedNow(): Date {
 }
 
 function remember(): void {
+  // A caught-up time is not stored: offline, a device clock moved forward looks like a sleep, and
+  // stored it would become the floor of the next offline start even after the clock is put back.
   if (!anchor) return;
+  const now = trustedNowMs(); // can catch the anchor up, so read before the check
+  if (anchor.caughtUp) return;
   try {
-    localStorage.setItem(LAST_TRUSTED_KEY, String(Math.round(trustedNowMs())));
+    localStorage.setItem(LAST_TRUSTED_KEY, String(Math.round(now)));
   } catch {
     /* storage unavailable */
   }
