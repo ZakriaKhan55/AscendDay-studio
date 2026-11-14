@@ -4,10 +4,10 @@ import type { Goal, GoalStatus, Project, ProjectStatus, Task, TaskPriority, Task
 import { Dialog, FieldMessage, FieldRow, Form, Input, Select, Switch, Textarea, useFormController } from '@/components/ui/primitives';
 import { TAP_TARGET } from '@/components/ui/primitives/shared';
 import { earliestTargetDate, isNewPastDate, todayKey, uid } from '@/lib/time/dates';
-import { trustedNow } from '@/lib/time/clock';
 import { useUnsavedChanges } from '@/lib/ui/unsavedChanges';
 import { toUserMessage } from '@/lib/app/userMessage';
 import { nameTaken, sameName } from '@/lib/items/uniqueNames';
+import { dateBounds, sanitizeDate, subtasksToSave } from './hierarchyFormRules';
 
 /**
  * Create/edit dialogs for goals, projects and tasks. Each is mounted fresh for every open (the
@@ -24,19 +24,6 @@ const GOAL_CATEGORY_SUGGESTIONS = [
   'Relationships',
   'Mindset & Focus',
 ];
-
-/** Dates outside two years back to twenty years ahead are pulled to the nearest bound. */
-function dateBounds() {
-  const year = trustedNow().getFullYear();
-  return { min: `${year - 2}-01-01`, max: `${year + 20}-12-31` };
-}
-
-function sanitizeDate(value: string): string | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  const { min, max } = dateBounds();
-  return trimmed < min ? min : trimmed > max ? max : trimmed;
-}
 
 /** A due/target date can't be new and in the past; an item's own old date may stay. */
 const pastDateIssue = (value: string, saved: string | undefined, field: string) =>
@@ -105,7 +92,7 @@ export function GoalFormDialog({
         title: title.trim(),
         description: description.trim() || undefined,
         category: category.trim() || undefined,
-        targetDate: sanitizeDate(targetDate),
+        targetDate: sanitizeDate(targetDate, editing?.targetDate),
         status,
         sequentialMode,
       });
@@ -267,6 +254,8 @@ export function ProjectFormDialog({
   const completedLocked = hasTasks && editing?.status !== 'completed';
   const earliestDue = earliestTargetDate(editing?.dueDate);
   const { min, max } = dateBounds();
+  // The project's own start date stays pickable once it is older than the lower bound.
+  const earliestStart = editing?.startDate && editing.startDate < min ? editing.startDate : min;
 
   const handleSubmit = () => {
     if (!title.trim()) return;
@@ -275,8 +264,8 @@ export function ProjectFormDialog({
         title: title.trim(),
         description: description.trim() || undefined,
         goalId: goalId || undefined,
-        startDate: sanitizeDate(startDate),
-        dueDate: sanitizeDate(dueDate),
+        startDate: sanitizeDate(startDate, editing?.startDate),
+        dueDate: sanitizeDate(dueDate, editing?.dueDate),
         status,
       });
       onClose();
@@ -340,7 +329,7 @@ export function ProjectFormDialog({
             label="Start date"
             optional
             type="date"
-            min={min}
+            min={earliestStart}
             max={dueDate || max}
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
@@ -425,7 +414,8 @@ export function TaskFormDialog({
     setNewSubtask('');
   };
 
-  // A renamed subtask needs a title of its own; untouched ones may keep an old duplicate.
+  // A renamed subtask needs a title of its own; untouched ones may keep an old duplicate. A subtask
+  // typed in "Add a subtask" but not added yet is saved with the task, so it needs a new name too.
   const subtaskIssue = () => {
     for (const st of subtasks) {
       const field = `pg-task-subtask-${st.id}`;
@@ -435,6 +425,9 @@ export function TaskFormDialog({
       if (subtasks.some((x) => x.id !== st.id && sameName(x.title, st.title))) {
         return { message: 'This task already has a subtask with this name.', field };
       }
+    }
+    if (nameTaken(newSubtask, subtasks, { nameOf: (st) => st.title })) {
+      return { message: 'This task already has a subtask with this name.', field: 'pg-task-new-subtask' };
     }
     return null;
   };
@@ -446,9 +439,9 @@ export function TaskFormDialog({
         title: title.trim(),
         description: description.trim() || undefined,
         projectId: projectId || undefined,
-        dueDate: sanitizeDate(dueDate),
+        dueDate: sanitizeDate(dueDate, editing?.dueDate),
         priority,
-        subtasks: subtasks.map((st) => ({ ...st, title: st.title.trim() })),
+        subtasks: subtasksToSave(subtasks, newSubtask),
       });
       onClose();
     } catch (err) {
