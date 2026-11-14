@@ -215,11 +215,9 @@ export function useViewRoute(prepare?: (view: View) => Promise<unknown>) {
       const target = routeFromLocation();
       const previousAddress = lastAddress;
       lastAddress = window.location.pathname + window.location.search;
-      if (target.auth || authRef.current || target.legal || legalRef.current) {
-        syncToLocation('pop'); // to or from a sign-in or legal page: no page transition, no chunk wait
-        return;
-      }
-      if (hasUnsavedChanges() && target.view !== viewRef.current) {
+      // To or from a sign-in or legal page: no page transition, no chunk wait.
+      const outsideApp = Boolean(target.auth || authRef.current || target.legal || legalRef.current);
+      if (hasUnsavedChanges() && (outsideApp || target.view !== viewRef.current)) {
         // Back/forward can't be cancelled and the address has already moved: put the current
         // page's address back first (query included: `?section=account`), and go only if the user
         // discards the unsaved typing, to the target's full address.
@@ -227,8 +225,13 @@ export function useViewRoute(prepare?: (view: View) => Promise<unknown>) {
         window.history.pushState(null, '', previousAddress);
         confirmLeave(() => {
           window.history.replaceState(null, '', targetAddress);
-          show(target.view, 'pop');
+          if (outsideApp) syncToLocation('pop');
+          else show(target.view, 'pop');
         });
+        return;
+      }
+      if (outsideApp) {
+        syncToLocation('pop');
         return;
       }
       canonicalizeUrl(target);
