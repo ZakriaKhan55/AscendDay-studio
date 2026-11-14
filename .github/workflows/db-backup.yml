@@ -58,6 +58,9 @@ jobs:
           # Hold one read-only transaction open and export its snapshot, so every dump and the
           # manifest below see exactly the same data.
           coproc HOLD { "$BIN/psql" "$DB_URL" -XAtq -v ON_ERROR_STOP=1; }
+          # Kept now: bash unsets HOLD_PID once it reaps the finished holder, which can happen
+          # before the wait below reads it (set -u would then fail the step).
+          HOLD_SAVED_PID=$HOLD_PID
           echo "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SELECT pg_export_snapshot();" >&"${HOLD[1]}"
           read -r SNAP <&"${HOLD[0]}"
 
@@ -86,7 +89,7 @@ jobs:
           SQL
 
           exec {HOLD[1]}>&-
-          wait "$HOLD_PID"
+          wait "$HOLD_SAVED_PID"
           ls -l dump
           grep -E '^(rows|objects)' dump/manifest.tsv | cut -f2,3
 

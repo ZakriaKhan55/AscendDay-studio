@@ -13,10 +13,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: indexnow
-  cancel-in-progress: true
-
 jobs:
   ping:
     name: Ping IndexNow
@@ -24,6 +20,12 @@ jobs:
       github.repository == 'zakyprojects/Ascend' &&
       github.event.deployment_status.state == 'success' &&
       startsWith(github.event.deployment.environment, 'Production')
+    # On the job, not the workflow: only a production ping that actually runs takes the slot and
+    # cancels an older one; a preview, pending or failed deployment event (job skipped) never
+    # cancels a ping in progress.
+    concurrency:
+      group: indexnow
+      cancel-in-progress: true
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
