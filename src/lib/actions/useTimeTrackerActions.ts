@@ -881,11 +881,9 @@ export function useTimeTrackerActions(setState: StoreSetState, get: () => AppSta
                 updatedAt: trustedNow().toISOString(),
               };
             }
-            // If preceding block was trimmed to make room for the early start, restore its trimmed end time
-            if (
-              b.trimmedDueToPullId === blockId ||
-              (b.trimmedOriginalEndTime && timeStringToMinutes(b.endTime) <= timeStringToMinutes(target.startTime))
-            ) {
+            // A preceding block trimmed to make room for this early start gets its end time back. Only the
+            // block linked to it: a block finished or skipped early on its own keeps its real end.
+            if (b.trimmedDueToPullId === blockId) {
               return {
                 ...b,
                 endTime: b.trimmedOriginalEndTime || b.endTime,
