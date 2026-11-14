@@ -43,5 +43,18 @@ expectSlot(
   'uses the first free stretch when nothing is free after the last block'
 );
 expectSlot(suggestNewBlockTimes([b('00:00', '12:00'), b('12:00', '00:00')]), '09:00', '10:00', 'a full day falls back to 9:00 AM');
+// CR-06-12: today, nothing free from now on: a free stretch earlier in the day beats overlapping a block.
+expectSlot(
+  suggestNewBlockTimes([b('09:00', '10:00'), b('12:00', '00:00')], 13 * 60),
+  '00:00',
+  '01:00',
+  'nothing free after now: the first free stretch from midnight, not an overlapping 9:00 AM'
+);
+expectSlot(
+  suggestNewBlockTimes([b('00:00', '09:00'), b('09:00', '10:00'), b('12:00', '00:00')], 13 * 60),
+  '10:00',
+  '11:00',
+  'the earlier free stretch is the gap between blocks'
+);
 
 console.log('timeTracker new block fixtures: all passed');

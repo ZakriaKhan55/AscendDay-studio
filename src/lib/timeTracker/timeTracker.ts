@@ -148,7 +148,8 @@ function freeSlotFrom(
  * Otherwise the block follows the last block of the day; a block that closes the day at midnight
  * (the evening part of a sleep block) is not the one to follow, since nothing fits after it.
  * `notBeforeMinutes` (today: now) keeps the suggestion out of the past. When nothing is free
- * after that point, the first free stretch of the day is used, and a full day falls back to 9:00 AM.
+ * after that point, the first free stretch from then, else from midnight, is used (a free earlier
+ * stretch beats overlapping a block), and a full day falls back to 9:00 AM.
  */
 export function suggestNewBlockTimes(
   blocks: Pick<TimeTrackerBlock, 'startTime' | 'endTime'>[],
@@ -162,6 +163,7 @@ export function suggestNewBlockTimes(
   return (
     freeSlotFrom(blocks, Math.max(after, notBefore)) ??
     freeSlotFrom(blocks, notBefore) ??
+    freeSlotFrom(blocks, 0) ??
     { ...FALLBACK_BLOCK }
   );
 }
