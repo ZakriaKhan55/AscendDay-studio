@@ -15,10 +15,14 @@ export function useConnectionStatus(): ConnectionStatus {
   const [showRestored, setShowRestored] = useState<boolean>(false);
   const wasOfflineRef = useRef<boolean>(!isOnline);
   const lastReachableMarkRef = useRef<number | null>(null);
+  // Bumped by every check and every offline event: a check whose answer arrives after either no
+  // longer describes the connection and is dropped (a server reply landing after "offline").
+  const checkSeqRef = useRef(0);
 
-  /** True when the app's own server answered. */
-  const performHeartbeatCheck = useCallback(async (): Promise<boolean> => {
+  /** True when the app's own server answered; null when a newer check or an offline event replaced it. */
+  const performHeartbeatCheck = useCallback(async (): Promise<boolean | null> => {
     if (typeof window === 'undefined') return true;
+    const seq = ++checkSeqRef.current;
 
     // Fast check: if browser explicitly says offline, set false immediately
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -42,6 +46,7 @@ export function useConnectionStatus(): ConnectionStatus {
       });
 
       clearTimeout(timeoutId);
+      if (seq !== checkSeqRef.current) return null;
 
       if (res.ok) {
         lastReachableMarkRef.current = elapsedMark();
@@ -63,6 +68,7 @@ export function useConnectionStatus(): ConnectionStatus {
         return false;
       }
     } catch {
+      if (seq !== checkSeqRef.current) return null;
       setIsOnline((prev) => {
         if (prev) wasOfflineRef.current = true;
         return false;
@@ -82,7 +88,9 @@ export function useConnectionStatus(): ConnectionStatus {
     // 12 s heartbeat runs only while a check fails although the browser reports a network
     // (connected without internet), until the server answers; never while the tab is hidden.
     const check = async () => {
-      if (await performHeartbeatCheck()) stopHeartbeat();
+      const reachable = await performHeartbeatCheck();
+      if (reachable === null) return; // replaced: the newer check or the offline event decides
+      if (reachable) stopHeartbeat();
       else startHeartbeat();
     };
 
@@ -109,6 +117,7 @@ export function useConnectionStatus(): ConnectionStatus {
     };
 
     const handleOffline = () => {
+      checkSeqRef.current++;
       stopHeartbeat();
       setIsOnline(false);
       wasOfflineRef.current = true;
