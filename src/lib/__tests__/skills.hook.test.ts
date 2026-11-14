@@ -3,6 +3,7 @@
 //   T23  a new skill reaches skills; a practice log reaches skill_logs; a rename and a log edit read
 //        current state and save; a log delete removes the row; deleting the skill removes it and the
 //        weekly goal linked to it.
+//   T23b a note-only edit keeps the count of a drill deleted since (CR-04-4).
 import { bootHook, story, until, quiet, rows, assert, pass, server, UID } from './harness/bootHook';
 import { trustedNow } from '../time/clock';
 import { weekKey } from '../time/dates';
@@ -37,6 +38,18 @@ await story('skills.hook (skill actions)', async () => {
   await h.s().updateSkillLog(logId, { durationMinutes: 50, note: 'HookNoteEdited' });
   await until(() => log()?.note === 'HookNoteEdited' && log()?.durationMinutes === 50, 'T23: practice log edited in state');
   await until(() => rows('skill_logs').some((r) => r.id === logId && JSON.stringify(r).includes('HookNoteEdited')), 'T23: log edit reached the row', 5000);
+
+  // T23b (CR-04-4): a count of a drill deleted since stays on the log when only the note is edited.
+  await h.s().updateSkillLog(logId, { durationMinutes: 50, note: 'HookNoteEdited', newDrills: [{ name: 'HookDrill', unit: 'reps', count: 7 }] });
+  const drillId = () => mine()?.drills?.find((d) => d.name === 'HookDrill')?.id;
+  await until(() => Boolean(drillId()) && (log()?.counts || []).some((c) => c.drillId === drillId() && c.count === 7), 'T23b: drill count on the log');
+  const goneId = drillId()!;
+  h.s().deleteSkillDrill(skill.id, goneId);
+  await until(() => Boolean(mine()?.drills?.find((d) => d.id === goneId)?.deletedAt), 'T23b: drill marked deleted');
+  await h.s().updateSkillLog(logId, { durationMinutes: 50, note: 'HookNoteAgain', counts: [] });
+  await until(() => log()?.note === 'HookNoteAgain', 'T23b: note edited in state');
+  assert((log()?.counts || []).some((c) => c.drillId === goneId && c.count === 7), 'T23b: deleted drill count kept on the log');
+  await until(() => rows('skill_logs').some((r) => r.id === logId && JSON.stringify(r).includes('HookNoteAgain') && JSON.stringify(r).includes(goneId)), 'T23b: note edit with the kept count reached the row', 5000);
 
   h.s().deleteSkillLog(logId);
   await until(() => !log(), 'T23: practice log gone from state');

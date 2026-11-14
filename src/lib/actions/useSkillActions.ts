@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import type { AppState, Skill, SkillSessionLog, SkillLevel, SkillDrill, SkillDrillCount } from '@/types';
 import { uid, todayKey, weekKey } from '../time/dates';
-import { addLogDrills, drillNameProblem, foldClearedCounts, isDrillGoal, keepValidDrillCounts, normalizeDrillName, normalizeDrillUnit } from '../content/skillDrills';
+import { addLogDrills, drillNameProblem, foldClearedCounts, isDrillGoal, keepEditedDrillCounts, keepValidDrillCounts, normalizeDrillName, normalizeDrillUnit } from '../content/skillDrills';
 import type { NewLogDrill } from '../content/skillDrills';
 import { renameSkillIn } from '../items/itemEdits';
 import { CLEAR_SKILL_LOGS_MAX } from '../store/clearLimits';
@@ -184,7 +184,8 @@ export function useSkillActions(setState: StoreSetState, get: () => AppState) {
   /**
    * Edits a practice log (Zakria 2026-11-05): minutes only on the log's own local day (today's award
    * is then recomputed, as the server does); after that day its minutes are locked, so an earlier
-   * day's points never change. Note and counts can be edited any day (counts never earn points).
+   * day's points never change. Note and counts can be edited any day (counts never earn points);
+   * counts of drills deleted since stay on the log as they were (keepEditedDrillCounts).
    * The server takes an earlier day's edit only when date, skill, minutes and createdAt are unchanged
    * (skill_logs_guard_today, 20261105180000_skill_log_edit_keeps_minutes.sql).
    */
@@ -212,7 +213,8 @@ export function useSkillActions(setState: StoreSetState, get: () => AppState) {
         const skills = targetSkill === currentSkill ? prev.skills : prev.skills.map((s) => (s.id === targetSkill.id ? targetSkill : s));
         const today = todayKey();
         const minutesEditable = current.date === today;
-        const drillCounts = keepValidDrillCounts([...(changes.counts || []), ...(grown.counts || [])], targetSkill);
+        // Counts of drills deleted since (not in the form) stay on the log: they are history.
+        const drillCounts = keepEditedDrillCounts([...(changes.counts || []), ...(grown.counts || [])], current.counts, targetSkill);
         const { counts: _oldCounts, ...rest } = current;
         const updated: SkillSessionLog = {
           ...rest,

@@ -170,6 +170,28 @@ export function keepValidDrillCounts(counts: readonly SkillDrillCount[] | undefi
   return kept;
 }
 
+/**
+ * The counts an edited log keeps: the form's rows for the skill's live drills (keepValidDrillCounts),
+ * then the log's earlier counts for drills that are not live any more (deleted, or not on this
+ * device yet). The form can't show or change those, so they stay as they were: they are history
+ * (CodeRabbit CR-04-4, 2026-11-14). A valid count only, the first row of each drill.
+ */
+export function keepEditedDrillCounts(
+  formCounts: readonly SkillDrillCount[] | undefined,
+  previous: readonly SkillDrillCount[] | undefined,
+  skill: Pick<Skill, 'drills'>
+): SkillDrillCount[] {
+  const kept = keepValidDrillCounts(formCounts, skill);
+  const liveIds = new Set(liveDrills(skill).map((d) => d.id));
+  const seen = new Set(kept.map((c) => c.drillId));
+  for (const c of Array.isArray(previous) ? previous : []) {
+    if (!c || typeof c.drillId !== 'string' || !c.drillId || liveIds.has(c.drillId) || seen.has(c.drillId) || !isValidDrillCount(c.count)) continue;
+    seen.add(c.drillId);
+    kept.push({ drillId: c.drillId, count: c.count });
+  }
+  return kept;
+}
+
 /** A drill the Log practice form creates as it saves, with the count of this log. */
 export type NewLogDrill = { name: string; unit: string; count: number };
 

@@ -279,7 +279,10 @@ export function SkillTracker({ store, onNavigate }: { store: AppStore; onNavigat
     setEditLog(null);
     setLogModalOpen(true);
   };
-  /** Edit a practice log: minutes only on its own day, note and counts any day. */
+  /**
+   * Edit a practice log: minutes only on its own day, note and counts any day. The form shows live
+   * drills only; counts of drills deleted since stay on the log on save (updateSkillLog).
+   */
   const openEditLog = (log: SkillSessionLog) => {
     const skill = skills.find((s) => s.id === log.skillId);
     const rows = (Array.isArray(log.counts) ? log.counts : [])

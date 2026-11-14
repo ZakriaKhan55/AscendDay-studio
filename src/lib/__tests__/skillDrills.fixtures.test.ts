@@ -13,6 +13,7 @@ import {
   foldClearedCounts,
   isDrillGoal,
   isValidDrillCount,
+  keepEditedDrillCounts,
   keepValidDrillCounts,
   logDrillCount,
   normalizeDrillUnit,
@@ -118,6 +119,23 @@ const state = (overrides: Partial<AppState>): AppState => ({ ...DEFAULT_STATE, .
     skill
   );
   assert(kept.length === 1 && kept[0].drillId === 'scales' && kept[0].count === 5, 'store keeps first valid row of live drills');
+}
+
+// 3b. Editing a log (CR-04-4): the form's rows follow the live-drill rules; the log's earlier counts
+// of drills not live any more (deleted 'old', unknown 'gone') stay as they were (history).
+{
+  const skill = guitar();
+  const previous = [{ drillId: 'scales', count: 5 }, { drillId: 'old', count: 3 }, { drillId: 'gone', count: 4 }];
+  const noteOnly = keepEditedDrillCounts([], previous, skill);
+  assert(noteOnly.length === 2 && noteOnly.some((c) => c.drillId === 'old' && c.count === 3) && noteOnly.some((c) => c.drillId === 'gone' && c.count === 4), 'deleted and unknown drill counts kept');
+  assert(!noteOnly.some((c) => c.drillId === 'scales'), 'a live drill the form dropped is dropped (the form owns live drills)');
+  const edited = keepEditedDrillCounts([{ drillId: 'scales', count: 9 }, { drillId: 'chords', count: 0 }, { drillId: 'old', count: 99 }], previous, skill);
+  assert(edited.length === 3 && edited[0].drillId === 'scales' && edited[0].count === 9, 'live drill takes the form count');
+  assert(edited.some((c) => c.drillId === 'old' && c.count === 3), 'form cannot change a deleted drill count');
+  assert(!edited.some((c) => c.drillId === 'chords'), 'invalid live count still refused');
+  const badOld = keepEditedDrillCounts([], [{ drillId: 'old', count: 0 }, { drillId: 'old', count: 2 }, { drillId: 'old', count: 6 }, null as never], skill);
+  assert(badOld.length === 1 && badOld[0].count === 2, 'kept old counts: valid only, first per drill');
+  assert(keepEditedDrillCounts([{ drillId: 'scales', count: 1 }], undefined, skill).length === 1, 'log without counts');
 }
 
 // 4. Drill names: unique per skill among live drills (case and spaces ignored); a deleted drill's name is free.
