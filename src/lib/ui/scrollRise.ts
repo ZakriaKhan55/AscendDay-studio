@@ -86,10 +86,15 @@ export function installScrollRise({ everyWidth = false }: { everyWidth?: boolean
     root.querySelectorAll<HTMLElement>(SELECTOR).forEach(register);
   };
 
+  // A removed element also loses its state: React moves an element by removing and inserting it,
+  // and one put back still marked 'wait' would be skipped by register and stay hidden.
   const forget = (node: Node) => {
     if (!(node instanceof HTMLElement)) return;
-    if (node.hasAttribute('data-rise')) waiting.unobserve(node);
-    node.querySelectorAll('[data-rise]').forEach((el) => waiting.unobserve(el));
+    const marked = node.hasAttribute('data-rise') ? [node] : [];
+    for (const el of [...marked, ...node.querySelectorAll<HTMLElement>('[data-rise]')]) {
+      waiting.unobserve(el);
+      settle(el);
+    }
   };
 
   new MutationObserver((records) => {

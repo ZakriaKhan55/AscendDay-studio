@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 export interface UseAsyncActionOptions<T = any> {
   onSuccess?: (result: T) => void;
@@ -7,7 +7,8 @@ export interface UseAsyncActionOptions<T = any> {
 
 /**
  * Hook for managing single async action loading state. Loading lasts exactly as
- * long as the real work: no artificial minimum.
+ * long as the real work: no artificial minimum. Overlapping calls keep it on until
+ * the last one ends.
  */
 export function useAsyncAction<Args extends any[], ReturnType>(
   actionFn?: (...args: Args) => Promise<ReturnType>,
@@ -15,10 +16,19 @@ export function useAsyncAction<Args extends any[], ReturnType>(
 ) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const pending = useRef(0);
+  const start = useCallback(() => {
+    pending.current += 1;
+    setIsLoading(true);
+  }, []);
+  const finish = useCallback(() => {
+    pending.current -= 1;
+    if (pending.current === 0) setIsLoading(false);
+  }, []);
 
   const execute = useCallback(
     async (...args: Args): Promise<ReturnType | undefined> => {
-      setIsLoading(true);
+      start();
       setError(null);
 
       try {
@@ -34,10 +44,10 @@ export function useAsyncAction<Args extends any[], ReturnType>(
         options?.onError?.(errorObj);
         throw err;
       } finally {
-        setIsLoading(false);
+        finish();
       }
     },
-    [actionFn, options]
+    [actionFn, options, start, finish]
   );
 
   /**
@@ -45,7 +55,7 @@ export function useAsyncAction<Args extends any[], ReturnType>(
    */
   const executeFn = useCallback(
     async <T,>(inlineFn: () => Promise<T>): Promise<T | undefined> => {
-      setIsLoading(true);
+      start();
       setError(null);
 
       try {
@@ -56,10 +66,10 @@ export function useAsyncAction<Args extends any[], ReturnType>(
         setError(errorObj);
         throw err;
       } finally {
-        setIsLoading(false);
+        finish();
       }
     },
-    []
+    [start, finish]
   );
 
   return {
@@ -73,11 +83,13 @@ export function useAsyncAction<Args extends any[], ReturnType>(
 }
 
 /**
- * Hook for managing key-based async actions (e.g. actions on individual items in a list)
+ * Hook for managing key-based async actions (e.g. actions on individual items in a list). A key
+ * stays loading until its last overlapping call ends.
  */
 export function useAsyncActionKey() {
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set());
   const [errorMap, setErrorMap] = useState<Record<string, Error>>({});
+  const pendingByKey = useRef(new Map<string, number>());
 
   const isKeyLoading = useCallback(
     (key: string) => loadingKeys.has(key),
@@ -86,6 +98,7 @@ export function useAsyncActionKey() {
 
   const executeWithKey = useCallback(
     async <T,>(key: string, asyncFn: () => Promise<T>): Promise<T | undefined> => {
+      pendingByKey.current.set(key, (pendingByKey.current.get(key) ?? 0) + 1);
       setLoadingKeys((prev) => new Set(prev).add(key));
       setErrorMap((prev) => {
         const next = { ...prev };
@@ -101,11 +114,17 @@ export function useAsyncActionKey() {
         setErrorMap((prev) => ({ ...prev, [key]: errorObj }));
         throw err;
       } finally {
-        setLoadingKeys((prev) => {
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
+        const left = (pendingByKey.current.get(key) ?? 1) - 1;
+        if (left > 0) {
+          pendingByKey.current.set(key, left);
+        } else {
+          pendingByKey.current.delete(key);
+          setLoadingKeys((prev) => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+        }
       }
     },
     []

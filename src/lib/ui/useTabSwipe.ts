@@ -57,6 +57,17 @@ const ENTER_EASE = 'cubic-bezier(0.16, 1, 0.3, 1)';
 // Gap kept between the sticky header and the strip when a swipe scrolls back up to it.
 const STRIP_GAP_PX = 8;
 
+/**
+ * Finger speed at release (px per ms) from the recent move samples; 0 when the finger stopped
+ * moving more than FLICK_WINDOW_MS before it lifted, so a drag that pauses never counts as a flick.
+ */
+export function releaseSpeed(samples: readonly { x: number; t: number }[], releasedAt: number): number {
+  const first = samples[0];
+  const last = samples[samples.length - 1];
+  if (!first || !last || last.t <= first.t || releasedAt - last.t > FLICK_WINDOW_MS) return 0;
+  return (last.x - first.x) / (last.t - first.t);
+}
+
 interface Gesture {
   x: number;
   y: number;
@@ -222,9 +233,7 @@ export function useTabSwipe(
       gesture = null;
       if (g.axis !== 'x') return;
       suppressClickUntil = e.timeStamp + 400;
-      const first = g.samples[0];
-      const last = g.samples[g.samples.length - 1];
-      const speed = first && last && last.t > first.t ? (last.x - first.x) / (last.t - first.t) : 0;
+      const speed = releaseSpeed(g.samples, e.timeStamp);
       const flick = Math.abs(speed) >= FLICK_SPEED && Math.sign(speed) === Math.sign(g.dx) && Math.abs(g.dx) >= FLICK_MIN_PX;
       const direction: SwipeDirection = g.dx < 0 ? 'next' : 'prev';
       settle();

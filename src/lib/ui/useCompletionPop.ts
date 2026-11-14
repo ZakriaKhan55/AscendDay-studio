@@ -10,9 +10,16 @@ import { actionFeedback } from '@/lib/ui/actionFeedback';
  * plays when `isDone` turns true. Un-checking and checking again replays it,
  * because the check icon remounts (or leaves display:none) each time.
  * The tick feedback (vibration or sound, Settings) plays once each time the pop plays, so it follows the same rule.
+ * An arm lasts one completion: once the item is unchecked (here or on another device), the next
+ * completion pops only if this component armed it again.
  */
 export function useCompletionPop(isDone: boolean) {
   const [armed, setArmed] = useState(false);
+  const [wasDone, setWasDone] = useState(isDone);
+  if (wasDone !== isDone) {
+    setWasDone(isDone);
+    if (!isDone) setArmed(false);
+  }
   const arm = useCallback(() => setArmed(true), []);
   const popping = armed && isDone;
   useEffect(() => {
