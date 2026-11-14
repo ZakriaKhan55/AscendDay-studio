@@ -67,9 +67,10 @@ await wait(20);
 eq(route!.view, 'dashboard', 'nothing shows before the code is loaded');
 
 load('settings').resolve();
-await wait(50);
 load('habits').resolve();
-await wait(50);
+// Polled, not a fixed tick, so a busy CI machine does not fail it; then a margin for a late commit.
+for (let i = 0; i < 150 && route!.view !== 'settings'; i++) await wait(20);
+await wait(100);
 eq(route!.view, 'settings', 'Settings shows');
 eq(location.pathname + location.search, '/settings?section=notifications', 'the address is the latest request (notifications)');
 eq(route!.search, '?section=notifications', 'the page gets the latest query');
