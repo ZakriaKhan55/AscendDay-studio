@@ -2,6 +2,7 @@ import { lazy, useState, type ComponentType } from 'react';
 import { VIEWS, type View } from '@/lib/app/views';
 import { viewFromPath } from '@/lib/app/routes';
 import { reloadOnceForStaleChunk } from '@/lib/app/chunkReload';
+import { elapsedMark, isMarkOlderThan } from '@/lib/time/clock';
 
 /**
  * Every page is its own chunk, loaded on first need: the app shell boots without the 19 pages.
@@ -10,8 +11,11 @@ import { reloadOnceForStaleChunk } from '@/lib/app/chunkReload';
  */
 
 const preloaders = {} as Record<View, () => Promise<unknown>>;
+/** A page whose code failed to load imports again on a mount at least this long after the failure. */
+const RETRY_AFTER_MS = 1500;
 
-function page<P extends object>(view: View, importer: () => Promise<ComponentType<P>>): ComponentType<P> {
+/** Exported for tests (lazyPageRetry.test.ts); the app uses the pages below. */
+export function page<P extends object>(view: View, importer: () => Promise<ComponentType<P>>): ComponentType<P> {
   let loaded: ComponentType<P> | null = null;
   let pending: Promise<ComponentType<P>> | null = null;
   const load = () => {
@@ -26,21 +30,37 @@ function page<P extends object>(view: View, importer: () => Promise<ComponentTyp
   };
   preloaders[view] = load;
 
-  const Lazy = lazy(() =>
-    load().then(
-      (component) => ({ default: component }),
-      (error) => {
-        reloadOnceForStaleChunk();
-        throw error;
-      }
-    )
-  ) as unknown as ComponentType<P>;
+  let failedAt: number | null = null;
+  const makeLazy = () =>
+    lazy(() =>
+      load().then(
+        (component) => ({ default: component }),
+        (error) => {
+          failedAt = elapsedMark();
+          reloadOnceForStaleChunk();
+          throw error;
+        }
+      )
+    ) as unknown as ComponentType<P>;
+  let Lazy = makeLazy();
+
+  // React.lazy keeps a failed import for good, so a later mount (the error card's Try again, or the
+  // page opened again once back online) gets a fresh one that imports again. Not React's own
+  // immediate re-render of the failing mount: that one keeps the failure, or it would loop.
+  const component = (): ComponentType<P> => {
+    if (loaded) return loaded;
+    if (failedAt !== null && isMarkOlderThan(failedAt, RETRY_AFTER_MS)) {
+      failedAt = null;
+      Lazy = makeLazy();
+    }
+    return Lazy;
+  };
 
   // React.lazy suspends on its first render even when the module is already here; a page that has
   // been preloaded renders its component directly instead. Chosen once per mount, so a page never
   // switches component (and loses its state) mid-visit.
   function Page(props: P) {
-    const [Component] = useState<ComponentType<P>>(() => loaded ?? Lazy);
+    const [Component] = useState<ComponentType<P>>(component);
     return <Component {...props} />;
   }
   Page.displayName = `Page(${view})`;
