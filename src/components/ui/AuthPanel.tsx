@@ -982,11 +982,7 @@ export function AuthPanel({ mode, onAuthSuccess, onDone, guestState, pageLinks, 
                       </li>
                     </ul>
                   </div>
-                  {resendError && (
-                    <p role="alert" className="text-xs text-error-text">
-                      {resendError}
-                    </p>
-                  )}
+                  {resendError && <FieldErrorBubble message={resendError} attached={false} />}
                   <CaptchaSlot />
                   <div className="flex flex-col gap-2">
                     <button type="button" onClick={closeForgot} disabled={loading} className="btn-primary w-full min-h-11">

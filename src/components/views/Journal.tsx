@@ -88,7 +88,8 @@ export function Journal({ store }: { store: AppStore }) {
   };
 
   // Keep the editor in step with today's saved entry. Unsaved typing is kept when a sync lands
-  // mid-edit (saving then wins); a different entry for today (another device) closes the editor.
+  // mid-edit (saving then wins, also over a different entry for today from another device); with
+  // no unsaved typing, a different entry for today closes the editor.
   const entryDirtyRef = useRef(false);
   entryDirtyRef.current = entryForm.dirty;
   const shownEntryIdRef = useRef<string | undefined>(undefined);
