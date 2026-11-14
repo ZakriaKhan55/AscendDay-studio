@@ -36,10 +36,14 @@ export function DiscoverPanel({
   const now = leagueNow();
   const seasonPoints = (username: string) => getProfileSeasonPointsByUsername(username, 'ninetyDay', now) || 0;
 
+  // The server filtered by category; an own plan moved to another category on this device (not
+  // synced yet) still came back under its old one, so that card leaves a category it no longer fits.
   const visible = plans
-    .map((p) => {
+    .flatMap((p) => {
       const own = ownById.get(p.id);
-      return own ? { ...own, copyCount: p.copyCount } : p;
+      if (!own) return [p];
+      const movedOut = own.category !== p.category && filters.category !== 'All' && own.category !== filters.category;
+      return movedOut ? [] : [{ ...own, copyCount: p.copyCount }];
     })
     .filter((p) => p.isPublic);
   if (filters.sortBy === 'creator_rank') {

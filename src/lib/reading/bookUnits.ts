@@ -29,7 +29,8 @@ export const bookLogIds = (book: Pick<UserBook, 'id' | 'linkedBookId' | 'curated
  * - to chapters: place = chapters read in tenths (pages / 2 rounded down, so 31 pages -> 1.5, never a
  *   tenth not read); length = the chapter count saved before, else pages / 20 rounded up (at least 1).
  * - switching back while the place is still where the last switch put it: the place before that
- *   switch (so 10 pages -> 0 chapters -> back gives 10 pages, not 0).
+ *   switch (so 10 pages -> 0 chapters -> back gives 10 pages, not 0). Only while the book is still
+ *   in the unit that switch went to: a later switch that kept the place (saved as no record) ends it.
  * The length (always whole) is never below the place.
  */
 export function unitSwitchDefaults(book: UserBook, next: BookUnitName): { current: number; total: number } {
@@ -39,7 +40,9 @@ export function unitSwitchDefaults(book: UserBook, next: BookUnitName): { curren
   if (next === from) return { current, total };
   const last = Array.isArray(book.unitSwitches) ? book.unitSwitches[book.unitSwitches.length - 1] : undefined;
   const back =
-    last && typeof last.pagesBefore === 'number' && last.pagesAfter === toPages(current, from) ? Math.max(0, last.pagesBefore) : null;
+    last && typeof last.pagesBefore === 'number' && last.pagesAfter === toPages(current, from) && (!last.toUnit || last.toUnit === from)
+      ? Math.max(0, last.pagesBefore)
+      : null;
   if (next === 'pages') {
     const curated = findCuratedBook(book.curatedBookId || book.linkedBookId || '');
     const pages = positive(book.lengthByUnit?.pages) ?? positive(curated?.totalPages) ?? total * PAGES_PER_CHAPTER;
@@ -80,7 +83,7 @@ export function switchBookUnit(
   const pagesAfter = toPages(current, change.unit);
   const yesterday = addDays(today, -1);
   const kept = (Array.isArray(book.unitSwitches) ? book.unitSwitches : []).filter((s) => s && s.date >= yesterday);
-  const unitSwitches = pagesAfter !== pagesBefore ? [...kept, { date: today, at: nowIso, pagesBefore, pagesAfter }] : kept;
+  const unitSwitches = pagesAfter !== pagesBefore ? [...kept, { date: today, at: nowIso, pagesBefore, pagesAfter, toUnit: change.unit }] : kept;
   const lengthByUnit = { ...rememberLength(book, from, Math.max(1, book.totalAmount ?? book.totalPages ?? 1)), [change.unit]: total };
   const next: UserBook = {
     ...book,

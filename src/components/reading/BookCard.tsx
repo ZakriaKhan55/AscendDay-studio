@@ -1,16 +1,13 @@
-import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
+import { useClampOverflow } from '@/components/plans/ShowMore';
 import { getCategoryMeta } from '@/lib/reading/books';
 import type { BookCategory } from '@/types';
 
 export function ClampedText({ text, lines = 2 }: { text?: string; lines?: 2 | 3 }) {
   const [expanded, setExpanded] = useState(false);
-  const [overflowing, setOverflowing] = useState(false);
   const ref = useRef<HTMLParagraphElement>(null);
-
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (el && !expanded) setOverflowing(el.scrollHeight > el.clientHeight + 1);
-  }, [text, expanded]);
+  // Re-measured when the width changes too (rotation, sidebar fold), like the plan cards.
+  const overflowing = useClampOverflow(ref, !expanded, text ?? '');
 
   if (!text) return null;
   return (

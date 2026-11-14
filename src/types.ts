@@ -307,6 +307,8 @@ export interface BookUnitSwitch {
   at: string; // ISO timestamp
   pagesBefore: number;
   pagesAfter: number;
+  /** The unit it switched to (absent on switches saved before 2026-11-14). Only the form defaults read it. */
+  toUnit?: 'pages' | 'chapters';
 }
 
 export interface UserBook {
