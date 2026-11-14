@@ -9,7 +9,7 @@ import { uid, generateUUID, todayKey, isPlanJourneyDoneThisPeriod, calculateActi
 import { trustedNow, trustedNowMs } from '../time/clock';
 import { editedPlanStructure } from '../items/planStructure';
 import type { PlanStructureEdits } from '../items/planStructure';
-import { supabase, syncBroadcaster, syncPlanToSupabase, syncFollowedPlanToSupabase, deletePlanFromSupabase, deleteFollowedPlanFromSupabase } from '../auth/supabase';
+import { supabase, syncBroadcaster, syncPlanToSupabase, syncFollowedPlanToSupabase, deletePlanFromSupabase, deleteFollowedPlanFromSupabase, setPlanVisibilityInSupabase } from '../auth/supabase';
 import type { StoreSetState } from '../store/storeSetState';
 
 export function usePlanActions(setState: StoreSetState, afterCommit: (fn: () => void) => void, stateRef: { current: AppState }, state: AppState) {
@@ -633,15 +633,11 @@ export function usePlanActions(setState: StoreSetState, afterCommit: (fn: () => 
     const local = stateRef.current?.improvementPlans.find((p) => p.id === planId);
     const isPublic = newVisibility ?? !local?.isPublic;
 
-    const { data, error } = await supabase
-      .from('improvement_plans')
-      .update({ is_public: isPublic })
-      .eq('id', planId)
-      .eq('creator_id', session.user.id)
-      .select('id');
-    if (error) throw error;
-    const reachedTable = Boolean(data && data.length > 0);
-    const isUnconfirmed = local?.syncStatus === 'pending' || local?.syncStatus === 'failed';
+    // Queued behind any save still running for this plan, so an older save can't undo it.
+    const reachedTable = await setPlanVisibilityInSupabase(planId, session.user.id, isPublic);
+    // Read after the update: a save started meanwhile (queued after it) still carries the old setting.
+    const saved = stateRef.current?.improvementPlans.find((p) => p.id === planId);
+    const isUnconfirmed = saved?.syncStatus === 'pending' || saved?.syncStatus === 'failed';
     if (!reachedTable && !isUnconfirmed) throw new Error('Try again in a moment.');
 
     let updatedPlan: ImprovementPlan | null = null;

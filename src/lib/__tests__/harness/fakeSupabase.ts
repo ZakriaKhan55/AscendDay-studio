@@ -194,8 +194,10 @@ async function route(req: Request, url: URL, r: Req): Promise<Response> {
     return json(201, /return=representation/.test(req.headers.get('prefer') || '') ? ([] as any[]).concat(body) : null);
   }
   if (method === 'PATCH') {
-    for (const row of g) if (filters.every((f: any) => f.f(row))) Object.assign(row, body);
-    return json(204);
+    const updated = g.filter((row: any) => filters.every((f: any) => f.f(row)));
+    for (const row of updated) Object.assign(row, body);
+    // `.update(...).select()` asks for the updated rows back (an empty list when none matched).
+    return /return=representation/.test(req.headers.get('prefer') || '') ? json(200, updated) : json(204);
   }
   if (method === 'DELETE') {
     server.generic.set(table, g.filter((row: any) => !filters.every((f: any) => f.f(row))));

@@ -819,6 +819,24 @@ export function deletePlanFromSupabase(planId: string): Promise<void> {
   });
 }
 
+/**
+ * Sets who can see one of the user's own plans, after any save still running for it, so an older
+ * save carrying the previous setting can't land after it. Resolves whether the row was found;
+ * rejects on error.
+ */
+export function setPlanVisibilityInSupabase(planId: string, creatorId: string, isPublic: boolean): Promise<boolean> {
+  return serializeRowSync(`plan:${planId}`, async () => {
+    const { data, error } = await supabase
+      .from('improvement_plans')
+      .update({ is_public: isPublic })
+      .eq('id', planId)
+      .eq('creator_id', creatorId)
+      .select('id');
+    if (error) throw error;
+    return Boolean(data && data.length > 0);
+  });
+}
+
 /** Upserts this user's copy of a plan; resolves true once the row is saved. */
 export function syncFollowedPlanToSupabase(followedPlan: UserPlanFollow): Promise<boolean> {
   if (!isSupabaseConfigured) return Promise.resolve(false);
@@ -894,20 +912,25 @@ async function upsertFollowRow(followedPlan: UserPlanFollow): Promise<boolean> {
   }
 }
 
-/** Deletes this user's copy of a plan; resolves true once the row is gone (or never existed). */
-export async function deleteFollowedPlanFromSupabase(followedPlanId: string): Promise<boolean> {
-  if (!isSupabaseConfigured) return false;
-  try {
-    const { error } = await supabase.from('user_plan_follows').delete().eq('id', followedPlanId);
-    if (error) {
-      console.error('Error deleting followed plan from Supabase:', error);
+/**
+ * Deletes this user's copy of a plan, after any save still running for it, so a late save can
+ * never bring it back. Resolves true once the row is gone (or never existed).
+ */
+export function deleteFollowedPlanFromSupabase(followedPlanId: string): Promise<boolean> {
+  if (!isSupabaseConfigured) return Promise.resolve(false);
+  return serializeRowSync(`follow:${followedPlanId}`, async () => {
+    try {
+      const { error } = await supabase.from('user_plan_follows').delete().eq('id', followedPlanId);
+      if (error) {
+        console.error('Error deleting followed plan from Supabase:', error);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.warn('Supabase followed plan delete error:', e);
       return false;
     }
-    return true;
-  } catch (e) {
-    console.warn('Supabase followed plan delete error:', e);
-    return false;
-  }
+  });
 }
 
 /** A JSON column that may arrive as text: parsed when it is valid JSON, otherwise returned as is. */
