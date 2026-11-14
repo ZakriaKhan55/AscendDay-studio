@@ -4,14 +4,12 @@
 // whole app to render): the day is captured when the dialog opens and is the one the dialog shows,
 // checks against and saves to. The store side (a past day refuses the save with "Past days can't
 // change.") is the existing addDailyTimeBlock / updateDailyTimeBlock guard.
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import src from '../views/TimeTrackerView.tsx?raw';
 
 function assert(condition: boolean, msg: string) {
   if (!condition) throw new Error(`Assertion failed: ${msg}`);
 }
 
-const src = readFileSync(fileURLToPath(new URL('../views/TimeTrackerView.tsx', import.meta.url)), 'utf8');
 const body = (name: string) => {
   const start = src.indexOf(`const ${name} = (`);
   assert(start !== -1, `${name} exists`);
