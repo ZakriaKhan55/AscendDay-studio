@@ -13,6 +13,8 @@ import { trustedNowMs } from '../time/clock';
 const REPAIRED_AT_KEY = 'ascend_asset_recovery_at';
 /** One automatic repair per this window. */
 const REPAIR_GUARD_MS = 60_000;
+/** Longest wait for the stylesheet refetch before the reload goes ahead anyway. */
+const STYLESHEET_REFRESH_TIMEOUT_MS = 5_000;
 /** Must match the cache names in public/sw.js. The push cache holds no build files and stays. */
 const BUILD_CACHE_PREFIXES = ['ascend-assets-', 'ascend-pages-', 'ascend-static-'];
 
@@ -63,9 +65,28 @@ async function dropCachedBuildAndReload(): Promise<void> {
   // Build files are served `immutable` for a year, so a bad copy in the browser's HTTP cache
   // survives every reload under the same file name. `cache: 'reload'` refetches it from the
   // network and overwrites that copy (through the service worker, which passes the mode on).
+  // A refetch that hangs (a stalled phone connection) is given up after a few seconds: the
+  // reload still happens, so Repair app never sits doing nothing.
   const link = mainStylesheetLink();
-  if (link) await fetch(link.href, { cache: 'reload' }).catch(() => undefined);
+  if (link) await refetchStylesheet(link.href);
   window.location.reload();
+}
+
+async function refetchStylesheet(href: string): Promise<void> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      resolve();
+    }, STYLESHEET_REFRESH_TIMEOUT_MS);
+  });
+  const refetch = fetch(href, { cache: 'reload', signal: controller.signal }).then(
+    () => undefined,
+    () => undefined
+  );
+  await Promise.race([refetch, timeout]);
+  clearTimeout(timer);
 }
 
 /** Whether the build's own stylesheet (`/assets/*.css`) is missing or has no rules. */
