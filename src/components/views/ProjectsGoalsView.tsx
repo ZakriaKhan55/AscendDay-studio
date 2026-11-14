@@ -193,6 +193,8 @@ export function ProjectsGoalsView({
   useEffect(() => {
     setQuickTaskProjectId(filterProjectId || '');
   }, [filterProjectId]);
+  // A chosen project that was deleted since shows (and saves) as No project.
+  const quickProjectId = projects.some((p) => p.id === quickTaskProjectId) ? quickTaskProjectId : '';
   // Focus the quick-add box once the Tasks tab has rendered it.
   useEffect(() => {
     if (!focusQuickAdd || activeTab !== 'tasks') return;
@@ -447,7 +449,7 @@ export function ProjectsGoalsView({
     const title = quickTaskTitle.trim();
     if (!title) return;
     await executeWithKey('quick_add_task', async () => {
-      store.createTask({ title, priority: quickTaskPriority, projectId: quickTaskProjectId || undefined, completed: false, subtasks: [] });
+      store.createTask({ title, priority: quickTaskPriority, projectId: quickProjectId || undefined, completed: false, subtasks: [] });
       setQuickTaskTitle('');
       showSuccessToast('Task added', `"${title}" is on your list.`);
     }).catch((err) => showErrorToast("Couldn't add the task", toUserMessage(err, 'Try again.')));
@@ -935,7 +937,7 @@ export function ProjectsGoalsView({
                 {filterProjectId ? (
                   <span aria-hidden="true" />
                 ) : (
-                  <ToolbarSelect aria-label="New task project" value={quickTaskProjectId} onChange={(e) => setQuickTaskProjectId(e.target.value)} className="truncate">
+                  <ToolbarSelect aria-label="New task project" value={quickProjectId} onChange={(e) => setQuickTaskProjectId(e.target.value)} className="truncate">
                     <option value="">No project</option>
                     {projects.map((p) => (
                       <option key={p.id} value={p.id}>
