@@ -1388,6 +1388,10 @@ html[data-page-hidden] *::after {
       animation: scroll-rise linear backwards;
       animation-timeline: view();
       animation-range: entry 0% entry 260px;
+      /* A card shorter than 260px finishes once it is fully in, so a short last card still
+         settles at the end of the page (its entry ends before a 260px range would). The line
+         above stays for browsers that refuse min() here. */
+      animation-range: entry 0% entry min(100%, 260px);
     }
   }
 }
