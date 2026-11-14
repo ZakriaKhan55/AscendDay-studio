@@ -147,6 +147,10 @@ export function useViewRoute(prepare?: (view: View) => Promise<unknown>) {
   legalRef.current = route.legal;
   // The page most recently asked for (may still be loading). A newer request supersedes it.
   const targetRef = useRef(route.view);
+  // Bumped by every page request and every move to the address bar: a page that finishes loading
+  // shows only if no later request came, even one for the same page (Settings ?section=A, Habits,
+  // Settings ?section=B: the first Settings must not commit its old address).
+  const requestRef = useRef(0);
   const prepareRef = useRef(prepare);
   prepareRef.current = prepare;
   // The page asked for while its code is still loading, once that takes noticeably long.
@@ -162,6 +166,7 @@ export function useViewRoute(prepare?: (view: View) => Promise<unknown>) {
   const syncToLocation = useCallback((kind: NavigationKind) => {
     const target = routeFromLocation();
     canonicalizeUrl(target);
+    requestRef.current += 1;
     targetRef.current = target.view;
     viewRef.current = target.view;
     authRef.current = target.auth;
@@ -174,15 +179,16 @@ export function useViewRoute(prepare?: (view: View) => Promise<unknown>) {
     // Claimed now: the page shows a moment later, and a repeat request must not run it twice.
     if (view === targetRef.current) return;
     targetRef.current = view;
+    const request = ++requestRef.current;
     clearPending();
     if (view !== viewRef.current) {
       pendingTimerRef.current = setTimeout(() => {
         pendingTimerRef.current = null;
-        if (targetRef.current === view) setPendingView(view);
+        if (requestRef.current === request) setPendingView(view);
       }, PENDING_FEEDBACK_MS);
     }
     whenPrepared(prepareRef.current, view).then(() => {
-      if (targetRef.current !== view || view === viewRef.current) return; // superseded while loading
+      if (requestRef.current !== request || view === viewRef.current) return; // superseded while loading
       beforeShow?.();
       viewRef.current = view;
       runPageTransition(() => {
