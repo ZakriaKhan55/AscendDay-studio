@@ -194,6 +194,15 @@ export type SignUpResult =
  * `captchaToken`: from getCaptchaToken (undefined while the bot check is off), here and in the
  * other Auth calls below.
  */
+/** Removes a sessionStorage mark; storage that throws (blocked, private mode) must not turn a result into an error. */
+function removeSessionItem(key: string): void {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // Storage unavailable: nothing was stored there either.
+  }
+}
+
 export async function signUpUser(
   email: string,
   password: string,
@@ -238,19 +247,19 @@ export async function signUpUser(
   });
 
   if (authError) {
-    sessionStorage.removeItem('ascend_signup_defaults');
+    removeSessionItem('ascend_signup_defaults');
     if (isCaptchaRejection(authError)) throw new CaptchaRejectedError();
     throw new Error(signUpErrorMessage(authError.message));
   }
 
   if (!authData.user) {
-    sessionStorage.removeItem('ascend_signup_defaults');
+    removeSessionItem('ascend_signup_defaults');
     throw new Error("Couldn't create your account. Try again.");
   }
 
   if (!authData.session) {
     // Email confirmation is enabled — no active session yet
-    sessionStorage.removeItem('ascend_signup_defaults');
+    removeSessionItem('ascend_signup_defaults');
     return { type: 'email_confirmation', email: trimmedEmail };
   }
 
@@ -378,7 +387,7 @@ export async function signInWithGoogle(returnPath: string): Promise<void> {
     options: { redirectTo: `${window.location.origin}${returnPath}` },
   });
   if (error) {
-    sessionStorage.removeItem(GOOGLE_TERMS_KEY);
+    removeSessionItem(GOOGLE_TERMS_KEY);
     console.error('Google sign-in failed to start:', error);
     throw new Error('Couldn’t open Google sign-in. Try again.');
   }
