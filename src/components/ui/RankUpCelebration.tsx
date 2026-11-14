@@ -187,15 +187,18 @@ export function RankUpCelebration({ from, to, seasonPoints, onClose, forceSound 
       aria-labelledby={titleId}
       aria-describedby={descId}
       tabIndex={-1}
-      className={`fixed inset-0 flex items-center justify-center overflow-hidden outline-none px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] ${
+      className={`fixed inset-0 flex justify-center overflow-x-hidden overflow-y-auto overscroll-contain outline-none px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] ${
         exiting ? 'rankup-exit pointer-events-none' : ''
       }`}
       style={{ zIndex: 'calc(var(--z-blocking) + 10)', ...tierVars(to) }}
     >
-      <div aria-hidden="true" className="rankup-backdrop absolute inset-0 animate-enter-fade" />
-      {landed && !isReduced && level >= 1 && <div aria-hidden="true" className="rankup-wash absolute inset-0" />}
+      {/* Fixed, so they still cover the page when a short screen scrolls the content. */}
+      <div aria-hidden="true" className="rankup-backdrop fixed inset-0 animate-enter-fade" />
+      {landed && !isReduced && level >= 1 && <div aria-hidden="true" className="rankup-wash fixed inset-0" />}
 
-      <div className="relative flex flex-col items-center text-center w-full max-w-sm">
+      {/* my-auto centres it, and on a screen too short for it (a phone on its side) it starts at the
+          top and scrolls, so Continue stays reachable. */}
+      <div className="relative my-auto flex flex-col items-center text-center w-full max-w-sm">
         {/* The badge stage. */}
         <div aria-hidden="true" className="relative w-60 h-60 flex items-center justify-center">
           {landed && !isReduced && (

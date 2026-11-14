@@ -76,6 +76,26 @@ export function firstEnabled(options: SelectOption[]): number {
   return options.findIndex((o) => !o.disabled);
 }
 
+/**
+ * The active row after the options change (a sync brought a new skill while the list is open):
+ * the option that was active, found by value in the new list; else the same position, clamped.
+ */
+export function keepActive(before: SelectOption[], after: SelectOption[], active: number): number {
+  if (active < 0 || active >= before.length) return active;
+  const i = after.findIndex((o) => o.value === before[active].value);
+  return i >= 0 ? i : Math.min(active, after.length - 1);
+}
+
+/**
+ * An uncontrolled select's value after its options change, like a native select: kept while an
+ * option still has it (a disabled placeholder included), else the first enabled option (options
+ * that arrive later, or the chosen one removed). Unchanged while there is no enabled option.
+ */
+export function reconcileValue(all: SelectOption[], value: string): string {
+  if (all.some((o) => o.value === value)) return value;
+  return all.find((o) => !o.disabled)?.value ?? value;
+}
+
 export function lastEnabled(options: SelectOption[]): number {
   for (let i = options.length - 1; i >= 0; i--) if (!options[i].disabled) return i;
   return -1;

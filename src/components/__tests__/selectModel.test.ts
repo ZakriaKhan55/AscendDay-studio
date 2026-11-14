@@ -4,10 +4,12 @@ import { createElement as h, Fragment } from 'react';
 import {
   anchorOutOfView,
   firstEnabled,
+  keepActive,
   lastEnabled,
   moveActive,
   parseOptions,
   placeMenu,
+  reconcileValue,
   typeahead,
   MENU_MAX_HEIGHT,
   type SelectOption,
@@ -124,5 +126,26 @@ const area = { top: 0, left: 0, width: 375, height: 800 };
 eq(anchorOutOfView({ top: -60, left: 0, width: 10, height: 44 }, area), true, 'scrolled above → out');
 eq(anchorOutOfView({ top: 790, left: 0, width: 10, height: 44 }, area), false, 'partly visible → in');
 eq(anchorOutOfView({ top: 801, left: 0, width: 10, height: 44 }, area), true, 'below → out');
+
+// --- keepActive (CR-03-28): options change while the list is open --------------------------
+{
+  const opt = (value: string, disabled = false): SelectOption => ({ value, label: value, text: value, disabled });
+  const before = [opt('a'), opt('b'), opt('c')];
+  eq(keepActive(before, [opt('new'), ...before], 1), 2, 'an option added above: the active option (b) is kept by value');
+  eq(keepActive(before, [opt('a'), opt('c')], 1), 1, 'the active option removed: the same position');
+  eq(keepActive(before, [opt('a')], 2), 0, 'the active option removed at the end: clamped to the last row');
+  eq(keepActive(before, before, -1), -1, 'no active option stays none');
+}
+
+// --- reconcileValue (CR-03-27): an uncontrolled select's value when its options change -----
+{
+  const opt = (value: string, disabled = false): SelectOption => ({ value, label: value, text: value, disabled });
+  eq(reconcileValue([], ''), '', 'no options yet: nothing to pick');
+  eq(reconcileValue([opt('x', true), opt('a'), opt('b')], ''), 'a', 'options that arrive later: the first enabled one, like native');
+  eq(reconcileValue([opt('a'), opt('b')], 'b'), 'b', 'a value that is still there is kept');
+  eq(reconcileValue([opt('a'), opt('c')], 'b'), 'a', 'the chosen option removed: the first enabled one');
+  eq(reconcileValue([opt('', true), opt('a')], ''), '', 'a disabled placeholder that is the value is kept (a choice is still asked for)');
+  eq(reconcileValue([opt('x', true)], 'b'), 'b', 'no enabled option: unchanged');
+}
 
 console.log('selectModel fixtures: all passed');

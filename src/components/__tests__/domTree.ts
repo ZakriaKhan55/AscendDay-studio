@@ -86,6 +86,8 @@ function track(el: El, tag: string): El {
     querySelectorAll: (selector: string) => descendants(el).filter((node) => matches(node, selector)),
     querySelector: (selector: string) => descendants(el).find((node) => matches(node, selector)) ?? null,
   });
+  // react-dom marks the chosen <option> of a <select> through select.options.
+  if (tag.toLowerCase() === 'select') Object.defineProperty(el, 'options', { get: () => descendants(el).filter((n) => n.tagName === 'OPTION') });
   Object.defineProperty(el, 'isConnected', {
     configurable: true,
     get: () => {

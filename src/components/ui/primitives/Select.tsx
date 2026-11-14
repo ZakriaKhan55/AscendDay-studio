@@ -7,10 +7,12 @@ import { FieldShell, fieldBorder, controlBase, useFieldLinking, type BaseFieldPr
 import {
   anchorOutOfView,
   firstEnabled,
+  keepActive,
   lastEnabled,
   moveActive,
   parseOptions,
   placeMenu,
+  reconcileValue,
   typeahead,
   type Box,
   type Placement,
@@ -115,6 +117,8 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(function 
   const controlled = valueProp !== undefined;
   // Uncontrolled: like native, the first enabled option until one is picked.
   const [inner, setInner] = React.useState(() => defaultValue ?? firstEnabledValue(all));
+  const reconciled = controlled ? inner : reconcileValue(all, inner);
+  if (reconciled !== inner) setInner(reconciled);
   const value = controlled ? valueProp : inner;
   const selectedIndex = options.findIndex((o) => o.value === value);
   const selected = selectedIndex >= 0 ? options[selectedIndex] : null;
@@ -188,15 +192,14 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(function 
     if (closeOpenList === closeRef.current) closeOpenList = null;
   }, []);
 
-  // Options changed while open (a sync brought a new skill): keep the active option by value.
-  const activeValue = React.useRef<string | null>(null);
-  activeValue.current = active >= 0 && active < options.length ? options[active].value : null;
+  // Options changed while open (a sync brought a new skill): keep the active option by value,
+  // read from the options it was active in (the list as last shown), not the new ones.
+  const shownOptions = React.useRef(options);
   React.useEffect(() => {
-    if (!open || activeValue.current === null) return;
-    const i = options.findIndex((o) => o.value === activeValue.current);
-    setActive(i >= 0 ? i : Math.min(active, options.length - 1));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options]);
+    const before = shownOptions.current;
+    shownOptions.current = options;
+    if (open && before !== options) setActive((current) => keepActive(before, options, current));
+  }, [open, options]);
 
   // Place the list (and again on scroll, the on-screen keyboard, window resize). Never closes on
   // resize: on Android the keyboard folding away after a text field fires one right after opening.
