@@ -238,11 +238,16 @@ for (const c of cases) {
     phoneWrites(c.table, c.phoneItem);
     pull(a, c.table, [c.id]);
     const local = itemOf(a, c.table, c.id);
-    const expectMerge = c.table === 'time_tracker_days';
-    assert(
-      expectMerge || hashOf(c.table, local) === hashOf(c.table, itemsOf(collectionByTable(c.table), base(c.state('edit')))[0]),
-      `${c.name}: the offline edit stays over the other device's row`
-    );
+    if (c.table === 'time_tracker_days') {
+      // Merged block by block: other fields may change, but the offline edit (b1 ends 10:30) stays.
+      const blocks = ((local as { blocks?: { id: string; endTime?: string }[] } | undefined)?.blocks ?? []);
+      assert(blocks.find((x) => x.id === 'b1')?.endTime === '10:30', `${c.name}: the offline edit (b1 ends 10:30) stays after the merge`);
+    } else {
+      assert(
+        hashOf(c.table, local) === hashOf(c.table, itemsOf(collectionByTable(c.table), base(c.state('edit')))[0]),
+        `${c.name}: the offline edit stays over the other device's row`
+      );
+    }
     save(a);
     assert(opsFor(c.table).length === 1, `${c.name}: the offline edit uploads on reconnect`);
   }

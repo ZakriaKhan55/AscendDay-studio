@@ -52,9 +52,11 @@ const entries = [todayEntry, pastEntry, moodOnly];
   const shrunk = applyJournalEntryEdit(entries, 'p', 'sad', 'ok', TODAY)!;
   eq(shrunk.entry.pointsAwarded, true, "an earlier entry keeps its pointsAwarded flag");
   const ledger: PointsEntry = computeJournalAward(entries, TODAY, Date.parse(`${TODAY}T00:00:00`), Date.parse('2026-11-07T10:00:00.000Z'))!;
+  eq(ledger?.amount, 2, "baseline: today's +2 award exists");
   const after = computeJournalAward(shrunk.journalEntries, TODAY, Date.parse(`${TODAY}T00:00:00`), Date.parse('2026-11-07T10:00:00.000Z'), ledger);
   eq(after, ledger, "today's award unchanged by an earlier edit");
   const pastBefore = computeJournalAward(entries, PAST, Date.parse(`${PAST}T00:00:00`), Date.parse('2026-11-07T10:00:00.000Z'))!;
+  eq(pastBefore?.amount, 2, "baseline: the earlier day's +2 award exists");
   const pastAfter = computeJournalAward(shrunk.journalEntries, PAST, Date.parse(`${PAST}T00:00:00`), Date.parse('2026-11-07T10:00:00.000Z'), pastBefore);
   eq(pastAfter, pastBefore, "the earlier day's award row is the same (+2 stays)");
 }
@@ -67,6 +69,7 @@ const entries = [todayEntry, pastEntry, moodOnly];
   const start = Date.parse(`${TODAY}T00:00:00`);
   const now = Date.parse('2026-11-07T10:00:00.000Z');
   const ledger = computeJournalAward(entries, TODAY, start, now)!;
+  eq(ledger?.amount, 2, "baseline: today's +2 award exists");
   eq(computeJournalAward(edit.journalEntries, TODAY, start, now, ledger), ledger, "today's award unchanged by today's edit");
 }
 

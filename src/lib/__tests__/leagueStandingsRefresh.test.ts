@@ -170,12 +170,20 @@ const last = <T,>(xs: T[]) => xs[xs.length - 1];
     void pull.then(() => (pullDone = true));
     const again = refresher.refresh({ full: true });
     assert(again === pull, 'a second full ask during the poll shares the queued full run');
+    // Let the poll finish but hold the queued full fetch: the pull must still be waiting for it.
+    const openPoll = open;
+    hold();
+    openPoll();
+    await poll;
+    for (let i = 0; i < 50 && calls.length < 3; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    assert(calls.slice(1).join() === 'slim,full', 'poll then exactly one full run');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert(!pullDone, 'the pull is still waiting while its full fetch is out');
     gate = null;
     open();
-    await poll;
     await pull;
     assert(pullDone, 'the pull waited for its full run');
-    assert(calls.slice(1).join() === 'slim,full', 'poll then exactly one full run');
+    assert(calls.slice(1).join() === 'slim,full', 'still exactly one full run');
     // During a full run: a full ask shares it (no extra call).
     nowMs += MIN;
     hold();

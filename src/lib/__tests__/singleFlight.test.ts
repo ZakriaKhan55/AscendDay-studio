@@ -61,5 +61,17 @@ async function main() {
   console.log('singleFlight fixtures: all passed');
 }
 
-// An assertion that throws rejects this promise; Node then exits non-zero (unhandled rejection).
-void main();
+// A failed assertion, or main() never finishing (a promise singleFlight leaves pending would let
+// Node exit 0 with the remaining checks unrun), ends the process non-zero.
+const proc = (globalThis as unknown as { process: { exit: (code: number) => never } }).process;
+const deadline = setTimeout(() => {
+  console.error('singleFlight fixtures: main() did not finish within 10 s');
+  proc.exit(1);
+}, 10_000);
+main().then(
+  () => clearTimeout(deadline),
+  (err: unknown) => {
+    console.error(err);
+    proc.exit(1);
+  }
+);

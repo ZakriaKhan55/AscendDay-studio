@@ -184,7 +184,9 @@ for (const [name, guide, expected] of guides) {
   assert(!/\bdrills?\b/i.test(text), `${name}: user-facing word is "count", not "drill"`);
 
   const atPoints = renderToString(createElement(HowItWorksBody, { guide, focus: 'points' }));
-  assert(/<h3[^>]*data-autofocus[^>]*>Points<\/h3>|<h3[^>]*>Points<\/h3>/.test(atPoints) && atPoints.includes('data-autofocus'), `${name}: focus=points marks the Points heading`);
+  // The marker sits on the Points heading's own opening tag, and nowhere else.
+  assert(/<h3\b[^>]*\bdata-autofocus\b[^>]*>Points<\/h3>/.test(atPoints), `${name}: focus=points marks the Points heading`);
+  assert((atPoints.match(/data-autofocus/g) || []).length === 1, `${name}: focus=points marks one element only`);
 }
 
 // One explanation per page: the old side boxes and the CapMeter note are gone from the app.
