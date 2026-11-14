@@ -1354,7 +1354,7 @@ export function useAppState() {
 
                 const rawMergedState = guardResult.hasSuspiciousDrop
                   ? guardResult.retainedState
-                  : withHydratedPoints(guardResult.mergedState, sanitizedState);
+                  : withHydratedPoints(guardResult.mergedState, sanitizedState, tablesRead);
                 const reconciledMergedState = reconcileWeeklyGoalsPointsForAllWeeks(
                   reconcileLinkedWeeklyGoals(rawMergedState, trustedNow()),
                   trustedNow()

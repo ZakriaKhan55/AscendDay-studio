@@ -63,9 +63,14 @@ export function excisePointsEntriesInternal(
   };
 }
 
-export function withHydratedPoints(merged: AppState, hydrated: AppState): AppState {
+/**
+ * After the boot merge, keeps only the point rows the server has (previews it never took go).
+ * `serverRead`: every table was read, so an empty server ledger is real (no points on the server)
+ * and the last stale preview goes too; otherwise an empty one may be a failed read and is not trusted.
+ */
+export function withHydratedPoints(merged: AppState, hydrated: AppState, serverRead: boolean): AppState {
   const serverPoints = hydrated.pointsHistory || [];
-  if (serverPoints.length === 0) return merged;
+  if (serverPoints.length === 0 && !serverRead) return merged;
   const live = new Set(serverPoints.map((entry) => entry.id));
   const pointsHistory = (merged.pointsHistory || []).filter((entry) => live.has(entry.id));
   if (pointsHistory.length === (merged.pointsHistory || []).length) return merged;

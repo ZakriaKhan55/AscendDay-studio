@@ -186,7 +186,8 @@ export function parseDate(dateVal?: string | Date | number | null): Date | null 
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
       const [y, m, d] = trimmed.split('-').map(Number);
       const date = new Date(y, m - 1, d);
-      return isNaN(date.getTime()) ? null : date;
+      // A day the month doesn't have (2026-02-30) rolls into the next month: invalid, not March 2.
+      return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d ? date : null;
     }
 
     const d = new Date(trimmed);

@@ -10,7 +10,7 @@ import { isRetiredAppSkillAward } from '../points/skillAwards';
 import { isRetiredAppReadingAward } from '../points/readingAwards';
 import { isRetiredAppJournalAward } from '../points/journalAwards';
 import { isRetiredAppFocusAward } from '../points/focusAwards';
-import { weekKey, uid, todayKey } from '../time/dates';
+import { weekKey, uid, todayKey, parseDate } from '../time/dates';
 import { WEEKLY_REFLECTION_POINTS, calculateWeeklyGoalsPoints } from '../points/pointsConfig';
 import { trustedNow, trustedNowMs } from '../time/clock';
 import { leagueNow, getSeasonNumber, getSeasonStart } from '../time/leagueTime';
@@ -237,7 +237,9 @@ export function sanitizeLoadedState(loaded: Partial<AppState>, profile: UserProf
 
   const computedSeasonPoints = calculateSeasonalTotal(pointsHistory, activeSeasonStart);
 
-  // Deduplicate badHabitLogs by (badHabitId, date) keeping latest entry
+  // Deduplicate badHabitLogs by (badHabitId, date) keeping the last changed entry (updatedAt, else
+  // createdAt), the same pick as mergeBadHabitLogs, so loading and merging keep the same log.
+  const changedAt = (l: BadHabitLog) => (parseDate(l.updatedAt) || parseDate(l.createdAt))?.getTime() ?? 0;
   const logsMap = new Map<string, BadHabitLog>();
   (st.badHabitLogs ?? []).forEach((l) => {
     if (!l || !l.badHabitId || !l.date) return;
@@ -246,9 +248,7 @@ export function sanitizeLoadedState(loaded: Partial<AppState>, profile: UserProf
     if (!existing) {
       logsMap.set(key, l);
     } else {
-      const existingTime = existing.createdAt ? new Date(existing.createdAt).getTime() : 0;
-      const newTime = l.createdAt ? new Date(l.createdAt).getTime() : 0;
-      if (newTime >= existingTime) {
+      if (changedAt(l) >= changedAt(existing)) {
         logsMap.set(key, l);
       }
     }

@@ -1307,6 +1307,9 @@ function mergeAppStateInternal(
     };
   }
 
+  // A tracker deleted on either side stays deleted, whichever side's copy was picked above.
+  if (addictionTracker?.id && tombstoneSet.has(addictionTracker.id)) addictionTracker = null;
+
   return {
     ...DEFAULT_STATE,
     ...baseState,
