@@ -45,7 +45,8 @@ function pact(extra: Partial<SharedChallenge>): SharedChallenge {
 }
 
 // Noon UTC: the same calendar date on a device in Karachi, UTC and New York.
-const noonUtc = (day: string) => new Date(`${day}T12:00:00.000Z`);
+// Local noon of that day on this device (UTC noon is already the next day east of UTC+12, e.g. Auckland).
+const noonOn = (day: string) => new Date(`${day}T12:00:00`);
 
 function karachiLondon() {
   // 01:00 PKT on 11-21 = 20:00 London on 11-20. user1 = Karachi, user2 = London. Server start 11-21.
@@ -66,13 +67,13 @@ function karachiLondon() {
   const karachiEnd = pactDayCells(done, true, '2026-11-27', '2026-11-27');
   assert(karachiEnd.every((cell) => cell.state === 'both'), 'Karachi end: every day done together');
   assert(pactCanStillFinish(karachiEnd), 'Karachi end: can finish');
-  assert(reconcileSharedChallengeLifecycle(done, noonUtc('2026-11-27')).status === 'completed', '7/7 = completed');
+  assert(reconcileSharedChallengeLifecycle(done, noonOn('2026-11-27')).status === 'completed', '7/7 = completed');
 
   // London's day 7 (11-27) is still a pact day: the challenge is running there, not ended.
   const running = pact({ startDate: '2026-11-21', user1DoneDates: range('2026-11-21', 7), user2DoneDates: range('2026-11-21', 6) });
   assert(pactDayNumber(running, '2026-11-27') === 7, 'London 11-27 = day 7');
-  assert(reconcileSharedChallengeLifecycle(running, noonUtc('2026-11-27')).status === 'active', 'day 7 still running');
-  assert(reconcileSharedChallengeLifecycle(running, noonUtc('2026-11-28')).status === 'expired', 'day 8 = ended on this device');
+  assert(reconcileSharedChallengeLifecycle(running, noonOn('2026-11-27')).status === 'active', 'day 7 still running');
+  assert(reconcileSharedChallengeLifecycle(running, noonOn('2026-11-28')).status === 'expired', 'day 8 = ended on this device');
   console.log('Karachi / London start date passed');
 }
 
@@ -83,15 +84,15 @@ function tokyoLondon() {
   const cells = pactDayCells(c, false, '2026-11-20', '2026-11-21');
   assert(cells[0].date === '2026-11-21' && cells[6].date === '2026-11-27', 'chain = 11-21 .. 11-27 on any device');
   assert(pactCanStillFinish(cells), 'no false "can\'t finish" on any device');
-  assert(reconcileSharedChallengeLifecycle(c, noonUtc('2026-11-27')).status === 'active', '11-27 is day 7, still running');
+  assert(reconcileSharedChallengeLifecycle(c, noonOn('2026-11-27')).status === 'active', '11-27 is day 7, still running');
   console.log('Tokyo / London start date passed');
 }
 
 function noTickBeforeDayOne() {
   const c = pact({ startDate: '2026-11-21' });
-  const before = applyPledgeToggle(c, false, true, noonUtc('2026-11-20'));
+  const before = applyPledgeToggle(c, false, true, noonOn('2026-11-20'));
   assert(before.updated === c && !before.becameCompleted, 'no tick before day 1');
-  const onDay1 = applyPledgeToggle(c, false, true, noonUtc('2026-11-21'));
+  const onDay1 = applyPledgeToggle(c, false, true, noonOn('2026-11-21'));
   assert((onDay1.updated.user2DoneDates || []).includes('2026-11-21'), 'tick on day 1');
 
   // A habit-linked pact whose day 1 is after the real today is left alone (the server would refuse).
