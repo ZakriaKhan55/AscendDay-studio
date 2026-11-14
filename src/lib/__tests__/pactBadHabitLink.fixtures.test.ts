@@ -141,6 +141,13 @@ const doom = badHabit('b1', 'Doomscrolling');
   const withYesterday = resist('t6', 'Doomscrolling', { user1DoneDates: [yesterday, TODAY] });
   const kept = tickLinkedBadHabitPacts([withYesterday], () => true, doom, false, TODAY).challenges[0];
   assert((kept.user1DoneDates || []).join() === yesterday, "yesterday's tick stays");
+
+  // CR-05-10: the day the guards checked is the day changed. A log saved just before midnight
+  // passes its own day; the tick lands there, not on the device's new today.
+  const started = resist('t7', 'Doomscrolling', { createdAt: `${addDays(TODAY, -3)}T12:00:00` });
+  const lateTick = tickLinkedBadHabitPacts([started], () => true, doom, true, yesterday);
+  assert(lateTick.ticks.length === 1, 'late tick: sent once');
+  assert((lateTick.challenges[0].user1DoneDates || []).join() === yesterday, 'late tick: lands on the checked day, not today');
   console.log('resist tick fixtures passed');
 }
 

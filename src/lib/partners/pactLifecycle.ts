@@ -475,13 +475,15 @@ export function tickLinkedBadHabitPacts(
   today: string = todayKey()
 ): { challenges: SharedChallenge[]; ticks: LinkedPactTick[] } {
   const ticks: LinkedPactTick[] = [];
+  const todayAt = parseDate(today) ?? trustedNow();
   const next = challenges.map((challenge) => {
     if (challenge.status !== 'active') return challenge;
     const isUser1 = sideOf(challenge);
     if (isUser1 === null || !linkedBadHabitFor(challenge, isUser1, [badHabit])) return challenge;
     if (pactNotStartedYet(challenge, today)) return challenge;
     if (pactSideDoneOn(challenge, isUser1, today) === resisted) return challenge;
-    const { updated } = applyPledgeToggle(challenge, isUser1, resisted);
+    // The day checked above is the day changed, even when the clock passed midnight in between.
+    const { updated } = applyPledgeToggle(challenge, isUser1, resisted, todayAt);
     ticks.push({ updated, isUser1 });
     return updated;
   });

@@ -13,7 +13,7 @@ import { PageHero } from '@/components/ui/PageHero';
 import { HowItWorksButton, HowItWorksDialog, useHowItWorks } from '@/components/ui/HowItWorks';
 import { partnersGuide } from '@/components/howItWorks/partners';
 import { FOCUS_RING, TAP_TARGET, TAP_TARGET_Y, cx } from '@/components/ui/primitives/shared';
-import { leagueNow } from '@/lib/time/leagueTime';
+import { getSeasonNumber, leagueNow } from '@/lib/time/leagueTime';
 import { leaguePeriodKey } from '@/lib/leagues/leagueStandingsRefresh';
 import { getCurrentTier } from '@/lib/leagues/tiers';
 import { isPartnershipUser1 } from '@/lib/partners/partnershipSide';
@@ -173,8 +173,12 @@ export function AccountabilityPartner({ store, onNavigate }: { store: AppStore; 
   // The partner's season points, streak and avatar from the server, kept with the partner they are
   // for: a tab switch never shows the previous partner's numbers, and a failed fetch is never zeros.
   // A pull-to-refresh fetches them again with the numbers kept on screen; a failed refetch keeps them.
+  // They are kept with their season too: a new season fetches them again and never compares the
+  // partner's old season with yours.
+  const season = getSeasonNumber(leagueNow());
   const [partnerStats, setPartnerStats] = useState<{
     name: string;
+    season: number;
     status: 'ready' | 'failed';
     seasonPoints?: number;
     streak?: number;
@@ -192,7 +196,9 @@ export function AccountabilityPartner({ store, onNavigate }: { store: AppStore; 
     let mounted = true;
     // This partner's numbers already on screen stay when the fetch fails.
     const failed = () =>
-      setPartnerStats((prev) => (prev?.name === partnerName && prev.status === 'ready' ? prev : { name: partnerName, status: 'failed' }));
+      setPartnerStats((prev) =>
+        prev?.name === partnerName && prev.season === season && prev.status === 'ready' ? prev : { name: partnerName, season, status: 'failed' }
+      );
     getPartnerProfileStats(partnerName)
       .then((res) => {
         if (!mounted) return;
@@ -202,6 +208,7 @@ export function AccountabilityPartner({ store, onNavigate }: { store: AppStore; 
         }
         setPartnerStats({
           name: partnerName,
+          season: res.seasonId,
           status: 'ready',
           seasonPoints: res.seasonPoints,
           streak: res.stats?.currentStreakDays ?? res.stats?.streakDays ?? 0,
@@ -215,8 +222,8 @@ export function AccountabilityPartner({ store, onNavigate }: { store: AppStore; 
     return () => {
       mounted = false;
     };
-  }, [partnerName, getPartnerProfileStats, statsAttempt]);
-  const shownStats = partnerStats && partnerStats.name === partnerName ? partnerStats : null;
+  }, [partnerName, getPartnerProfileStats, statsAttempt, season]);
+  const shownStats = partnerStats && partnerStats.name === partnerName && partnerStats.season === season ? partnerStats : null;
   const retryPartnerStats = () => {
     setPartnerStats(null);
     setStatsAttempt((n) => n + 1);
