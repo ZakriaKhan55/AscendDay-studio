@@ -27,7 +27,9 @@ function madeLabel(createdAt?: string): string {
 
 /**
  * Names to show where categories sit side by side: two with the same name get "· made <date>"
- * (from createdAt) so they can be told apart. Keyed by category id.
+ * (from createdAt) so they can be told apart. Two still alike (made the same day, or with no date)
+ * get " (2)", " (3)" after the first, oldest first, so the numbers never move when the list is
+ * reordered. Keyed by category id.
  */
 export function categoryDisplayNames(activities: TimeTrackerActivity[]): Map<string, string> {
   const counts = new Map<string, number>();
@@ -37,6 +39,18 @@ export function categoryDisplayNames(activities: TimeTrackerActivity[]): Map<str
     const dup = (counts.get(categoryNameKey(a.name)) || 0) > 1;
     const made = dup ? madeLabel(a.createdAt) : '';
     out.set(a.id, made ? `${a.name} · made ${made}` : a.name);
+  }
+  const alike = new Map<string, TimeTrackerActivity[]>();
+  for (const a of activities) {
+    const key = categoryNameKey(out.get(a.id) || '');
+    alike.set(key, [...(alike.get(key) || []), a]);
+  }
+  for (const group of alike.values()) {
+    if (group.length < 2) continue;
+    const ordered = [...group].sort((x, y) => (x.createdAt || '').localeCompare(y.createdAt || '') || x.id.localeCompare(y.id));
+    ordered.forEach((a, i) => {
+      if (i > 0) out.set(a.id, `${out.get(a.id)} (${i + 1})`);
+    });
   }
   return out;
 }

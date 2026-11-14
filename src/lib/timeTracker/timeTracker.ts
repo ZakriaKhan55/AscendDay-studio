@@ -477,7 +477,8 @@ export function commitTimeTrackerDays(
     const keptIds = new Set(next.map((b) => b.id));
     const removed = previous.filter((b) => !keptIds.has(b.id)).map((b) => b.id);
     const meta: TimeTrackerDayMeta = { ...(dayMeta[dateKey] || {}), updatedAt: nowIso };
-    if (removed.length > 0) {
+    // A block back on the day (same id) is no longer removed, whatever else this commit does.
+    if (removed.length > 0 || meta.deletedBlockIds?.some((id) => keptIds.has(id))) {
       const kept = (meta.deletedBlockIds || []).filter((id) => !keptIds.has(id));
       meta.deletedBlockIds = Array.from(new Set([...kept, ...removed])).slice(-MAX_DELETED_BLOCK_IDS);
     }

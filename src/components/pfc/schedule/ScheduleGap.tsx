@@ -1,7 +1,7 @@
 import { ArrowRight, CalendarDays, CheckCircle2, Play } from 'lucide-react';
 import type { AppStore } from '@/lib/store/store';
 import type { TimeTrackerActivity } from '@/types';
-import { formatTime12h, timeStringToMinutes } from '@/lib/timeTracker/timeTracker';
+import { blockIntervalMs, formatTime12h } from '@/lib/timeTracker/timeTracker';
 import { EmptyState } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/Toast';
 import { toUserMessage } from '@/lib/app/userMessage';
@@ -36,8 +36,8 @@ export function ScheduleGap({
   const shownActivity = shown ? activityMap.get(shown.activityId) : null;
   const nextActivity = nextBlock ? activityMap.get(nextBlock.activityId) : null;
 
-  const nowSecs = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-  const untilNext = nextBlock ? Math.max(0, timeStringToMinutes(nextBlock.startTime) * 60 - nowSecs) : 0;
+  // Real instants (like the active block's countdown), so a daylight-saving change today counts right.
+  const untilNext = nextBlock ? Math.max(0, Math.ceil((blockIntervalMs(nextBlock, day).startMs - now.getTime()) / 1000)) : 0;
   const minsUntilNext = Math.max(1, Math.ceil(untilNext / 60));
 
   const status = resolved?.skipped ? 'Block skipped' : resolved?.completed ? 'Finished early' : 'Free time';
