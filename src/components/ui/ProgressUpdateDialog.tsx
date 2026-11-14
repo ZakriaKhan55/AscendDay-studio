@@ -34,6 +34,8 @@ export interface ProgressUpdateDialogProps {
 }
 
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+// Rounded so decimal amounts never show float noise (0.1 + 0.2).
+const round = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Ascend's one way to update a progress amount by hand (reading, plan targets, project and goal
@@ -59,7 +61,8 @@ export function ProgressUpdateDialog({
 }: ProgressUpdateDialogProps) {
   const remaining = Math.max(0, target - current);
   const startMode: Mode = remaining > 0 ? 'add' : 'set';
-  const startAmount = Math.min(step, remaining) || step;
+  // Rounded like the field's max: 21.1 - 21 is 0.10000000000000142, which the field refuses as over 0.1.
+  const startAmount = round(Math.min(step, remaining)) || step;
 
   const [mode, setMode] = useState<Mode>(startMode);
   const [amount, setAmount] = useState(startAmount);
@@ -80,8 +83,6 @@ export function ProgressUpdateDialog({
 
   const form = useUnsavedChanges(open, [mode, amount, total]);
 
-  // Rounded so decimal amounts never show float noise (0.1 + 0.2).
-  const round = (n: number) => Math.round(n * 100) / 100;
   const next = round(mode === 'add' ? clamp(current + amount, 0, target) : clamp(total, 0, target));
   const delta = round(next - current);
 
