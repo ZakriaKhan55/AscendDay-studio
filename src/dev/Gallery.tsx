@@ -95,7 +95,12 @@ function GalleryContent() {
 
   // The page renders after the browser's own jump to the hash, so a deep link scrolls here.
   useEffect(() => {
-    const id = decodeURIComponent(window.location.hash.slice(1));
+    let id = '';
+    try {
+      id = decodeURIComponent(window.location.hash.slice(1));
+    } catch {
+      return; // a malformed escape (e.g. #%) is no deep link: ignore it
+    }
     if (!id) return;
     const frame = requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView());
     return () => cancelAnimationFrame(frame);

@@ -57,7 +57,10 @@ function EmberDemo() {
     setPoseId(id);
     const field = next.field === 'email' ? emailRef.current : next.field === 'password' ? passwordRef.current : null;
     if (field) field.focus({ preventScroll: true });
-    else (document.activeElement as HTMLElement | null)?.blur?.();
+    // A pose without a field only takes focus off a demo field; the pressed pose button keeps it.
+    else if (document.activeElement === emailRef.current || document.activeElement === passwordRef.current) {
+      (document.activeElement as HTMLElement).blur();
+    }
   };
 
   const props: EmberProps = {

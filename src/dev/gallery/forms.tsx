@@ -186,7 +186,8 @@ function DropdownFormDemo() {
 function DropdownDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [emotion, setEmotion] = useState('calm');
   const [note, setNote] = useState('');
-  const form = useUnsavedChanges(open, [emotion, note]);
+  const [page, setPage] = useState('');
+  const form = useUnsavedChanges(open, [emotion, page, note]);
   return (
     <Dialog
       open={open}
@@ -206,7 +207,7 @@ function DropdownDialog({ open, onClose }: { open: boolean; onClose: () => void 
             <option key={e} value={e.toLowerCase()}>{e}</option>
           ))}
         </Select>
-        <Select id="gallery-dd-dialog-page" label="Which page?" value="" onChange={() => undefined}>
+        <Select id="gallery-dd-dialog-page" label="Which page?" value={page} onChange={(e) => setPage(e.target.value)}>
           <option value="">Not sure</option>
           {DEMO_PAGES.map((p) => <option key={p} value={p}>{p}</option>)}
         </Select>
