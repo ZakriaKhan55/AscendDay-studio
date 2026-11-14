@@ -149,7 +149,8 @@ const eq = (a: unknown, b: unknown, msg: string) => assert(a === b, `${msg} (got
   assert(/blockIntervalMs\(nextBlock, day\)\.startMs - now\.getTime\(\)/.test(scheduleGapSrc), 'CR-02-5: gap countdown from real instants');
   assert(!/getHours\(\) \* 3600/.test(scheduleGapSrc), 'CR-02-5: no wall-clock seconds left');
 
-  assert(/own\.category !== p\.category && filters\.category !== 'All' && own\.category !== filters\.category/.test(discoverSrc), 'CR-02-6: own copy rechecked against the category filter');
+  // CR-02-6 is checked by behaviour in discoverVisible.test.ts; the page must use that rule.
+  assert(/discoverVisiblePlans\(plans, ownById, filters\)/.test(discoverSrc), 'CR-02-6: Discover cards go through discoverVisiblePlans');
 
   assert(/useClampOverflow\(ref, !expanded, text \?\? ''\)/.test(bookCardSrc), 'CR-02-10: book text uses the width-aware clamp hook');
   assert(!/useLayoutEffect/.test(bookCardSrc), 'CR-02-10: the one-time measure is gone');

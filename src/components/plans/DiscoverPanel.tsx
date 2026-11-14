@@ -10,6 +10,7 @@ import { PlanCard } from './PlanCard';
 import { PLAN_TYPES, PLAN_TYPE_META, copiesLabel } from './planMeta';
 import type { DiscoverSort, useDiscoverPlans } from './useDiscoverPlans';
 import { MasonryGrid } from '@/components/ui/MasonryGrid';
+import { discoverVisiblePlans } from './discoverVisible';
 
 type Discover = ReturnType<typeof useDiscoverPlans>;
 
@@ -36,16 +37,8 @@ export function DiscoverPanel({
   const now = leagueNow();
   const seasonPoints = (username: string) => getProfileSeasonPointsByUsername(username, 'ninetyDay', now) || 0;
 
-  // The server filtered by category; an own plan moved to another category on this device (not
-  // synced yet) still came back under its old one, so that card leaves a category it no longer fits.
-  const visible = plans
-    .flatMap((p) => {
-      const own = ownById.get(p.id);
-      if (!own) return [p];
-      const movedOut = own.category !== p.category && filters.category !== 'All' && own.category !== filters.category;
-      return movedOut ? [] : [{ ...own, copyCount: p.copyCount }];
-    })
-    .filter((p) => p.isPublic);
+  // An own plan edited here (not synced yet) leaves a category or search it no longer fits.
+  const visible = discoverVisiblePlans(plans, ownById, filters);
   if (filters.sortBy === 'creator_rank') {
     visible.sort((a, b) => seasonPoints(b.creatorUsername) - seasonPoints(a.creatorUsername));
   }
