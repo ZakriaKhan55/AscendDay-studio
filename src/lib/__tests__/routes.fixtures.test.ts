@@ -35,6 +35,11 @@ function runFixtures() {
   assert(viewFromPath('/prefrontal') === 'prefrontal', 'alias /prefrontal');
   assert(viewFromPath('/index.html') === 'dashboard', '/index.html');
   assert(viewFromPath('/foo') === null, 'unknown path');
+  // CR-04-19: names on Object.prototype are not pages (before: `/constructor` gave Object, then `/undefined`).
+  for (const name of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf']) {
+    assert(viewFromPath(`/${name}`) === null, `prototype name /${name} is no page`);
+    assert(viewFromLegacyHash(`#/${name}`) === 'dashboard', `old #/${name} gives the dashboard`);
+  }
   assert(viewFromPath('/%E0%A4%A') === null, 'malformed escape');
 
   assert(viewFromLegacyHash('#/habits') === 'habits', 'old #/habits');

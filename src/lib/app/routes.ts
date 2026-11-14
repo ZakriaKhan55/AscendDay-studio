@@ -40,8 +40,9 @@ function viewFromSegment(raw: string): View | null {
     return null;
   }
   segment = segment.replace(/^\/+|\/+$/g, '').toLowerCase();
-  if (segment in VIEW_BY_SEGMENT) return VIEW_BY_SEGMENT[segment];
-  if (segment in ALIASES) return ALIASES[segment];
+  // Own keys only: `in` also finds Object.prototype names (`/constructor`, `/toString`).
+  if (Object.prototype.hasOwnProperty.call(VIEW_BY_SEGMENT, segment)) return VIEW_BY_SEGMENT[segment];
+  if (Object.prototype.hasOwnProperty.call(ALIASES, segment)) return ALIASES[segment];
   return isView(segment) ? segment : null;
 }
 
