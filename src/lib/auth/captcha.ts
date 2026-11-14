@@ -17,6 +17,8 @@ const SITE_KEY = ((import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
 const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 /** Longest wait for an invisible solve; a click challenge runs on Turnstile's own timeout. */
 const SOLVE_TIMEOUT_MS = 15_000;
+/** Longest wait for Turnstile's script; a request that hangs counts as slow internet. */
+const SCRIPT_TIMEOUT_MS = 15_000;
 
 export const CAPTCHA_FAILED_MESSAGE = 'Couldn’t confirm this browser. Check your connection and try again.';
 export const CAPTCHA_SLOW_MESSAGE =
@@ -92,15 +94,27 @@ declare global {
 
 let scriptPromise: Promise<TurnstileApi> | null = null;
 
-function loadTurnstile(): Promise<TurnstileApi> {
+/** Exported for tests (captchaScriptTimeout.test.ts). */
+export function loadTurnstile(timeoutMs = SCRIPT_TIMEOUT_MS): Promise<TurnstileApi> {
   if (window.turnstile) return Promise.resolve(window.turnstile);
   if (!scriptPromise) {
     const loading = new Promise<TurnstileApi>((resolve, reject) => {
       const script = document.createElement('script');
+      // A script that never answers would leave the form's button loading for good: give up, and
+      // the next attempt loads it again.
+      const timer = window.setTimeout(() => {
+        script.remove();
+        reject(new CaptchaSolveError('network', 'script_timeout'));
+      }, timeoutMs);
       script.src = SCRIPT_URL;
       script.async = true;
-      script.onload = () => (window.turnstile ? resolve(window.turnstile) : reject(new CaptchaSolveError('other')));
+      script.onload = () => {
+        window.clearTimeout(timer);
+        if (window.turnstile) resolve(window.turnstile);
+        else reject(new CaptchaSolveError('other'));
+      };
       script.onerror = () => {
+        window.clearTimeout(timer);
         script.remove();
         reject(new CaptchaSolveError('network'));
       };
