@@ -4,6 +4,7 @@ import { Dialog, cx } from '@/components/ui/primitives';
 import type { View } from '@/components/AppShell';
 import { NAV_DASHBOARD, NAV_FEEDBACK_SHORTCUTS, NAV_GROUPS, NAV_HELP, NAV_SETTINGS, NavEntry } from './navConfig';
 import { IS_APPLE_PLATFORM } from '@/lib/ui/platform';
+import { isImeKey } from '@/components/ui/primitives/submitShortcut';
 
 /** "g" then this key jumps to the page. Kept to the most visited pages so the letters stay memorable. */
 const GO_KEYS: Partial<Record<View, string>> = {
@@ -121,7 +122,8 @@ export function CommandPalette({ open, onOpenChange, currentView, onViewChange }
   }, [activeIndex, results]);
 
   const onInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (results.length === 0) return;
+    // Arrows and Enter while an IME composes pick and confirm its text, not a page.
+    if (results.length === 0 || isImeKey(event)) return;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       const step = event.key === 'ArrowDown' ? 1 : -1;

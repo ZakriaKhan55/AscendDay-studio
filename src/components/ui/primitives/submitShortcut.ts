@@ -14,13 +14,18 @@ export interface ShortcutKeyEvent {
   keyCode?: number;
 }
 
+/** True while the key belongs to an IME (Chinese, Japanese, … text being composed), not the page. */
+export function isImeKey(event: Pick<ShortcutKeyEvent, 'nativeEvent' | 'isComposing' | 'keyCode'>): boolean {
+  const native = event.nativeEvent ?? event;
+  // 229 = the key went to an IME (Safari reports isComposing late on the confirming Enter).
+  return Boolean(native.isComposing) || native.keyCode === 229;
+}
+
 /** True for one Ctrl/Cmd+Enter press; false while an IME is composing or the key repeats. */
 export function isSubmitShortcut(event: ShortcutKeyEvent): boolean {
   if (event.key !== 'Enter' || event.repeat) return false;
   if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return false;
-  const native = event.nativeEvent ?? event;
-  // 229 = the key went to an IME (Safari reports isComposing late on the confirming Enter).
-  return !native.isComposing && native.keyCode !== 229;
+  return !isImeKey(event);
 }
 
 type SubmitControl = HTMLButtonElement | HTMLInputElement;
