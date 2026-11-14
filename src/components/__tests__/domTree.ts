@@ -77,6 +77,7 @@ function track(el: El, tag: string): El {
     getBoundingClientRect: () => ({ top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }),
     scrollIntoView: () => undefined,
     setSelectionRange: () => undefined,
+    remove: () => detach(el),
     matches: (selector: string) => matches(el, selector),
     closest: (selector: string) => {
       for (let n: El | null = el; n && n.nodeType === 1; n = n.parentNode) if (matches(n, selector)) return n;
@@ -86,6 +87,7 @@ function track(el: El, tag: string): El {
     querySelectorAll: (selector: string) => descendants(el).filter((node) => matches(node, selector)),
     querySelector: (selector: string) => descendants(el).find((node) => matches(node, selector)) ?? null,
   });
+  Object.defineProperty(el, 'id', { configurable: true, get: () => attrs.get('id') ?? '', set: (v: string) => void attrs.set('id', String(v)) });
   // react-dom marks the chosen <option> of a <select> through select.options.
   if (tag.toLowerCase() === 'select') Object.defineProperty(el, 'options', { get: () => descendants(el).filter((n) => n.tagName === 'OPTION') });
   Object.defineProperty(el, 'isConnected', {
@@ -98,10 +100,14 @@ function track(el: El, tag: string): El {
   return el;
 }
 
-/** Focus selectors (button, a[href], input, [tabindex]) and `[attr]` / `[attr="value"]`. */
+/** Focus selectors (button, a[href], input, [tabindex]), `#id`, `tag[attr="value"]`, `[attr]` / `[attr="value"]`. */
 export function matches(node: El, selector: string): boolean {
   return selector.split(',').some((part) => {
     const s = part.trim();
+    const id = s.match(/^#([\w-]+)$/);
+    if (id) return node.getAttribute('id') === id[1];
+    const tagAttr = s.match(/^([a-z]+)\[([\w-]+)="([^"]*)"\]$/);
+    if (tagAttr) return node.tagName === tagAttr[1].toUpperCase() && node.getAttribute(tagAttr[2]) === tagAttr[3];
     const attr = s.match(/^\[([\w-]+)(?:="([^"]*)")?\]$/);
     if (attr) return node.hasAttribute(attr[1]) && (attr[2] === undefined || node.getAttribute(attr[1]) === attr[2]);
     if (node.disabled) return false;

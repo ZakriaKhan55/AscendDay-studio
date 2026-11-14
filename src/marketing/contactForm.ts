@@ -56,6 +56,11 @@ export function installContactForm(form: HTMLFormElement): void {
     form.querySelectorAll('[data-contact-error]').forEach((node) => node.remove());
     form.querySelectorAll<HTMLElement>('[aria-invalid="true"]').forEach((node) => {
       node.removeAttribute('aria-invalid');
+      // Back to its own description (the hint), as before the problem.
+      const describedBy = node.getAttribute('data-describedby');
+      node.removeAttribute('data-describedby');
+      if (describedBy) node.setAttribute('aria-describedby', describedBy);
+      else node.removeAttribute('aria-describedby');
       node.classList.remove(...BORDER_ERROR);
       node.classList.add(...BORDER_OK);
     });
@@ -73,6 +78,9 @@ export function installContactForm(form: HTMLFormElement): void {
     if (label) label.textContent = text;
     if (field) {
       field.setAttribute('aria-invalid', 'true');
+      // Screen readers read the problem with the field (the hint it described is hidden now).
+      field.setAttribute('data-describedby', field.getAttribute('aria-describedby') ?? '');
+      field.setAttribute('aria-describedby', `${field.id}-error`);
       field.classList.remove(...BORDER_OK);
       field.classList.add(...BORDER_ERROR);
       // The bubble takes the hint's place, as in the app.
