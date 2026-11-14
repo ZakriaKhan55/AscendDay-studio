@@ -593,7 +593,8 @@ export interface LinkedPactRepair {
  * when it also differed on the previous pass (about a minute earlier), so a habit change still on
  * its way from another device is not undone; and at most once per pact per day, so a day the
  * server will not take (device day not the server's day) is not sent again every minute. A failed
- * save from a habit tick is resent on every pass until it goes through.
+ * save from a habit tick is resent on every pass until it goes through, also when that tick
+ * completed the pact here.
  */
 export function planLinkedPactRepairs(input: LinkedPactReconcileInput): {
   repairs: LinkedPactRepair[];
@@ -602,7 +603,10 @@ export function planLinkedPactRepairs(input: LinkedPactReconcileInput): {
   const repairs: LinkedPactRepair[] = [];
   const diverged = new Set<string>();
   for (const challenge of input.challenges) {
-    if (challenge.status !== 'active' || input.isBusy(challenge.id)) continue;
+    // A failed save of the tick that completed the pact is still resent: the server's copy is
+    // running until it lands.
+    const retryCompleted = challenge.status === 'completed' && input.retry.has(challenge.id);
+    if ((challenge.status !== 'active' && !retryCompleted) || input.isBusy(challenge.id)) continue;
     const isUser1 = input.sideOf(challenge);
     if (isUser1 === null) continue;
     const habit = linkedHabitFor(challenge, isUser1, input.habits);

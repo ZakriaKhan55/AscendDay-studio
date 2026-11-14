@@ -137,6 +137,20 @@ function runFixtures() {
   });
   assert(retry.repairs.length === 1 && retry.repairs[0].isRetry && retry.repairs[0].done, 'retry resends the habit state');
 
+  // CR-05-11: the failed save was the tick that completed the pact here: still resent.
+  const finalTick = plan({
+    challenges: [{ ...p, status: 'completed', user1DoneDates: [TODAY] }],
+    habits: [ticked],
+    retry: new Set(['c1']),
+  });
+  assert(finalTick.repairs.length === 1 && finalTick.repairs[0].isRetry && finalTick.repairs[0].done, 'a failed final tick is resent');
+  // Only a retry: a completed pact is otherwise left alone, and other ended pacts are never resent.
+  assert(plan({ challenges: [{ ...p, status: 'completed' }], habits: [ticked], divergedBefore: new Set(['c1']) }).repairs.length === 0, 'completed, no retry: untouched');
+  for (const status of ['expired', 'broken'] as const) {
+    assert(plan({ challenges: [{ ...p, status }], habits: [ticked], retry: new Set(['c1']) }).repairs.length === 0, `${status} pact never resent`);
+  }
+  assert(plan({ challenges: [{ ...p, status: 'completed' }], habits: [ticked], retry: new Set(['c1']), isBusy: () => true }).repairs.length === 0, 'busy completed pact waits');
+
   // The partner's side (user2) is planned from user2's goal.
   const partnerSide = plan({
     challenges: [pact('c2', 'Read 20 pages', '10,000 steps')],
