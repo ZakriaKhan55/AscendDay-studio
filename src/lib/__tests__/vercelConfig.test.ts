@@ -5,8 +5,8 @@ import { pathForAuthRoute, pathForView } from '../app/routes';
 import { VIEWS } from '../app/views';
 import { buildSite } from '@/marketing/prerender';
 import { MARKETING_ROUTES } from '@/marketing/routes';
-import { APP_PATHS, checkSite } from '@/marketing/seoChecks';
-import type { VercelConfig } from '@/marketing/vercelRules';
+import { APP_PATHS, checkSite, cspScriptHashes, servedPathOf } from '@/marketing/seoChecks';
+import { sourceMatches, type VercelConfig } from '@/marketing/vercelRules';
 
 /**
  * vercel.json against the app and the public site, without a deploy (there is no preview
@@ -73,6 +73,38 @@ assert(!/AscendDay – Self-Improvement/.test(written['signup.html']), 'signup l
 
 const errors = await checkSite(files, config);
 assert(errors.length === 0, `site checks:\n  ${errors.join('\n  ')}`);
+
+// Route sources: literal characters match only themselves; groups and :name work as written.
+assert(sourceMatches('/sw.js', '/sw.js') && !sourceMatches('/sw.js', '/swXjs'), 'a literal dot in a source is a dot');
+assert(sourceMatches('/(sw\\.js|index\\.html)', '/sw.js') && !sourceMatches('/(sw\\.js|index\\.html)', '/swXjs'), 'an escaped dot in a group is a dot');
+assert(sourceMatches('/:view(dashboard|habits)', '/habits') && !sourceMatches('/:view(dashboard|habits)', '/journal'), ':name(regex) matches its list only');
+assert(sourceMatches('/:slug', '/abc') && !sourceMatches('/:slug', '/a/b'), 'bare :name is one segment');
+assert(sourceMatches('/assets/(.*)', '/assets/x.js') && sourceMatches('/(.*)', '/'), '(.*) groups match any rest');
+
+// Inline-script hashes come from the script directive only (script-src-elem, else script-src, else default-src).
+const hashesOf = (csp: string) => [...cspScriptHashes(csp)].sort().join(',');
+assert(hashesOf("script-src 'none'; style-src 'sha256-st='") === '', 'a style-src hash does not allow a script');
+assert(hashesOf("script-src-elem 'sha256-el='; script-src 'sha256-sc='") === 'el=', 'script-src-elem wins over script-src');
+assert(hashesOf("default-src 'self' 'sha256-df='; style-src 'unsafe-inline'") === 'df=', 'default-src is the fallback');
+assert(servedPathOf('index.html') === '/' && servedPathOf('features/journal.html') === '/features/journal' && servedPathOf('features/index.html') === '/features', 'served path of a built file');
+
+// Each page is checked against the enforced CSP it is served with: a later rule overrides the first,
+// and a Report-Only policy does not count.
+{
+  const body = 'window.x=1';
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body)));
+  const hash = btoa(String.fromCharCode(...digest));
+  const page = `<html><head><script>${body}</script></head></html>`;
+  const probe: VercelConfig = {
+    headers: [
+      { source: '/(.*)', headers: [{ key: 'Content-Security-Policy', value: `script-src 'self' 'sha256-${hash}'` }] },
+      { source: '/login', headers: [{ key: 'Content-Security-Policy', value: "script-src 'self'" }] },
+      { source: '/signup', headers: [{ key: 'Content-Security-Policy-Report-Only', value: `script-src 'sha256-${hash}'` }, { key: 'Content-Security-Policy', value: "script-src 'self'" }] },
+    ],
+  };
+  const probeErrors = (await checkSite(new Map([['index.html', page], ['login.html', page], ['signup.html', page]]), probe)).filter((e) => e.includes('inline script'));
+  assert(probeErrors.length === 2 && probeErrors.some((e) => e.startsWith('login.html:')) && probeErrors.some((e) => e.startsWith('signup.html:')), `per-page CSP: only login and signup refuse the script (got ${probeErrors.join(' | ')})`);
+}
 
 // The service worker keeps public pages apart from the app shell: its list = the public pages.
 const swPattern = serviceWorker.match(/const MARKETING_PAGE = \/(.+)\/;/)?.[1];

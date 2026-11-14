@@ -27,21 +27,34 @@ export function inlineScripts(html: string): string[] {
     .map(([, , body]) => body);
 }
 
-function cspScriptHashes(config: VercelConfig): Set<string> {
-  const csp = (config.headers ?? [])
-    .flatMap((rule) => rule.headers)
-    .find((h) => /^content-security-policy/i.test(h.key))?.value;
-  return new Set([...(csp ?? '').matchAll(/'sha256-([^']+)'/g)].map((m) => m[1]));
+/** The path a built HTML file is served at (cleanUrls): index.html -> /, features/x.html -> /features/x. */
+export function servedPathOf(file: string): string {
+  return `/${file.replace(/(^|\/)index\.html$/, '').replace(/\.html$/, '')}`.replace(/(.)\/$/, '$1');
+}
+
+/**
+ * The script hashes a CSP allows for inline scripts: the sources of script-src-elem, else
+ * script-src, else default-src (a hash in style-src or any other directive does not count).
+ */
+export function cspScriptHashes(csp: string | undefined): Set<string> {
+  const directives = new Map<string, string>();
+  for (const part of (csp ?? '').split(';')) {
+    const [name, ...sources] = part.trim().split(/\s+/);
+    if (name && !directives.has(name.toLowerCase())) directives.set(name.toLowerCase(), sources.join(' '));
+  }
+  const sources = directives.get('script-src-elem') ?? directives.get('script-src') ?? directives.get('default-src') ?? '';
+  return new Set([...sources.matchAll(/'sha256-([^']+)'/g)].map((m) => m[1]));
 }
 
 export async function checkSite(files: Map<string, string>, config: VercelConfig): Promise<string[]> {
   const errors: string[] = [];
   const exists = (file: string) => files.has(file);
 
-  // Every inline script on every page is allowed by the CSP (enforced since 2026-10-24).
-  const hashes = cspScriptHashes(config);
+  // Every inline script on every page is allowed by the CSP (enforced since 2026-10-24): the
+  // enforced Content-Security-Policy that page is served with (later header rules win).
   for (const [file, text] of files) {
     if (!file.endsWith('.html')) continue;
+    const hashes = cspScriptHashes(headersFor(config, servedPathOf(file))['content-security-policy']);
     for (const body of inlineScripts(text)) {
       const hash = await sha256Base64(body);
       if (!hashes.has(hash)) errors.push(`${file}: inline script sha256-${hash} is not in vercel.json's CSP`);

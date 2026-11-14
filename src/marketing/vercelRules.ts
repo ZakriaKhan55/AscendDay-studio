@@ -22,10 +22,35 @@ export interface VercelConfig {
 
 /**
  * A vercel.json `source` (path-to-regexp style) as a RegExp over the whole path. Supports what
- * this project uses: literal segments, `:name(regex)`, `(regex)` groups and bare `:name`.
+ * this project uses: literal segments, `:name(regex)`, `(regex)` groups and bare `:name`. Literal
+ * characters match only themselves (the dot in /sw.js is a dot); a group is used as written.
  */
 export function sourceToRegExp(source: string): RegExp {
-  const pattern = source.replace(/:[A-Za-z_]\w*(?=\()/g, '').replace(/:[A-Za-z_]\w*/g, '([^/]+)');
+  let pattern = '';
+  let i = 0;
+  while (i < source.length) {
+    const name = /^:[A-Za-z_]\w*/.exec(source.slice(i));
+    if (name) {
+      i += name[0].length;
+      if (source[i] !== '(') pattern += '([^/]+)'; // bare :name; :name(regex) keeps its group below
+      continue;
+    }
+    if (source[i] === '(') {
+      // Copy the group up to its matching ')' (escaped characters and nested groups included).
+      let depth = 0;
+      let j = i;
+      for (; j < source.length; j += 1) {
+        if (source[j] === '\\') j += 1;
+        else if (source[j] === '(') depth += 1;
+        else if (source[j] === ')' && --depth === 0) break;
+      }
+      pattern += source.slice(i, j + 1);
+      i = j + 1;
+      continue;
+    }
+    pattern += source[i].replace(/[.*+?^${}|[\]\\]/g, '\\$&');
+    i += 1;
+  }
   return new RegExp(`^${pattern}$`);
 }
 
