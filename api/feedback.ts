@@ -340,7 +340,7 @@ export function buildIssue(input: IssueInput): { title: string; body: string; la
   }
 
   const contextRows = Object.entries(context)
-    .map(([key, value]) => [text(key, 30), defuseMentions(text(value, 120))])
+    .map(([key, value]) => [defuseMentions(text(key, 30)), defuseMentions(text(value, 120))])
     .filter(([key, value]) => key && value)
     .map(([key, value]) => `| ${key} | ${value.replace(/\|/g, '/')} |`);
 
@@ -459,11 +459,13 @@ async function fileReport(
 
   const context = (input.context ?? {}) as Record<string, unknown>;
   // Signed-out senders can't attach screenshots (nothing ties a file to a person).
-  const images = (sender.type === 'account' && Array.isArray(input.images) ? input.images : []).slice(0, MAX_IMAGES) as ImageIn[];
+  const images = (sender.type === 'account' && Array.isArray(input.images) ? input.images : []).slice(0, MAX_IMAGES) as (ImageIn | null)[];
 
   // Screenshots go into the repo first, so the issue can show them.
   const imageLines: string[] = [];
   for (const [index, image] of images.entries()) {
+    // A hand-made request may hold null entries; they are skipped like any unusable screenshot.
+    if (!image) continue;
     const data = typeof image.data === 'string' ? image.data : '';
     if (!/^[A-Za-z0-9+/=]+$/.test(data) || !isJpegBase64(data) || data.length * 0.75 > MAX_IMAGE_BYTES) continue;
     const saved = await uploadScreenshot(token, repo, `attachments/${ref}/${index + 1}.jpg`, ref, data).catch(() => ({}));

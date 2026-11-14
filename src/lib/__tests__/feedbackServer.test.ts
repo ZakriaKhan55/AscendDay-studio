@@ -39,6 +39,11 @@ const guestReply = buildIssue({
   sender: { type: 'account', id: 'guest', email: '' }, replyOk: true,
 });
 assert(!guestReply.body.includes('Reply to'), 'a guest (no email) gets no reply line');
+const mentionKey = buildIssue({
+  kind: 'other', ref: 'ASC-5', title: '', fields: { message: 'Hi' },
+  context: { '@someone': 'Chrome' }, imageLines: [], sender: account, replyOk: false,
+});
+assert(mentionKey.body.includes('| @\u200bsomeone | Chrome |') && !mentionKey.body.includes('| @someone'), 'context keys: @mentions defused');
 const bugWithRating = buildIssue({
   kind: 'bug', ref: 'ASC-4', title: 'Broke', fields: { whatHappened: 'It broke', severity: 'blocking', rating: 2 },
   context: {}, imageLines: [], sender: account, replyOk: false,
@@ -107,6 +112,11 @@ assert(!calls.some((c) => c.url.includes('siteverify')), 'signed in: no Turnstil
 const signedInIssue = JSON.parse(String(githubPosts()[0]?.init?.body)) as { body: string; labels: string[] };
 assert(signedInIssue.body.includes('zak@example.com') && signedInIssue.body.includes('5 / 5'), 'signed in: email (ticked, from the session) and rating');
 assert(!signedInIssue.labels.includes('contact'), 'signed in: not labelled contact');
+
+// A null screenshot entry (only a hand-made request sends one) is skipped, not a 500.
+calls = [];
+assert((await status(await POST(request({ kind: 'other', fields: { message: 'Null image' }, images: [null] }, 'good')))) === '200 ok', 'signed in: images [null] is skipped and the report is sent');
+assert(githubPosts().length === 1 && !calls.some((c) => c.url.includes('/contents/')), 'images [null]: issue filed, nothing uploaded');
 
 // A session that no longer works is told so, never treated as signed out.
 env.TURNSTILE_SECRET_KEY = 'secret';
