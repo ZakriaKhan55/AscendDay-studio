@@ -61,10 +61,16 @@ export function startDeviceTimezoneSync(): void {
 
   let timer: ReturnType<typeof setTimeout> | null = null;
   let sending = false;
+  // A trigger that came while a send was running (a sign-in to another account): sent after it.
+  let pending = false;
   const send = async () => {
     timer = null;
     // Offline the send can only fail; the online event sends it.
-    if (sending || isDeviceOffline()) return;
+    if (isDeviceOffline()) return;
+    if (sending) {
+      pending = true;
+      return;
+    }
     sending = true;
     try {
       const { data } = await supabase.auth.getSession();
@@ -74,6 +80,10 @@ export function startDeviceTimezoneSync(): void {
       // Offline or a lapsed sign-in: the next trigger or save sends it.
     } finally {
       sending = false;
+      if (pending) {
+        pending = false;
+        sendSoon();
+      }
     }
   };
   const sendSoon = () => {
