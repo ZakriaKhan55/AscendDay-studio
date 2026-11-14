@@ -131,10 +131,17 @@ export function NotificationCenter({
       const focusables = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
         (el) => el.getClientRects().length > 0
       );
+      const active = document.activeElement;
+      // The focused button went away (Mark all read, Clear): Tab comes back into the panel.
+      if (!panelRef.current.contains(active)) {
+        event.preventDefault();
+        const target = event.shiftKey ? focusables[focusables.length - 1] : focusables[0];
+        (target ?? panelRef.current).focus();
+        return;
+      }
       if (focusables.length === 0) return;
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
-      const active = document.activeElement;
       if (event.shiftKey && (active === first || active === panelRef.current)) {
         event.preventDefault();
         last.focus();
@@ -346,8 +353,9 @@ export function NotificationCenter({
     void store.refreshNotifications();
   };
 
+  // The bell takes focus first, so the release-notes dialog returns focus to it on close.
   const openReleaseNote = () => {
-    close(false);
+    close();
     setReleaseNoteOpen(true);
   };
 

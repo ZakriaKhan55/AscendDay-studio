@@ -23,6 +23,8 @@ const d = doc as Record<string, unknown> & { body: El; documentElement: El; acti
 function detach(child: El) {
   const parent = child.parentNode;
   if (!parent) return;
+  // As in a browser: focus inside a node that leaves the document falls back to the body.
+  if (d.activeElement && child.contains?.(d.activeElement)) d.activeElement = d.body;
   const i = parent.childNodes.indexOf(child);
   if (i >= 0) parent.childNodes.splice(i, 1);
   child.parentNode = null;
@@ -138,6 +140,7 @@ track(d.body, 'body');
 d.documentElement = track(d.documentElement, 'html');
 d.documentElement.appendChild(d.body);
 d.activeElement = d.body;
+doc.getElementById = (id: string) => descendants(d.documentElement).find((el) => el.getAttribute('id') === id) ?? null;
 
 /** The props React last gave this element (event handlers included). */
 export function propsOf(el: El): Record<string, unknown> {

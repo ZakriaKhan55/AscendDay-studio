@@ -108,11 +108,15 @@ export const Dialog: React.FC<DialogProps> = ({
     if (movePanel || !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
   }, []);
   const shownKeyRef = React.useRef(contentKey);
+  const wasOpenRef = React.useRef(false);
   React.useLayoutEffect(() => {
+    const opening = open && !wasOpenRef.current;
+    wasOpenRef.current = open;
     if (!open || shownKeyRef.current === contentKey) return;
     shownKeyRef.current = contentKey;
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
-    focusInitial(true);
+    // Opening with new content: the open effect saves the opener first, then places focus.
+    if (!opening) focusInitial(true);
   }, [open, contentKey, focusInitial]);
   const rootRef = React.useRef<HTMLDivElement>(null);
   // A leaving dialog is inert, not aria-hidden: inert also drops focus from the button that
