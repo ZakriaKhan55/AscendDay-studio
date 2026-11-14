@@ -14,7 +14,10 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { StoreSetState } from '../store/storeSetState';
 
 export function useNotificationActions(setState: StoreSetState, get: () => AppState, state: AppState, leagueDataVersion: number, notificationsRefreshRef: { current: (() => Promise<void>) | null }, partnersRefreshRef: { current: (() => Promise<void>) | null }, setNotificationsStatus: Dispatch<SetStateAction<'loading' | 'ready' | 'failed'>>, setPartnersStatus: Dispatch<SetStateAction<'loading' | 'ready' | 'failed'>>) {
-  /** Marks these notices read at once; a failed save puts them back as unread with a toast (N7). */
+  /**
+   * Marks these notices read at once; a failed save puts them back as unread with a toast (N7).
+   * Each notice is saved on its own, so only the ones whose save failed go back.
+   */
   const markNotificationsRead = useCallback((notificationIds: string[]) => {
     const ids = new Set(notificationIds);
     const wereUnread = (get().notifications || []).filter((n) => ids.has(n.id) && !n.read).map((n) => n.id);
@@ -23,16 +26,16 @@ export function useNotificationActions(setState: StoreSetState, get: () => AppSt
       ...prev,
       notifications: (prev.notifications || []).map((n) => (ids.has(n.id) ? { ...n, read: true } : n)),
     }));
-    const revert = (err: unknown) => {
-      console.error('Failed to mark notifications read:', err);
-      const back = new Set(wereUnread);
+    void Promise.allSettled(wereUnread.map((id) => markNotificationReadSupabase(id))).then((results) => {
+      const back = new Set(wereUnread.filter((_, i) => results[i].status === 'rejected'));
+      if (back.size === 0) return;
+      console.error('Failed to mark notifications read:', results.find((r): r is PromiseRejectedResult => r.status === 'rejected')?.reason);
       setState((prev) => ({
         ...prev,
         notifications: (prev.notifications || []).map((n) => (back.has(n.id) ? { ...n, read: false } : n)),
       }));
       dispatchToastError("Couldn't mark as read", 'Check your connection and try again.');
-    };
-    Promise.all(wereUnread.map((id) => markNotificationReadSupabase(id))).catch(revert);
+    });
     // False positive: setState/enqueuePersist/get are stable (useCallback with empty deps array)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
