@@ -412,13 +412,20 @@ export const Form = React.forwardRef<HTMLFormElement, FormProps>(
       return () => bound?.bind(null);
     }, [controller, show]);
 
-    // Mark the field with the problem (also raw `.input` controls, which style aria-invalid).
+    // Mark the field with the problem (also raw `.input` controls, which style aria-invalid) and
+    // point it at its FieldMessage, ahead of any description it already has.
     React.useEffect(() => {
       if (!issue?.field) return;
       const el = formRef.current?.ownerDocument.getElementById(issue.field);
       if (!el || el.hasAttribute('aria-invalid')) return;
+      const describedBy = el.getAttribute('aria-describedby');
       el.setAttribute('aria-invalid', 'true');
-      return () => el.removeAttribute('aria-invalid');
+      el.setAttribute('aria-describedby', [`${issue.field}-error`, describedBy].filter(Boolean).join(' '));
+      return () => {
+        el.removeAttribute('aria-invalid');
+        if (describedBy === null) el.removeAttribute('aria-describedby');
+        else el.setAttribute('aria-describedby', describedBy);
+      };
     }, [issue]);
 
     React.useEffect(() => {

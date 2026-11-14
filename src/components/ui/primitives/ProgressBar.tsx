@@ -70,7 +70,7 @@ export function ProgressBar({
       aria-label={label}
       aria-valuemin={0}
       aria-valuemax={max}
-      aria-valuenow={Math.min(max, Math.max(0, Math.round(value)))}
+      aria-valuenow={Math.min(max, Math.max(0, value))}
       className={cx('relative w-full overflow-hidden rounded-full bg-overlay-default', sizeClasses[size], className)}
     >
       <div

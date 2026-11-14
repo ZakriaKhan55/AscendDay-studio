@@ -83,7 +83,8 @@ export function ProgressUpdateDialog({
 
   const form = useUnsavedChanges(open, [mode, amount, total]);
 
-  const next = round(mode === 'add' ? clamp(current + amount, 0, target) : clamp(total, 0, target));
+  // Rounded before the clamp, so rounding can never lift the total past the goal (0.125 would save 0.13).
+  const next = clamp(round(mode === 'add' ? current + amount : total), 0, target);
   const delta = round(next - current);
 
   const handleSubmit = async () => {
@@ -114,7 +115,7 @@ export function ProgressUpdateDialog({
     <button
       type="button"
       data-pill-id={id}
-      disabled={disabled}
+      disabled={disabled || saving}
       aria-pressed={mode === id}
       onClick={() => setMode(id)}
       className={cx(
@@ -194,7 +195,7 @@ export function ProgressUpdateDialog({
             <button
               type="button"
               aria-label="Decrease"
-              disabled={value <= min}
+              disabled={saving || value <= min}
               onClick={() => change(round(clamp(value - step, min, max)))}
               className="btn-secondary h-11 w-11 shrink-0 p-0 disabled:opacity-40"
             >
@@ -208,6 +209,7 @@ export function ProgressUpdateDialog({
               max={max}
               value={value}
               onValueChange={change}
+              disabled={saving}
               decimal={decimal}
               step={decimal && !Number.isInteger(step) ? step : undefined}
               enterKeyHint="done"
@@ -221,7 +223,7 @@ export function ProgressUpdateDialog({
             <button
               type="button"
               aria-label="Increase"
-              disabled={value >= max}
+              disabled={saving || value >= max}
               onClick={() => change(round(clamp(value + step, min, max)))}
               className="btn-secondary h-11 w-11 shrink-0 p-0 disabled:opacity-40"
             >

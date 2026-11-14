@@ -63,8 +63,7 @@ export function PasswordInput({
         />
         <button
           type="button"
-          tabIndex={-1}
-          // Keep focus (and the caret) in the field while toggling.
+          // Reachable by Tab, right after the field. A mouse click keeps focus (and the caret) in the field.
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             const next = !showPassword;
@@ -72,7 +71,7 @@ export function PasswordInput({
             onVisibilityChange?.(next);
           }}
           aria-label={showPassword ? 'Hide password' : 'Show password'}
-          className={`absolute inset-y-0 right-0 pr-3 flex items-center text-content-disabled hover:text-content-primary focus:outline-none transition-colors ${TAP_AREA}`}
+          className={`absolute inset-y-0 right-0 pl-2.5 pr-3 flex items-center rounded-r-xl text-content-disabled hover:text-content-primary focus-visible:text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-text transition-colors ${TAP_AREA}`}
         >
           {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>

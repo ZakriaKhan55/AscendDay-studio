@@ -160,7 +160,11 @@ const TOAST_TONES: Record<ToastType, { icon: ReactNode; title: string; message: 
  */
 function ToastCard({ toast, onDismiss }: { toast: ShownToast; onDismiss: (id: string) => void }) {
   const tone = TOAST_TONES[toast.type];
-  const [paused, setPaused] = useState(false);
+  // Hover and keyboard focus pause it on their own: the pointer leaving never resumes a toast
+  // that still has focus, and focus leaving never resumes one under the pointer.
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const paused = hovered || focused;
   const remainingRef = useRef(toast.duration);
 
   useEffect(() => {
@@ -175,10 +179,12 @@ function ToastCard({ toast, onDismiss }: { toast: ShownToast; onDismiss: (id: st
 
   return (
     <div
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocus={() => setPaused(true)}
-      onBlur={() => setPaused(false)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
+      }}
       className={`relative overflow-hidden pointer-events-auto p-3.5 rounded-xl border border-overlay-default bg-bg-800/90 backdrop-blur-md shadow-lg flex items-start gap-3 ${
         toast.leaving ? 'animate-toast-out' : 'animate-slide-in-right'
       }`}

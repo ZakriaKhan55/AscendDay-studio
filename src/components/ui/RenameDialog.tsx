@@ -34,6 +34,13 @@ export function RenameDialog({
   onSave: (name: string) => void;
 }) {
   const [name, setName] = useState(initialName);
+  // Each open starts from the saved name: Cancel keeps the dialog mounted (same item), and its
+  // discarded draft must not come back.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setName(initialName);
+  }
   const form = useUnsavedChanges(open, name);
   const issues = useFormController();
   const formId = `${inputId}-form`;
