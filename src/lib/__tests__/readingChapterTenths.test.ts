@@ -71,7 +71,7 @@ assert(PAGES_PER_CHAPTER_TENTH === 2, 'config: 0.1 chapter = 2 pages');
   eq(unitSwitchDefaults(book({ currentAmount: 1.1, currentPage: 1.1 }), 'pages').current, 22, '1.1 chapters -> 22 pages exactly (not 22.000000000000004)');
   const sw = switchBookUnit(pagesBook, { unit: 'chapters', current: 1.5, total: 15 }, at(3), DAY);
   eq([sw.unit, sw.currentAmount, sw.totalAmount], ['chapters', 1.5, 15], 'switchBookUnit keeps 1.5');
-  eq(sw.unitSwitches, [{ date: DAY, at: at(3), pagesBefore: 31, pagesAfter: 30 }], 'the switch records 31 -> 30 pages');
+  eq(sw.unitSwitches, [{ date: DAY, at: at(3), pagesBefore: 31, pagesAfter: 30, toUnit: 'chapters' }], 'the switch records 31 -> 30 pages (to chapters)');
   const swNoise = switchBookUnit(pagesBook, { unit: 'chapters', current: 0.7 + 0.1, total: 15 }, at(3), DAY);
   eq(swNoise.currentAmount, 0.8, 'a noisy place is snapped');
   const back = switchBookUnit(sw, { unit: 'pages', current: 31, total: 300 }, at(4), DAY);
