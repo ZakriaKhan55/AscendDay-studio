@@ -5,7 +5,7 @@ import { weekKey, todayKey, getWeekDates, addDays, parseDate } from '../time/dat
 import { excisePointsEntriesInternal } from './stateAwards';
 import { addPointsInternal } from './pointsLedger';
 import { getWeeklyGoalEntryId, getWeeklyGoalSeasonSplitEntryId, getSeasonBoundaryInWeek, isWeeklyGoalSeasonSplitEntryId, isWeekBeforeSeason } from '../leagues/weeklyGoalSeasons';
-import { weeklyScoringGoals, heldCountedGoals, legacyHeldWeeklyPoints, weeklyGoalAwardTimestamp, countedGoalRefs, reflectionWindow, isReflectionWindowOpen } from './weeklyAwards';
+import { weeklyScoringGoals, heldCountedGoals, mergeHeldGoals, legacyHeldWeeklyPoints, weeklyGoalAwardTimestamp, countedGoalRefs, reflectionWindow, isReflectionWindowOpen } from './weeklyAwards';
 import { calculateWeeklyGoalsPoints, calculateWeeklyGoalsPointsBefore, POINTS_V2_START_DATE_KEY, WEEKLY_REFLECTION_POINTS } from './pointsConfig';
 import { leagueNow, getSeasonStart } from '../time/leagueTime';
 import { computeLinkedGoalProgress, linkedGoalCrossing, linkedEntryPresent } from '../items/linkedGoalMetrics';
@@ -154,9 +154,11 @@ function recomputeSeasonSplitWeeklyGoalsPoints(
   const entryId = getWeeklyGoalSeasonSplitEntryId(targetWeekKey, seasonNumber);
   const existing = currentHistory.find((e) => e && e.id === entryId);
 
-  // Goals counted on an earlier day stay counted (an earlier day's points never drop).
+  // Goals counted on an earlier day stay counted (an earlier day's points never drop), and so does
+  // every goal the earlier season's frozen entry counted: its amount is subtracted below (CR-05-17).
   const todayStartMs = localDayStartMs(todayKey());
-  const scoringGoals = weeklyScoringGoals(newGoals, heldCountedGoals(existing, todayStartMs));
+  const held = mergeHeldGoals(heldCountedGoals(existing, todayStartMs), heldCountedGoals(earlierEntry, Number.POSITIVE_INFINITY));
+  const scoringGoals = weeklyScoringGoals(newGoals, held);
   const score = calculateWeeklyGoalsPoints(scoringGoals);
   const earlierSeasonPoints = earlierEntry
     ? earlierEntry.amount || 0

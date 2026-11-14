@@ -258,7 +258,9 @@ export function computeFocusAwards(
   if (opts.floor && kept && used <= kept.amount) return { entry: kept, sessionPoints };
   if (used <= 0) return { entry: opts.floor ? kept : null, sessionPoints };
 
-  const at = Math.min(Math.max(firstMs !== null && Number.isFinite(firstMs) ? firstMs : nowMs, dayStartMs), nowMs);
+  // Never later than the day's last millisecond (a part ending exactly at midnight stays on its day, CR-10-13).
+  const dayLastMs = localDayStartMs(addDays(day, 1)) - 1;
+  const at = Math.min(Math.max(firstMs !== null && Number.isFinite(firstMs) ? firstMs : nowMs, dayStartMs), nowMs, dayLastMs);
   return {
     entry: {
       id,

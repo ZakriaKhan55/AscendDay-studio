@@ -72,6 +72,20 @@ export function heldCountedGoals(entry: PointsEntry | null | undefined, todaySta
 }
 
 /**
+ * Held goal lists merged by goal id, each at its earliest time (the server's `held` set, min(at) per
+ * id). In the week a season started in, this season's part holds its own earlier-day goals and every
+ * goal the earlier season's frozen row counted (CR-05-17 / CR-09-24).
+ */
+export function mergeHeldGoals(...lists: CountedGoalRef[][]): CountedGoalRef[] {
+  const byId = new Map<string, CountedGoalRef>();
+  for (const h of lists.flat()) {
+    const prev = byId.get(h.id);
+    if (!prev || instantMs(h.at) < instantMs(prev.at)) byId.set(h.id, h);
+  }
+  return [...byId.values()];
+}
+
+/**
  * A row written before metadata.counted existed: the points it held before today (all of them when
  * it was stamped before today, else all but the goal stamped today). 0 for rows with metadata.counted.
  */

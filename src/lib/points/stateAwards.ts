@@ -149,7 +149,7 @@ export function applyBadHabitAwardsInternal(
     day,
     new Date(`${day}T00:00:00`).getTime(),
     trustedNow().getTime(),
-    getEffectiveSeasonPoints(state, leagueNow())
+    (history) => getEffectiveSeasonPoints({ ...state, pointsHistory: history }, leagueNow())
   );
 
   const { excisedEntryIds: _excised, ...excised } = excisePointsEntriesInternal(state, (entry) =>
