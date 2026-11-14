@@ -57,4 +57,4 @@ assert(hook!.pushStatus === 'denied', 'the newest read is shown');
 
 root.unmount();
 console.log('pushStatusOrder: all passed');
-process.exit(0); // the push module's imports keep timers alive
+(globalThis as unknown as { process: { exit: (code: number) => never } }).process.exit(0); // the push module's imports keep timers alive

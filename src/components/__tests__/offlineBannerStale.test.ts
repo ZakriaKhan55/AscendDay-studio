@@ -49,4 +49,4 @@ assert(status() === 'restored', `a check started after coming back shows restore
 
 root.unmount();
 console.log('offlineBannerStale: all passed');
-process.exit(0); // the 4 s "restored" timer is not waited for
+(globalThis as unknown as { process: { exit: (code: number) => never } }).process.exit(0); // the 4 s "restored" timer is not waited for

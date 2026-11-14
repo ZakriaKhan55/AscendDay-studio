@@ -53,4 +53,4 @@ assert(
 
 root.unmount();
 console.log('partnerDayKeysOrder: all passed');
-process.exit(0); // the Supabase client keeps timers alive
+(globalThis as unknown as { process: { exit: (code: number) => never } }).process.exit(0); // the Supabase client keeps timers alive
