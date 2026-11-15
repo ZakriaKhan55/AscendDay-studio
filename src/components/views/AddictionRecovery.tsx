@@ -22,6 +22,9 @@ import { FOCUS_RING, TAP_TARGET, cx } from '@/components/ui/primitives/shared';
 import { trustedNow } from '@/lib/time/clock';
 import { CRISIS_ELSEWHERE, CRISIS_LINES } from '@/lib/content/crisisLines';
 
+// Clean today / Slipped: one compact size and the same width, soft tints instead of a solid fill.
+const RECOVERY_DAY_BUTTON = cx('btn border px-3 py-1.5 text-xs min-w-[7.5rem] max-sm:flex-1', TAP_TARGET);
+
 const CRAVINGS_PAGE = 10;
 
 const DISTRACTION_ACTIVITIES = [
@@ -388,8 +391,12 @@ export function AddictionRecovery({ store }: { store: AppStore }) {
                 {(showClean || showSlipped) && (
                   <div className="flex gap-2 max-sm:w-full">
                     {showClean && (
-                      <button type="button" onClick={() => checkIn(today)} className="btn-primary max-sm:flex-1">
-                        <Check size={16} /> Clean today
+                      <button
+                        type="button"
+                        onClick={() => checkIn(today)}
+                        className={cx(RECOVERY_DAY_BUTTON, 'border-emerald-500/40 bg-emerald-500/10 text-success-text hover:bg-emerald-500/20')}
+                      >
+                        <Check size={14} aria-hidden="true" /> Clean today
                       </button>
                     )}
                     {showSlipped && (
@@ -397,9 +404,9 @@ export function AddictionRecovery({ store }: { store: AppStore }) {
                         type="button"
                         onClick={() => setResetConfirmOpen(true)}
                         aria-label="I slipped today, reset my streak"
-                        className="btn border border-rose-500/40 bg-rose-500/10 text-rose-theme hover:bg-rose-500/20 max-sm:flex-1"
+                        className={cx(RECOVERY_DAY_BUTTON, 'border-rose-500/40 bg-rose-500/10 text-rose-theme hover:bg-rose-500/20')}
                       >
-                        <X size={16} aria-hidden="true" /> Slipped
+                        <X size={14} aria-hidden="true" /> Slipped
                       </button>
                     )}
                   </div>

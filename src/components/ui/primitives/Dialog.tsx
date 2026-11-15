@@ -30,10 +30,14 @@ export interface DialogProps {
   /** Id of the field to focus on open instead of the first one, when the primary typing field is not
    *  first (e.g. after a slider). Same rule as the default: mouse/trackpad only. */
   initialFocus?: string;
+  /** 'showcase': a bigger rise in and drop out, for a dialog that announces something (What's New). */
+  motion?: 'default' | 'showcase';
 }
 
 // Matches the longest exit animation (dialog-out / exit-fade, tailwind.config.js).
 const EXIT_MS = 200;
+// Matches dialog-showcase-out (tailwind.config.js).
+const SHOWCASE_EXIT_MS = 280;
 
 const dialogStack: symbol[] = [];
 let lockCount = 0;
@@ -58,6 +62,7 @@ export const Dialog: React.FC<DialogProps> = ({
   dirty = false,
   contentKey,
   initialFocus,
+  motion = 'default',
 }) => {
   // Stays mounted for its exit animation after `open` turns false. The last open title and
   // content are shown while it leaves, so a parent clearing its data on close cannot make the
@@ -76,7 +81,7 @@ export const Dialog: React.FC<DialogProps> = ({
     const timer = setTimeout(() => {
       setRendered(false);
       setExiting(false);
-    }, EXIT_MS);
+    }, motion === 'showcase' ? SHOWCASE_EXIT_MS : EXIT_MS);
     return () => clearTimeout(timer);
   }, [exiting]);
   const lastOpenContent = React.useRef({ title, description, children, footer });
@@ -269,7 +274,13 @@ export const Dialog: React.FC<DialogProps> = ({
         className={cx(
           'modal-panel relative flex w-full max-h-full flex-col overflow-hidden bg-bg-800 border border-bg-700 rounded-2xl shadow-xl z-10',
           maxWidth,
-          exiting ? 'animate-dialog-out' : 'motion-safe:animate-dialog-in'
+          motion === 'showcase'
+            ? exiting
+              ? 'animate-dialog-showcase-out'
+              : 'motion-safe:animate-dialog-showcase-in'
+            : exiting
+              ? 'animate-dialog-out'
+              : 'motion-safe:animate-dialog-in'
         )}
       >
         <div className="shrink-0 border-b border-bg-700">

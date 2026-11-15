@@ -158,6 +158,9 @@ export default {
         // Enter ends on `transform: none`, so nothing inside is trapped in a containing block.
         'dialog-in': 'dialogIn 340ms var(--ease-emphasized) both',
         'dialog-out': 'dialogOut 180ms var(--ease-standard) forwards',
+        // What's New: a longer rise with a small settle, and a clear drop on close.
+        'dialog-showcase-in': 'dialogShowcaseIn 620ms var(--ease-emphasized) both',
+        'dialog-showcase-out': 'dialogShowcaseOut 280ms var(--ease-standard) forwards',
         'exit-fade': 'exitFade 200ms var(--ease-standard) forwards',
         'toast-out': 'toastOut 180ms var(--ease-standard) forwards',
         // Scroll reveal (Motion.tsx Reveal): `backwards` holds it hidden through its stagger delay
@@ -214,6 +217,15 @@ export default {
         dialogOut: {
           '0%': { opacity: '1', transform: 'none' },
           '100%': { opacity: '0', transform: 'translateY(8px) scale(0.96)', filter: 'blur(4px)' },
+        },
+        dialogShowcaseIn: {
+          '0%': { opacity: '0', transform: 'translateY(56px) scale(0.86)', filter: 'blur(10px)' },
+          '60%': { opacity: '1', transform: 'translateY(-4px) scale(1.01)', filter: 'none' },
+          '100%': { opacity: '1', transform: 'none', filter: 'none' },
+        },
+        dialogShowcaseOut: {
+          '0%': { opacity: '1', transform: 'none' },
+          '100%': { opacity: '0', transform: 'translateY(32px) scale(0.9)', filter: 'blur(6px)' },
         },
         exitFade: {
           '0%': { opacity: '1' },

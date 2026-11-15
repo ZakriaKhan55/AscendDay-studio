@@ -8,8 +8,14 @@ export function ReleaseNoteBody({ note }: { note: ReleaseNote }) {
   const baseId = useId();
   return (
     <div className="space-y-4">
-      {releaseNoteGroups(note).map((group) => (
-        <section key={group.key} aria-labelledby={`${baseId}-${group.key}`} className="space-y-1.5">
+      {releaseNoteGroups(note).map((group, index) => (
+        <section
+          key={group.key}
+          aria-labelledby={`${baseId}-${group.key}`}
+          // Each group rises in after the last, once the What's New panel has nearly settled.
+          className="space-y-1.5 motion-safe:animate-reveal"
+          style={{ animationDelay: `${220 + index * 90}ms` }}
+        >
           <h3 id={`${baseId}-${group.key}`} className="item-name text-sm">
             {group.label}
           </h3>
@@ -32,6 +38,7 @@ export function WhatsNewDialog({ open, onClose, note }: { open: boolean; onClose
       onClose={onClose}
       title={note.title || DEFAULT_RELEASE_TITLE}
       description={formatDateShort(note.releasedAt)}
+      motion="showcase"
       footer={
         <button type="button" onClick={onClose} className="btn-secondary">
           Got it
