@@ -4,6 +4,7 @@ import { todayKey } from '@/lib/time/dates';
 import { dayProgress } from '@/lib/timeTracker/timeTracker';
 import { getActiveBadHabitsOrdered } from '@/lib/points/badHabitEligibility';
 import { trustedNow } from '../time/clock';
+import { recoveryCheckinBlock } from '@/lib/points/recoveryAwards';
 
 /** done = today's part is finished; pending = still open; risk = still open late in the day. */
 export type NavStatusTone = 'done' | 'pending' | 'risk';
@@ -101,11 +102,15 @@ export function getNavStatuses(state: AppState, isHabitDone: (habit: Habit) => b
     statuses.skills = { tone: 'pending', label: 'not practised today' };
   }
 
-  // Recovery: today's check-in saved (its id is the local day key); open only while a tracker exists.
+  // Recovery: today's check-in saved (its id is the local day key); open only while a tracker exists
+  // and today can take a check-in. On the first day and on the day the streak restarted (a slip or a
+  // reset) there is no Clean today button, so no status (Zakria 2026-11-16).
   if (state.addictionTracker) {
-    statuses.recovery = (state.recoveryCheckins ?? []).some((c) => c.id === today)
-      ? { tone: 'done', label: 'checked in today' }
-      : { tone: late ? 'risk' : 'pending', label: 'not checked in today' };
+    if ((state.recoveryCheckins ?? []).some((c) => c.id === today)) {
+      statuses.recovery = { tone: 'done', label: 'checked in today' };
+    } else if (!recoveryCheckinBlock(state.addictionTracker, today)) {
+      statuses.recovery = { tone: late ? 'risk' : 'pending', label: 'not checked in today' };
+    }
   }
 
   return statuses;

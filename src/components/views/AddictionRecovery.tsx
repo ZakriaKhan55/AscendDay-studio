@@ -70,6 +70,18 @@ const formatSpan = (hours: number): string => {
   return d > 0 ? `${d}d ${h}h` : `${h}h`;
 };
 
+/** Ring centre: days large, hours small beside them, so "67d 23h" still fits inside the 104 px ring. */
+function RingSpan({ hours }: { hours: number }) {
+  const d = Math.floor(hours / 24);
+  const h = hours % 24;
+  if (d === 0) return <>{h}h</>;
+  return (
+    <>
+      {d}d<span className="ml-0.5 text-sm text-content-secondary">{h}h</span>
+    </>
+  );
+}
+
 /** The craving's local day, or null when its timestamp does not parse. */
 const cravingDay = (log: CravingLog): string | null => {
   const at = new Date(log.date);
@@ -282,7 +294,7 @@ export function AddictionRecovery({ store }: { store: AppStore }) {
               value: nextMilestone ? elapsedHours - prevHours : 1,
               max: nextMilestone ? nextMilestone.hours - prevHours : 1,
               label: nextMilestone ? `Progress to ${nextMilestone.label}` : 'All milestones reached',
-              center: nextMilestone ? formatSpan(nextMilestone.hours - elapsedHours) : <Check size={28} />,
+              center: nextMilestone ? <RingSpan hours={nextMilestone.hours - elapsedHours} /> : <Check size={28} />,
               caption: nextMilestone ? `to ${nextMilestone.label.replace(' Clean', '')}` : 'all reached',
             }}
             lead={{

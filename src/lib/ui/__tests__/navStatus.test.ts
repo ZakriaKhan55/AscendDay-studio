@@ -68,6 +68,19 @@ eq(recovery(stateWith({ addictionTracker: tracker, recoveryCheckins: [] }), AT_R
   eq(recovery(s, AT_RISK)?.tone, 'risk', "yesterday's check-in: risk after 20:00");
 }
 
+// 5b. 2026-11-16: no status on a day that cannot take a check-in: the streak restarted today
+// (Slipped / Reset streak) or the tracker was made today. The day after, it is open again.
+{
+  const restartedToday: AddictionTracker = { ...tracker, startDate: new Date(2026, 10, 12, 8, 30).toISOString() };
+  eq(recovery(stateWith({ addictionTracker: restartedToday, recoveryCheckins: [checkin(YESTERDAY)] }), MORNING), undefined, 'restarted today: no status');
+  eq(recovery(stateWith({ addictionTracker: restartedToday, recoveryCheckins: [] }), AT_RISK), undefined, 'restarted today: no risk after 20:00');
+  const createdToday: AddictionTracker = { ...tracker, startDate: new Date(2026, 10, 12, 8, 30).toISOString(), createdAt: new Date(2026, 10, 12, 8, 30).toISOString() };
+  eq(recovery(stateWith({ addictionTracker: createdToday, recoveryCheckins: [] }), MORNING), undefined, 'tracker made today: no status');
+  const restartedYesterday: AddictionTracker = { ...tracker, startDate: new Date(2026, 10, 11, 22, 0).toISOString() };
+  eq(recovery(stateWith({ addictionTracker: restartedYesterday, recoveryCheckins: [] }), MORNING)?.tone, 'pending', 'restarted yesterday: open today');
+  eq(recovery(stateWith({ addictionTracker: restartedToday, recoveryCheckins: [checkin(TODAY)] }), MORNING)?.tone, 'done', 'stray check-in today still shows done');
+}
+
 // 6. The id format is the same key the Recovery page writes (todayKey / useLocalDayKey: YYYY-MM-DD local).
 assert(/^\d{4}-\d{2}-\d{2}$/.test(TODAY), 'today key is YYYY-MM-DD');
 eq(TODAY, '2026-11-12', 'today key is the local calendar day');
