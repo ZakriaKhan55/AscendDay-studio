@@ -9,7 +9,7 @@ import {
   timeStringToMinutes,
 } from '@/lib/timeTracker/timeTracker';
 import { cx, TAP_TARGET } from '@/components/ui/primitives/shared';
-import { blockName, launchModules, MODULE_LABELS } from './dayMeta';
+import { blockEndMinutes as endOf, blockName, launchModules, MODULE_LABELS } from './dayMeta';
 
 /** Free time this long or longer shows as a row you can tap to plan it. */
 const MIN_GAP_MINUTES = 15;
@@ -42,12 +42,6 @@ interface DayTimelineProps {
 type Row =
   | { kind: 'block'; item: TimelineBlock; start: number; end: number }
   | { kind: 'gap'; start: number; end: number };
-
-const endOf = (b: TimeTrackerBlock) => {
-  const start = timeStringToMinutes(b.startTime);
-  const end = timeStringToMinutes(b.endTime);
-  return end === 0 && start > 0 ? 1440 : end;
-};
 
 const asTime = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 
@@ -240,7 +234,7 @@ function BlockRow({
         >
           <span className={cx('item-name block truncate text-sm', (block.completed || block.skipped) && '!text-content-muted')}>{name}</span>
           <span className="block text-xs text-content-muted">
-            <span className="figure">
+            <span className="figure whitespace-nowrap">
               {formatTime12h(block.startTime)}–{formatTime12h(block.endTime)}
             </span>{' '}
             · {formatDurationHuman(duration)}
@@ -255,6 +249,19 @@ function BlockRow({
             </span>
           )}
         </button>
+        {canSkip && isPassed && !block.completed && !block.skipped && (
+          // A missed block can be skipped straight from its row (Zakria 2026-11-16): no need to open it first.
+          <button
+            type="button"
+            onClick={() => onSkip(block)}
+            aria-label={`Skip ${name}`}
+            title="Skip"
+            className={cx('btn-ghost shrink-0 self-center px-2 py-1 text-xs text-content-muted hover:text-content-secondary', TAP_TARGET)}
+          >
+            <SkipForward size={14} aria-hidden="true" />
+            <span className="hidden sm:inline">Skip</span>
+          </button>
+        )}
       </div>
 
       {open && (

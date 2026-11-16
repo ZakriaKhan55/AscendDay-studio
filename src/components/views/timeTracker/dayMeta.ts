@@ -3,7 +3,7 @@ import type { AppState, TimeTrackerActivity, TimeTrackerBlock } from '@/types';
 import { trustedNow } from '@/lib/time/clock';
 import { calculateTimeTrackerDailyPoints, TIME_TRACKER_POINTS } from '@/lib/points/pointsConfig';
 import { timeTrackerAwardId } from '@/lib/points/timeTrackerAwards';
-import { formatTime12h } from '@/lib/timeTracker/timeTracker';
+import { formatTime12h, timeStringToMinutes } from '@/lib/timeTracker/timeTracker';
 
 export { blockName } from '@/lib/timeTracker/timeTracker';
 
@@ -81,3 +81,13 @@ export const MODULE_LABELS: Record<string, string> = {
   Recovery: 'Recovery',
   'Addiction Recovery': 'Recovery',
 };
+
+/** Minutes since midnight a block ends at; a block ending at 00:00 ends at 1440 (midnight). */
+export const blockEndMinutes = (b: TimeTrackerBlock) => {
+  const start = timeStringToMinutes(b.startTime);
+  const end = timeStringToMinutes(b.endTime);
+  return end === 0 && start > 0 ? 1440 : end;
+};
+
+/** Today's block that has ended without being done or skipped ("Not done"). */
+export const isMissedBlock = (b: TimeTrackerBlock, nowMinutes: number) => !b.completed && !b.skipped && nowMinutes >= blockEndMinutes(b);

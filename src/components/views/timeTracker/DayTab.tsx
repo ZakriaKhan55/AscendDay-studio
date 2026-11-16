@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CalendarClock, Layers, Plus } from 'lucide-react';
+import { CalendarClock, Layers, Plus, SkipForward } from 'lucide-react';
 import type { TimeTrackerActivity, TimeTrackerBlock, TimeTrackerTemplate } from '@/types';
 import { AppStore } from '@/lib/store/store';
 import {
@@ -28,7 +28,7 @@ import { View } from '@/components/AppShell';
 import { WeekStrip } from './WeekStrip';
 import { NowCard } from './NowCard';
 import { DayTimeline, type TimelineBlock } from './DayTimeline';
-import { blockName, blockRange, ledgerDayPoints, nextTierHint, useNowTick } from './dayMeta';
+import { blockName, blockRange, isMissedBlock, ledgerDayPoints, nextTierHint, useNowTick } from './dayMeta';
 import { actionFeedback } from '@/lib/ui/actionFeedback';
 import { useOpenFor, useOpenForWith } from '@/lib/ui/useOpenFor';
 import { groupMinutes } from '@/lib/timeTracker/timeTrackerGroups';
@@ -128,6 +128,14 @@ export function DayTab({
       store.markDailyTimeBlockSkipped(selectedDateKey, block.id);
       showSuccessToast('Skipped', blockName(block, activityMap.get(block.activityId)));
     }, "Couldn't skip block");
+
+  // Today's blocks that ended without done or skip: one tap skips them all (each can still be undone on its row).
+  const missed = mode === 'today' ? blocks.filter((b) => isMissedBlock(b, live.currentMinutes)) : [];
+  const skipMissed = () =>
+    run(() => {
+      for (const block of missed) store.markDailyTimeBlockSkipped(selectedDateKey, block.id);
+      showSuccessToast(missed.length === 1 ? 'Skipped 1 block' : `Skipped ${missed.length} blocks`, 'Undo any of them from its row.');
+    }, "Couldn't skip blocks");
 
   // Undo skip puts the block back to not done (never marks it done).
   const undoSkip = (block: TimeTrackerBlock) =>
@@ -256,6 +264,11 @@ export function DayTab({
           </div>
           {mode !== 'past' && (
             <div className="flex flex-wrap items-center gap-2">
+              {missed.length > 0 && (
+                <button type="button" onClick={skipMissed} className="btn-secondary text-xs">
+                  <SkipForward size={14} /> Skip missed ({missed.length})
+                </button>
+              )}
               {templates.length > 0 && (
                 <button type="button" onClick={onApplyTemplate} className="btn-secondary text-xs">
                   <Layers size={14} /> Apply template
