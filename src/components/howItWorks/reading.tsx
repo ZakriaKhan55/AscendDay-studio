@@ -16,7 +16,7 @@ export const readingGuide: HowItWorksGuide = {
       text: 'Books you’re reading now. Log progress in pages, or in chapters if you set the book that way. You can switch a book between the two in Edit book.',
     },
     { title: 'Library', text: 'Books you want to read. Start one and it moves to Reading.' },
-    { title: 'Finished', text: 'Finish a book with its key takeaway. You can read it again any time.' },
+    { title: 'Finished', text: 'Finish a book with its key takeaway. You can read it again any time: its pages earn daily points, but no second finish bonus.' },
     { title: 'Discover', text: 'A picked list of books. Save one to your Library or start it right away.' },
     { title: 'Daily habit', text: 'Turn on the Reading habit and it ticks itself on Habits on days you log reading.' },
   ],

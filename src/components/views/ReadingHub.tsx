@@ -648,7 +648,7 @@ export function ReadingHub({ store }: { store: AppStore }) {
                             type="button"
                             onClick={() => {
                               store.restartBook(book.id);
-                              showSuccessToast('Reading again', `${book.title} is back in Reading.`, `book_reread_${book.id}`);
+                              showSuccessToast('Reading again', `${book.title} is back in Reading. Pages you log earn daily points. The finish bonus is once per book.`, `book_reread_${book.id}`);
                             }}
                             className="btn-secondary text-xs py-1.5 px-3"
                           >
