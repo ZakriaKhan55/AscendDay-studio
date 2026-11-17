@@ -1,0 +1,532 @@
+{
+ "day": "2026-11-08",
+ "tz": "Asia/Karachi",
+ "scenarios": [
+  {
+   "name": "two devices 20->26 from the same place count 6 pages once",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z",
+     "fromAmount": 20,
+     "readStartedAt": "2026-11-01T10:00:00.000Z"
+    },
+    {
+     "id": "b",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T21:00:00.000Z",
+     "fromAmount": 20,
+     "readStartedAt": "2026-11-01T10:00:00.000Z"
+    }
+   ],
+   "points": 3,
+   "oldPoints": 6
+  },
+  {
+   "name": "then a real 26->30 still counts",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z",
+     "fromAmount": 20,
+     "readStartedAt": "2026-11-01T10:00:00.000Z"
+    },
+    {
+     "id": "b",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T21:00:00.000Z",
+     "fromAmount": 20,
+     "readStartedAt": "2026-11-01T10:00:00.000Z"
+    },
+    {
+     "id": "c",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 4,
+     "unit": "pages",
+     "createdAt": "2026-11-07T22:00:00.000Z",
+     "fromAmount": 26,
+     "readStartedAt": "2026-11-01T10:00:00.000Z"
+    }
+   ],
+   "points": 5,
+   "oldPoints": 8
+  },
+  {
+   "name": "stale device 12->30 over 12->20 counts 18 pages",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 8,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z",
+     "fromAmount": 12
+    },
+    {
+     "id": "b",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 18,
+     "unit": "pages",
+     "createdAt": "2026-11-07T21:00:00.000Z",
+     "fromAmount": 12
+    }
+   ],
+   "points": 9,
+   "oldPoints": 10
+  },
+  {
+   "name": "partial overlap 20->26 and 24->30 = 10 pages",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z",
+     "fromAmount": 20
+    },
+    {
+     "id": "b",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T21:00:00.000Z",
+     "fromAmount": 24
+    }
+   ],
+   "points": 5,
+   "oldPoints": 6
+  },
+  {
+   "name": "touching ranges merge: 20->25, 25->30, then 20->30 adds nothing",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 5,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z",
+     "fromAmount": 20
+    },
+    {
+     "id": "b",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 5,
+     "unit": "pages",
+     "createdAt": "2026-11-07T21:00:00.000Z",
+     "fromAmount": 25
+    },
+    {
+     "id": "c",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 10,
+     "unit": "pages",
+     "createdAt": "2026-11-07T22:00:00.000Z",
+     "fromAmount": 20
+    }
+   ],
+   "points": 5,
+   "oldPoints": 10
+  },
+  {
+   "name": "Read again: same pages in a new read count again",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading",
+     "startedAt": "2026-11-08T03:00:00.000Z"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 8,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z",
+     "fromAmount": 0,
+     "readStartedAt": "2026-11-01T10:00:00.000Z"
+    },
+    {
+     "id": "b",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T23:00:00.000Z",
+     "fromAmount": 0,
+     "readStartedAt": "2026-11-08T03:00:00.000Z"
+    }
+   ],
+   "points": 7,
+   "oldPoints": 7
+  },
+  {
+   "name": "old logs without fromAmount count in full as before",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z"
+    },
+    {
+     "id": "b",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "createdAt": "2026-11-07T21:00:00.000Z"
+    }
+   ],
+   "points": 6,
+   "oldPoints": 6
+  },
+  {
+   "name": "an old log next to a new one: both count",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z"
+    },
+    {
+     "id": "b",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T21:00:00.000Z",
+     "fromAmount": 20
+    }
+   ],
+   "points": 6,
+   "oldPoints": 6
+  },
+  {
+   "name": "chapters: two devices 1.0->1.3 count 0.3 chapter once",
+   "books": [
+    {
+     "id": "c1",
+     "unit": "chapters",
+     "status": "reading"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "c1",
+     "date": "2026-11-08",
+     "pagesRead": 0.3,
+     "unit": "chapters",
+     "createdAt": "2026-11-07T20:00:00.000Z",
+     "fromAmount": 1
+    },
+    {
+     "id": "b",
+     "bookId": "c1",
+     "date": "2026-11-08",
+     "pagesRead": 0.3,
+     "unit": "chapters",
+     "createdAt": "2026-11-07T21:00:00.000Z",
+     "fromAmount": 1
+    }
+   ],
+   "points": 3,
+   "oldPoints": 6
+  },
+  {
+   "name": "different books never dedupe",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading"
+    },
+    {
+     "id": "b2",
+     "unit": "pages",
+     "status": "reading"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z",
+     "fromAmount": 20
+    },
+    {
+     "id": "b",
+     "bookId": "b2",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T21:00:00.000Z",
+     "fromAmount": 20
+    }
+   ],
+   "points": 6,
+   "oldPoints": 6
+  },
+  {
+   "name": "a unit switch starts the ranges over; the switch rule still owes",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading",
+     "unitSwitches": [
+      {
+       "date": "2026-11-08",
+       "at": "2026-11-07T21:00:00.000Z",
+       "pagesBefore": 30,
+       "pagesAfter": 20,
+       "toUnit": "pages"
+      }
+     ]
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 10,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z",
+     "fromAmount": 20
+    },
+    {
+     "id": "b",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 10,
+     "unit": "pages",
+     "createdAt": "2026-11-07T22:00:00.000Z",
+     "fromAmount": 20
+    },
+    {
+     "id": "c",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T23:00:00.000Z",
+     "fromAmount": 30
+    }
+   ],
+   "points": 8,
+   "oldPoints": 8
+  },
+  {
+   "name": "a shrunk log (taken back to 20->23) only covers 20->23",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 3,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z",
+     "fromAmount": 20
+    },
+    {
+     "id": "b",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 4,
+     "unit": "pages",
+     "createdAt": "2026-11-07T21:00:00.000Z",
+     "fromAmount": 23
+    }
+   ],
+   "points": 3,
+   "oldPoints": 3
+  },
+  {
+   "name": "Finish log never counts, with or without fromAmount",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 40,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z",
+     "fromAmount": 20,
+     "finish": true
+    },
+    {
+     "id": "b",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 4,
+     "unit": "pages",
+     "createdAt": "2026-11-07T21:00:00.000Z",
+     "fromAmount": 20
+    }
+   ],
+   "points": 2,
+   "oldPoints": 2
+  },
+  {
+   "name": "bad fromAmount (negative / text) counts in full",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z",
+     "fromAmount": -1
+    },
+    {
+     "id": "b",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 6,
+     "unit": "pages",
+     "createdAt": "2026-11-07T21:00:00.000Z",
+     "fromAmount": "20"
+    }
+   ],
+   "points": 6,
+   "oldPoints": 6
+  },
+  {
+   "name": "daily cap 10 still holds",
+   "books": [
+    {
+     "id": "b1",
+     "unit": "pages",
+     "status": "reading"
+    }
+   ],
+   "logs": [
+    {
+     "id": "a",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 30,
+     "unit": "pages",
+     "createdAt": "2026-11-07T20:00:00.000Z",
+     "fromAmount": 0
+    },
+    {
+     "id": "b",
+     "bookId": "b1",
+     "date": "2026-11-08",
+     "pagesRead": 30,
+     "unit": "pages",
+     "createdAt": "2026-11-07T21:00:00.000Z",
+     "fromAmount": 0
+    }
+   ],
+   "points": 10,
+   "oldPoints": 10
+  }
+ ]
+}

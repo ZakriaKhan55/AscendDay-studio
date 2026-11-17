@@ -6,7 +6,7 @@ import type { AppState, ReadingLog, UserBook, UserBookStatus, CuratedBook, BookC
 import { periodKey, todayKey, weekKey } from '../time/dates';
 import type { LinkedPactTick } from '../partners/pactLifecycle';
 import { tickPactsLinkedTo } from '../partners/pactLifecycle';
-import { stampLogUnits, switchBookUnit, takeBackTodaysReading, unitSwitchDefaults } from '../reading/bookUnits';
+import { readCycleOf, stampLogUnits, switchBookUnit, takeBackTodaysReading, unitSwitchDefaults } from '../reading/bookUnits';
 import {
   isChapterBook,
   meetsReadingBonusGates,
@@ -52,6 +52,9 @@ export function useReadingActions(setState: StoreSetState, afterCommit: (fn: () 
           date,
           pagesRead: pageDelta,
           unit,
+          // Where this device's place was: the same pages logged on two devices count once (logRange).
+          fromAmount: existingPage,
+          ...readCycleOf(targetUserBook),
           pointsAwarded: 0,
           createdAt: trustedNow().toISOString(),
         };

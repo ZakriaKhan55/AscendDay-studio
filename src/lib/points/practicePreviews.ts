@@ -8,7 +8,7 @@
 import type { ReadingLog, UserBook, WorkoutLog } from '@/types';
 import { computeWorkoutAwards } from './workoutAwards';
 import { computeReadingDayAward, isChapterBook, snapReadingAmount } from './readingAwards';
-import { takeBackTodaysReading } from '../reading/bookUnits';
+import { readCycleOf, takeBackTodaysReading } from '../reading/bookUnits';
 import { workoutFields } from '../items/itemEdits';
 
 /** The preview line's label when the whole amount counts. */
@@ -69,7 +69,7 @@ export function readingProgressPreview(
   let next = all;
   if (delta > 0) {
     next = [
-      { id: 'preview', bookId: book.id, date: today, pagesRead: delta, unit, pointsAwarded: 0, createdAt: nowIso },
+      { id: 'preview', bookId: book.id, date: today, pagesRead: delta, unit, fromAmount: existing, ...readCycleOf(book), pointsAwarded: 0, createdAt: nowIso },
       ...all,
     ];
   } else if (delta < 0) {

@@ -115,12 +115,19 @@ export function stampLogUnits(logs: ReadingLog[], book: UserBook): ReadingLog[] 
   return changed ? next : logs;
 }
 
+/** The read a new log belongs to (readStartedAt = the book's startedAt; "Read again" sets a new one). */
+export const readCycleOf = (book: Pick<UserBook, 'startedAt' | 'dateStarted'>): { readStartedAt?: string } => {
+  const at = book.startedAt || book.dateStarted;
+  return typeof at === 'string' && at ? { readStartedAt: at } : {};
+};
+
 /**
  * Lowering a book's progress takes back today's reading of that book, newest log first, counted in
  * pages (a tenth of a chapter = 2 pages), whatever unit each log was written in; earlier days never
  * change. A chapter log that is only partly taken back loses whole tenths of a chapter and an odd
  * page left over comes back as a pages log at the same time (refund), so the day keeps exactly the
- * pages still read.
+ * pages still read. A shrunk log keeps its fromAmount, so its range shrinks from the top; the
+ * refund log has none (at most 1 page, in pages, counted in full as before).
  */
 export function takeBackTodaysReading(
   logs: ReadingLog[],

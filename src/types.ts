@@ -260,6 +260,10 @@ export interface ReadingLog {
   pagesRead: number; // positive delta only, in `unit`
   /** The unit pagesRead is in. The app writes it on new logs and the server stamps it (reading_logs_unit); it never changes. Older logs: the book's unit (logUnit). */
   unit?: 'pages' | 'chapters';
+  /** The book's place this log started from, in `unit` (the log covers fromAmount .. fromAmount + pagesRead). The server counts pages two logs of the same day, book, unit and read both cover only once (logRange). Older logs: none (counted in full). */
+  fromAmount?: number;
+  /** The book's startedAt when the log was made: a "Read again" starts a new read, whose pages count again. */
+  readStartedAt?: string;
   createdAt: string; // ISO timestamp
   pointsAwarded?: number;
   finish?: boolean; // unread pages added by Finish: no page points, still a reading day

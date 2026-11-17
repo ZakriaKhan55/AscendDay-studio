@@ -97,6 +97,43 @@ export const logPageAmount = (log: ReadingLog, book: Pick<UserBook, 'unit'> | un
   readingAmountPages(logPages(log), logUnit(log, book));
 
 /**
+ * The place range a log covers, for the de-duplication of logs made from the same place on two
+ * devices (20261117173000_reading_awards_dedupe_ranges.sql): [lo, hi) in the log's unit, chapters
+ * in whole tenths, and the key its ranges are compared under (unit + the book's read it was made
+ * in, readStartedAt). null for a log without a usable fromAmount (older logs and older app
+ * versions): it adds its whole amount, as before.
+ */
+export function logRange(log: ReadingLog, book: Pick<UserBook, 'unit'> | undefined): { key: string; lo: number; hi: number } | null {
+  const from = log.fromAmount;
+  if (typeof from !== 'number' || !Number.isFinite(from) || from < 0) return null;
+  const unit = logUnit(log, book);
+  const amount = logPages(log);
+  const lo = unit === 'chapters' ? chapterTenths(from) : from;
+  const hi = lo + (unit === 'chapters' ? chapterTenths(amount) : amount);
+  return { key: `${unit}|${typeof log.readStartedAt === 'string' ? log.readStartedAt : ''}`, lo, hi };
+}
+
+/**
+ * Adds [lo, hi) to `ranges` (disjoint) and returns how much of it was not covered yet: the
+ * covered set only grows, so a later log never adds what an earlier one already counted.
+ */
+export function addRange(ranges: [number, number][], lo: number, hi: number): { added: number; ranges: [number, number][] } {
+  let added = hi - lo;
+  let mlo = lo;
+  let mhi = hi;
+  const keep: [number, number][] = [];
+  for (const [rlo, rhi] of ranges) {
+    added -= Math.max(0, Math.min(hi, rhi) - Math.max(lo, rlo));
+    if (rhi < lo || rlo > hi) keep.push([rlo, rhi]);
+    else {
+      mlo = Math.min(mlo, rlo);
+      mhi = Math.max(mhi, rhi);
+    }
+  }
+  return { added: Math.max(0, added), ranges: [...keep, [mlo, mhi]] };
+}
+
+/**
  * How far a unit switch moved the book's place, in pages (after minus before): below 0 when it
  * lowered the place, above 0 when it raised it, 0 for an entry that can't be read.
  */
@@ -129,6 +166,11 @@ const dayLastMs = (day: string): number => new Date(`${addDayKeys(day, 1)}T00:00
  * total it reached (never below 0). So a switch never earns or takes points, reading the same pages
  * again after a lowering switch earns nothing until the book passes where it was, and switching back
  * to the old place makes new reading earn again. A day without a switch is the plain sum.
+ * A log with a start place (fromAmount, logRange) adds only the part of its range that earlier
+ * logs of that book, unit and read did not already cover that day (so two devices logging 20 -> 30
+ * from the same place count 10 pages once); a unit switch starts the book's covered ranges over
+ * (the switch rule above governs reading pages again after it). A log without fromAmount adds its
+ * whole amount.
  * Points = floor(the books' pages / pagesPerPoint), capped across all books.
  * The row's time follows the server: a day whose row already exists (existing, the live ledger row)
  * keeps that row's time and only the amount changes; a new row is stamped at the day's first
@@ -170,12 +212,26 @@ export function computeReadingDayAward(
 
   const logPoints = new Map<string, number>();
   const running = new Map<string, { total: number; best: number; owed: number }>();
+  // Per book: covered ranges per logRange key; cleared by a unit switch of that book.
+  const covered = new Map<string, Map<string, [number, number][]>>();
   let pages = 0;
   let used = 0;
   let firstMs: number | null = null;
   for (const ev of events) {
     const book = running.get(ev.bookId) ?? { total: 0, best: 0, owed: 0 };
-    if (ev.log || ev.pages < 0) book.total += ev.pages;
+    let evPages = ev.pages;
+    if (!ev.log) covered.delete(ev.bookId);
+    else {
+      const range = logRange(ev.log, bookById.get(ev.bookId));
+      if (range) {
+        const byKey = covered.get(ev.bookId) ?? new Map<string, [number, number][]>();
+        const { added, ranges } = addRange(byKey.get(range.key) ?? [], range.lo, range.hi);
+        byKey.set(range.key, ranges);
+        covered.set(ev.bookId, byKey);
+        evPages = range.key.startsWith('chapters|') ? added * PAGES_PER_CHAPTER_TENTH : added;
+      }
+    }
+    if (ev.log || ev.pages < 0) book.total += evPages;
     else book.total += Math.min(ev.pages, book.owed);
     if (!ev.log) book.owed = Math.max(0, book.owed - ev.pages);
     const best = Math.max(book.best, book.total);
