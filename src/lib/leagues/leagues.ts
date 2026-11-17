@@ -250,7 +250,6 @@ export function generateCompetitors(
   usernameFallback: string,
   totalPoints: number = 0,
   userStats: any | undefined,
-  activeHabits: any[] | undefined,
   now: Date
 ): LeagueCompetitor[] {
   const currentUserId = currentUser?.id;
@@ -269,7 +268,6 @@ export function generateCompetitors(
     isRealUser: true,
     isProfilePublic: currentUser?.isProfilePublic ?? true,
     stats: userStats,
-    activeHabits: activeHabits,
     season_history: currentUser?.season_history || userStats?.season_history,
     firstActiveAt: getCachedFirstActiveAt(currentUserId, type),
   };

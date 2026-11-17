@@ -151,7 +151,6 @@ export interface LeagueCompetitor {
   /** First activity in this board's period, epoch ms (server; active members only): orders 0-point rows. */
   firstActiveAt?: number;
   stats?: UserStats;
-  activeHabits?: { name: string; category?: string; frequency: string; isPreset: boolean }[];
   season_history?: SeasonHistoryEntry[];
 }
 

@@ -143,7 +143,6 @@ export function useNotificationActions(setState: StoreSetState, get: () => AppSt
         state.username,
         state.totalPoints,
         userStats,
-        undefined,
         now
       );
       const userRank = getUserRank(competitors);
