@@ -210,10 +210,10 @@ export function ReadingHub({ store }: { store: AppStore }) {
     if (!deletePoints || deletePoints.total <= 0) return '';
     const what =
       deletePoints.bonus > 0 && deletePoints.today > 0
-        ? 'finish bonus and today’s pages'
+        ? 'finish bonus and today’s reading'
         : deletePoints.bonus > 0
           ? 'finish bonus'
-          : 'today’s pages';
+          : 'today’s reading';
     return `Removing this book takes back its ${deletePoints.total} point${deletePoints.total === 1 ? '' : 's'} (${what}). `;
   })();
 
@@ -265,7 +265,7 @@ export function ReadingHub({ store }: { store: AppStore }) {
       <div className="page-header">
         <div>
           <h1 className="page-title">Reading Hub</h1>
-          <p className="page-subtitle">Log pages, keep the streak, and line up what to read next.</p>
+          <p className="page-subtitle">Log your reading, keep the streak, and line up what to read next.</p>
           <HowItWorksButton onClick={guide.show} />
         </div>
         <div className="page-header-actions">
@@ -648,7 +648,7 @@ export function ReadingHub({ store }: { store: AppStore }) {
                             type="button"
                             onClick={() => {
                               store.restartBook(book.id);
-                              showSuccessToast('Reading again', `${book.title} is back in Reading. Pages you log earn daily points. The finish bonus is once per book.`, `book_reread_${book.id}`);
+                              showSuccessToast('Reading again', `${book.title} is back in Reading. What you log earns daily points. The finish bonus is once per book.`, `book_reread_${book.id}`);
                             }}
                             className="btn-secondary text-xs py-1.5 px-3"
                           >

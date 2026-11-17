@@ -85,7 +85,7 @@ export function FinishBookDialog({
             <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-success-text" />
             <p className="text-xs leading-relaxed text-content-secondary">
               You get the <span className="figure text-success-text">+{READING_POINTS.completionBonus}</span> finish bonus. You
-              read it over {eligibility.spanDays} days and logged pages on {eligibility.loggedDays}.
+              read it over {eligibility.spanDays} days and logged reading on {eligibility.loggedDays}.
             </p>
           </div>
         ) : eligibility?.alreadyAwarded ? (
@@ -109,7 +109,7 @@ export function FinishBookDialog({
               <div className="flex items-start gap-3">
                 <Info size={18} className="mt-0.5 shrink-0 text-content-muted" />
                 <p className="text-xs leading-relaxed text-content-muted">
-                  No finish bonus yet. The <span className="figure">+{READING_POINTS.completionBonus}</span> bonus needs pages
+                  No finish bonus yet. The <span className="figure">+{READING_POINTS.completionBonus}</span> bonus needs reading
                   logged on {READING_BONUS_MIN_LOG_DAYS} separate days, the first at least {READING_BONUS_MIN_SPAN_DAYS} days
                   ago. Keep logging to earn it, or finish now without it. Page points you already earned stay.
                 </p>

@@ -15,7 +15,7 @@ const R = READING_POINTS;
 const pagesForCap = R.dailyCap * R.pagesPerPoint;
 const categories = BOOK_CATEGORIES.map((c) => c.name);
 const list = (items: string[]) => `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
-const BONUS_RULE = `you logged pages on at least ${READING_BONUS_MIN_LOG_DAYS} different days and the first of them was ${READING_BONUS_MIN_SPAN_DAYS} or more days before you finish`;
+const BONUS_RULE = `you logged reading on at least ${READING_BONUS_MIN_LOG_DAYS} different days and the first of them was ${READING_BONUS_MIN_SPAN_DAYS} or more days before you finish`;
 
 export const reading: FeatureContent = {
   intro: (
@@ -74,7 +74,7 @@ export const reading: FeatureContent = {
           <p>
             Discover holds {CURATED_BOOKS.length} books in {categories.length} categories: {list(categories)}. Search by
             title, author or takeaway, filter by category, and sort by suggested order, classics first or A to Z. A book you add from
-            Discover keeps its length, so you only have to log pages.
+            Discover keeps its length, so you only have to log your reading.
           </p>
         }
       />
@@ -132,7 +132,7 @@ export const reading: FeatureContent = {
         title="Reading inside the rest of AscendDay"
         lead={
           <p>
-            Pages you log don’t stay in one place. They count toward your season, your rank and the leagues, and they can
+            The pages and chapters you log don’t stay in one place. They count toward your season, your rank and the leagues, and they can
             fill other parts of the app as well:
           </p>
         }
@@ -147,8 +147,8 @@ export const reading: FeatureContent = {
                   <a href={featurePath('habits')} className={LINK_CLASS}>
                     habits
                   </a>
-                  , ticked by itself on every day you log pages. It keeps a habit streak and earns nothing extra, so
-                  pages are never counted twice.
+                  , ticked by itself on every day you log pages or chapters. It keeps a habit streak and earns nothing extra, so
+                  your reading is never counted twice.
                 </>
               ),
             },
@@ -205,20 +205,20 @@ export const reading: FeatureContent = {
   ],
   notFor: [
     'You want book reviews, ratings and a social feed; AscendDay tracks your reading, it isn’t a book community.',
-    'You want an e-reader; you read the book wherever you have it and log the pages here.',
+    'You want an e-reader; you read the book wherever you have it and log your progress here.',
   ],
   faq: [
     {
       q: 'Why use AscendDay for reading instead of a separate reading tracker app?',
-      a: 'Because pages read earn points toward your rank and the leagues, together with your habits and workouts, so an evening with a book counts as much as a gym session. Logging pages also ticks your Reading habit on its own and can fill a weekly goal like “Read 100 pages”, so you log once. It is built for the daily habit of reading, not for reviews or a social bookshelf.',
+      a: 'Because the pages or chapters you read earn points toward your rank and the leagues, together with your habits and workouts, so an evening with a book counts as much as a gym session. Logging your reading also ticks your Reading habit on its own and can fill a weekly goal like “Read 100 pages”, so you log once. It is built for the daily habit of reading, not for reviews or a social bookshelf.',
     },
     {
       q: 'Why does reading earn points per page, not only per finished book?',
-      a: `Because the habit is the reading, not the last page. A point every ${R.pagesPerPoint} pages rewards a short read on a busy night, and the ${R.completionBonus}-point finish bonus needs pages logged on at least ${READING_BONUS_MIN_LOG_DAYS} different days, so it rewards finishing a book over time, not racing through one in a sitting.`,
+      a: `Because the habit is the reading, not the last page. A point every ${R.pagesPerPoint} pages rewards a short read on a busy night, and the ${R.completionBonus}-point finish bonus needs reading logged on at least ${READING_BONUS_MIN_LOG_DAYS} different days, so it rewards finishing a book over time, not racing through one in a sitting.`,
     },
     {
       q: 'Is the reading tracker free?',
-      a: 'Yes. AscendDay is free while in beta. The library, Discover, the reading streak tracker, the pages read log and the points are all included.',
+      a: 'Yes. AscendDay is free while in beta. The library, Discover, the reading streak tracker, the reading log and the points are all included.',
     },
     {
       q: 'Can I track a book by chapters instead of pages?',
@@ -238,5 +238,5 @@ export const reading: FeatureContent = {
     },
   ],
   related: ['habits', 'weekly-goals', 'skills', 'time-blocking'],
-  cta: { title: 'Start your reading streak', text: 'Add the book on your desk, log today’s pages, and day one is done.' },
+  cta: { title: 'Start your reading streak', text: 'Add the book on your desk, log today’s reading, and day one is done.' },
 };

@@ -161,7 +161,7 @@ export const habits: FeatureContent = {
         </Note>
         <div className="scroll-rise mt-6 max-w-3xl space-y-3 text-sm leading-relaxed text-content-tertiary">
           <p>
-            The Reading habit is special: it ticks itself when you log pages in the{' '}
+            The Reading habit is special: it ticks itself when you log pages or chapters in the{' '}
             <a href={featurePath('reading')} className={LINK_CLASS}>
               Reading Hub
             </a>{' '}

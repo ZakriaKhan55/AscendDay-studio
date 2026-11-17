@@ -49,7 +49,7 @@ export const weeklyGoals: FeatureContent = {
             },
             {
               title: 'Let the week fill it in',
-              text: 'Linked goals move every time you tick the habit or log the workout, pages or practice, and tick themselves when the target is reached.',
+              text: 'Linked goals move every time you tick the habit or log the workout, reading or practice, and tick themselves when the target is reached.',
             },
             {
               title: 'Reflect, then carry over',
@@ -202,7 +202,7 @@ export const weeklyGoals: FeatureContent = {
   faq: [
     {
       q: 'Why use AscendDay for weekly goals instead of a separate goals app?',
-      a: `Because a goal linked to something you already log fills in on its own: habit days, workouts, pages or practice minutes count toward it from Monday to Sunday, with no second place to update. Reached goals earn ${pts(G.pointsPerGoal)} each and the weekend reflection ${reflection} more, all toward your rank and the leagues. A separate goals app only knows what you type into it; here a goal sees what you actually did.`,
+      a: `Because a goal linked to something you already log fills in on its own: habit days, workouts, pages or chapters, or practice minutes count toward it from Monday to Sunday, with no second place to update. Reached goals earn ${pts(G.pointsPerGoal)} each and the weekend reflection ${reflection} more, all toward your rank and the leagues. A separate goals app only knows what you type into it; here a goal sees what you actually did.`,
     },
     {
       q: 'Why do only the first few goals earn points?',

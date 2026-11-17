@@ -125,7 +125,7 @@ export const timeBlocking: FeatureContent = {
           <a href={featurePath('skills')} className={LINK_CLASS}>
             Skills
           </a>
-          . You can link your own categories the same way. Ticking a block doesn’t log the workout or the pages for you;
+          . You can link your own categories the same way. Ticking a block doesn’t log the workout or the reading for you;
           those earn their own points on their own pages.
         </Note>
       </Block>

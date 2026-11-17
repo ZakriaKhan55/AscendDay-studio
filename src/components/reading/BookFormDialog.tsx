@@ -308,7 +308,7 @@ export function BookFormDialog({
 
         {!editing && finished && (
           <p className="text-xs text-content-muted">
-            Books added as finished earn no points. Log pages as you read to earn them.
+            Books added as finished earn no points. Log pages or chapters as you read to earn them.
           </p>
         )}
       </Form>
