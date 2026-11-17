@@ -265,10 +265,17 @@ export function mergeSharedChallenge(baseC: SharedChallenge, incC: SharedChallen
     const ms = typeof v === 'number' ? v : Date.parse(String(v ?? ''));
     return Number.isFinite(ms) ? ms : 0;
   };
+  // Two copies of the SAME pact: the incoming copy wins, as in mergeEntityArrays (the live callers
+  // pass the newer copy as incoming: a save answer, a realtime row, a refresh, another tab; the boot
+  // merge passes this device's copy, which the refresh right after replaces). createdAt is no version stamp: the
+  // creator's own copy carries the device's creation time, which a skewed clock can put after the
+  // server's created_at, and then that copy's old goal beat every later relink. Two different pacts
+  // (the same running title, deduped) still keep the newer-created one.
   const baseTime = toMs(baseC.createdAt);
   const incTime = toMs(incC.createdAt);
-  const primary = incTime >= baseTime ? incC : baseC;
-  const secondary = incTime >= baseTime ? baseC : incC;
+  const incomingWins = baseC.id === incC.id || incTime >= baseTime;
+  const primary = incomingWins ? incC : baseC;
+  const secondary = incomingWins ? baseC : incC;
 
   const latestU1 = u1Dates.length > 0 ? u1Dates[u1Dates.length - 1] : undefined;
   const latestU2 = u2Dates.length > 0 ? u2Dates[u2Dates.length - 1] : undefined;
