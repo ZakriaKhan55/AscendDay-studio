@@ -30,6 +30,13 @@ export const isRetiredAppHabitAward = (entry: PointsEntry): boolean =>
   typeof entry.metadata?.periodKey === 'string' &&
   entry.metadata.periodKey >= HABIT_AWARDS_SERVER_SINCE;
 
+/**
+ * A habit with no frequency counts as daily, the same default penalty processing uses
+ * (habitPenalties.ts `habit.frequency || 'daily'`; SQL `coalesce(data->>'frequency', 'daily')`).
+ * Award code must use this, not `frequency === 'daily'` (CR-09-10).
+ */
+export const isDailyHabit = (habit: Pick<Habit, 'frequency'>): boolean => (habit.frequency || 'daily') === 'daily';
+
 /** Points of a daily custom habit's tick (ascend_preset_habit_points); weekly custom habits earn 0. */
 export const CUSTOM_HABIT_POINTS = 1;
 
@@ -39,7 +46,7 @@ export const CUSTOM_HABIT_POINTS = 1;
  * habit CUSTOM_HABIT_POINTS when daily.
  */
 export function presetHabitPoints(habit: Pick<Habit, 'isPreset' | 'name' | 'frequency'>): number {
-  if (habit.isPreset !== true) return habit.frequency === 'daily' ? CUSTOM_HABIT_POINTS : 0;
+  if (habit.isPreset !== true) return isDailyHabit(habit) ? CUSTOM_HABIT_POINTS : 0;
   return findPresetHabit(habit.name)?.points ?? 0;
 }
 
@@ -57,7 +64,7 @@ export function computeHabitAwards(
 ): { allocation: Record<string, number>; entries: PointsEntry[] } {
   const byName = new Map<string, { habit: Habit; item: PresetHabitCapItem }>();
   for (const habit of habits) {
-    if (!habit || habit.frequency !== 'daily') continue;
+    if (!habit || !isDailyHabit(habit)) continue;
     const points = presetHabitPoints(habit);
     if (points <= 0) continue;
     const completions = habit.completions as Habit['completions'] | string[] | undefined;

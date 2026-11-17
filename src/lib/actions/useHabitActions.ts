@@ -7,7 +7,7 @@ import { uid, periodKey, todayKey, weekKey } from '../time/dates';
 import type { LinkedPactTick } from '../partners/pactLifecycle';
 import { runningPactsLinkedTo, tickPactsLinkedTo } from '../partners/pactLifecycle';
 import type { PresetHabit } from '../content/presets';
-import { presetHabitPoints } from '../points/habitAwards';
+import { isDailyHabit, presetHabitPoints } from '../points/habitAwards';
 import { renameHabitIn } from '../items/itemEdits';
 import { removeLinkedWeeklyGoals, reconcileLinkedWeeklyGoals } from '../points/weeklyGoalPoints';
 import { applyHabitAwardsInternal } from '../points/stateAwards';
@@ -113,7 +113,7 @@ export function useHabitActions(setState: StoreSetState, get: () => AppState, af
 
         // If target had a completion today, recalculate cap allocation for the remaining habits
         let targetHadTodayDone = false;
-        if (target && target.frequency === 'daily' && presetHabitPoints(target) > 0) {
+        if (target && isDailyHabit(target) && presetHabitPoints(target) > 0) {
           if (Array.isArray(target.completions)) {
             targetHadTodayDone = target.completions.includes(today);
           } else if (target.completions && typeof target.completions === 'object') {
@@ -251,7 +251,7 @@ export function useHabitActions(setState: StoreSetState, get: () => AppState, af
                   ...h,
                   completions: {
                     ...currentCompletions,
-                    [key]: { done: true, updatedAt: nowIso, pointsAwarded: h.frequency === 'daily' && presetHabitPoints(h) > 0 ? 0 : h.points },
+                    [key]: { done: true, updatedAt: nowIso, pointsAwarded: isDailyHabit(h) && presetHabitPoints(h) > 0 ? 0 : h.points },
                   },
                   updatedAt: nowIso,
                 };
@@ -261,7 +261,7 @@ export function useHabitActions(setState: StoreSetState, get: () => AppState, af
             let runningState = prev;
 
             // Daily habits that earn points (presets and custom) share the daily cap; weekly ones earn none.
-            if (habit && habit.frequency === 'daily' && presetHabitPoints(habit) > 0) {
+            if (habit && isDailyHabit(habit) && presetHabitPoints(habit) > 0) {
               const awards = applyHabitAwardsInternal(runningState, habits, todayKey());
               runningState = { ...runningState, ...awards.points };
               habits = awards.habits;

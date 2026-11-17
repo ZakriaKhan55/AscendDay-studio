@@ -1,7 +1,7 @@
 // Fixtures for server-owned habit awards: the app's copy of the server's award rule
 // (ascend_recompute_habit_awards), and the sync rules that keep those rows server-only.
 import { DEFAULT_STATE, type AppState, type Habit } from '@/types';
-import { computeHabitAwards, isRetiredAppHabitAward } from '../points/habitAwards';
+import { computeHabitAwards, isDailyHabit, isRetiredAppHabitAward, presetHabitPoints } from '../points/habitAwards';
 import { diffSyncedCollections, hashRow } from '../sync/outbox';
 import { applyRemoteChanges } from '../sync/pull';
 
@@ -87,6 +87,25 @@ function habit(id: string, name: string, checkedHour: number | null, extra: Part
   assert(!('w' in allocation) && !('rb' in allocation) && !('r7' in allocation) && !('r3' in allocation), 'weekly custom, Reading, retired 0');
   assert(allocation.n1 === 2 && allocation.n2 === 2 && allocation.n3 === 2 && allocation.c2 === 1 && allocation.n4 === 1, 'new presets');
   assert(allocation.c3 === 1, 'last point of the cap');
+}
+
+// 1c. A habit with no frequency counts as daily, the same default penalty processing uses (CR-09-10).
+{
+  const noFreq = { frequency: undefined } as unknown as Partial<Habit>;
+  const { allocation } = computeHabitAwards(
+    [
+      habit('p0', 'Meditation', 1, noFreq),
+      habit('c0', 'Call my mom', 2, { isPreset: false, ...noFreq }),
+      habit('w0', 'Deep clean', 3, { isPreset: false, frequency: 'weekly' }),
+    ],
+    DAY,
+    START,
+    NOW
+  );
+  assert(allocation.p0 === 2 && allocation.c0 === 1, 'missing frequency awards as daily');
+  assert(!('w0' in allocation), 'weekly still earns 0');
+  assert(isDailyHabit({ frequency: undefined } as unknown as Habit) && !isDailyHabit({ frequency: 'weekly' }), 'isDailyHabit default');
+  assert(presetHabitPoints({ isPreset: false, name: 'x', frequency: undefined } as unknown as Habit) === 1, 'custom no-frequency 1');
 }
 
 // 2. Timestamps clamp to the day: a spoofed earlier check time stays inside it.

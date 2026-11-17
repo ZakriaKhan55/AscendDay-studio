@@ -1,5 +1,6 @@
 import { AppState } from '@/types';
 import { todayKey } from '@/lib/time/dates';
+import { isDailyHabit } from '@/lib/points/habitAwards';
 import {
   WORKOUT_POINTS,
   READING_POINTS,
@@ -106,7 +107,7 @@ export function getCapStatus(
     const cap = PRESET_HABIT_POINTS.dailyCap;
     let earned = 0;
     for (const h of state.habits || []) {
-      if (!h || h.frequency !== 'daily' || Array.isArray(h.completions)) continue;
+      if (!h || !isDailyHabit(h) || Array.isArray(h.completions)) continue;
       const comp = h.completions?.[periodKey];
       if (comp?.done) {
         earned += typeof comp.pointsAwarded === 'number' ? comp.pointsAwarded : (h.points || 0);
