@@ -1,5 +1,5 @@
 -- Reading: a book can switch its unit mid-book, chapters <-> pages (Zakria 2026-11-09). Replaces
--- the unit lock of 20261019170000 (reading_books_keep_unit): the lock existed only because points
+-- the unit lock of 20261019170001 (reading_books_keep_unit): the lock existed only because points
 -- read every log in the BOOK's current unit; now each log keeps its own unit.
 --
 -- Zakria's points rules (2026-11-09):
