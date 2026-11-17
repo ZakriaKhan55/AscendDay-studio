@@ -266,6 +266,11 @@ export function sendOp(transport: FocusTransport, op: FocusOp, revision: number 
           pausedAt: s.pausedAt,
           pausedRemainingSeconds: s.pausedRemainingSeconds,
           marksAt: s.marksAt,
+          // A session started offline may be uploaded on a break (or after one): the server keeps the
+          // break end (Continue until break end + 10 min) and counts its breaks toward the max of 2
+          // (20261117170000_focus_start_keeps_break.sql). Older SQL ignores both keys (a plain pause).
+          pauseEndsAt: s.isPaused && s.pauseEndsAt !== undefined ? s.pauseEndsAt : null,
+          breakCount: s.breakCount ?? 0,
         },
       });
     }

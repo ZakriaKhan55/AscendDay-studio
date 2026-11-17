@@ -214,6 +214,31 @@ await X.sendOp(transport, { kind: 'pause', sessionId: 'b1', atMs: T0 }, 7);
 eq(calls[1][0] + ' ' + calls[2][0], 'ascend_focus_session_resume ascend_focus_session_pause', 'Continue = the old 3-argument resume RPC');
 eq(JSON.stringify(calls[1][1]), JSON.stringify({ p_session_id: 'b1', p_revision: 6, p_at: iso(T0) }), 'resume args');
 
+// 9b. A start uploads the break this device is on and the breaks it took (offline start adopted on a
+// break: 20261117170000 keeps pause_ends_at and counts break_count toward the max of 2).
+const offline: Session = running(50, { id: 'off1', revision: undefined });
+const offlineOnBreak = S.breakAt(offline, T0 + 26 * MIN, 10);
+assert(S.onBreak(offlineOnBreak), 'offline session on a break (fixture)');
+await X.sendOp(transport, { kind: 'start', sessionId: offline.id, session: offlineOnBreak }, undefined);
+const sentOnBreak = calls[3][1].p_session as Record<string, unknown>;
+eq(calls[3][0], 'ascend_focus_session_start', 'start RPC');
+eq(sentOnBreak.isPaused, true, 'start on a break: isPaused');
+eq(sentOnBreak.pausedAt, T0 + 26 * MIN, 'start on a break: pausedAt = break start');
+eq(sentOnBreak.pauseEndsAt, T0 + 36 * MIN, 'start on a break: pauseEndsAt = break start + 10 min');
+eq(sentOnBreak.breakCount, 1, 'start on a break: breakCount 1');
+const continued = S.resumeAt(offlineOnBreak, T0 + 30 * MIN);
+await X.sendOp(transport, { kind: 'start', sessionId: offline.id, session: continued }, undefined);
+const sentContinued = calls[4][1].p_session as Record<string, unknown>;
+eq(sentContinued.pauseEndsAt, null, 'start after Continue: no pauseEndsAt');
+eq(sentContinued.breakCount, 1, 'start after Continue: the offline break still counts');
+await X.sendOp(transport, { kind: 'start', sessionId: offline.id, session: offline }, undefined);
+const sentFresh = calls[5][1].p_session as Record<string, unknown>;
+eq(sentFresh.pauseEndsAt, null, 'fresh start: pauseEndsAt null');
+eq(sentFresh.breakCount, 0, 'fresh start: breakCount 0');
+// A stale pauseEndsAt on a running copy is never sent as a break.
+await X.sendOp(transport, { kind: 'start', sessionId: offline.id, session: { ...continued, pauseEndsAt: T0 + 36 * MIN } }, undefined);
+eq((calls[6][1].p_session as Record<string, unknown>).pauseEndsAt, null, 'running copy with a stale pauseEndsAt: sent as null');
+
 // 10. An 'expired' row that ended after a break: closed at the break start, focused minutes only.
 const expiredRow = row({ status: 'ended', end_reason: 'expired', focus_ended_at: iso(T0 + 20 * MIN) });
 const closeRow = X.rowClose(expiredRow, 'u1')!;
