@@ -9,12 +9,12 @@ import type { AppState, PartnerInvite, Partnership, SharedChallenge, SharedChall
 import { isDeviceOffline } from '../store/deviceOffline';
 import { todayKey } from '../time/dates';
 import { adoptServerInviteId } from '../partners/partnerInvites';
-import { applyPledgeToggle, linkedHabitFor, linkedBadHabitFor, badHabitStatusOn, habitDoneOn, planLinkedPactRepairs } from '../partners/pactLifecycle';
+import { applyPledgeToggle, linkedHabitFor, linkedBadHabitFor, badHabitStatusOn, habitDoneOn, planLinkedPactRepairs, pactSideLinkCheck, pactSideGoal, withPactSideGoal } from '../partners/pactLifecycle';
 import { isPartnershipUser1 } from '../partners/partnershipSide';
 import { leagueNow, getSeasonNumber } from '../time/leagueTime';
 import { fetchProfileByUidFromSupabase } from '../auth/auth';
 import { trustedNow } from '../time/clock';
-import { supabase, isSupabaseConfigured, syncBroadcaster, sendPartnerInviteSupabase, fetchProfileByUsernameFromSupabase, fetchMemberCardFromSupabase, fetchPartnerInvitesSupabase, deletePartnershipSupabase, deletePartnerInviteSupabase, declinePartnerInviteSupabase, saveSharedChallengeSupabase, deleteSharedChallengeSupabase, acceptPartnerInviteAtomicSupabase, markNotificationReadSupabase } from '../auth/supabase';
+import { supabase, isSupabaseConfigured, syncBroadcaster, sendPartnerInviteSupabase, fetchProfileByUsernameFromSupabase, fetchMemberCardFromSupabase, fetchPartnerInvitesSupabase, deletePartnershipSupabase, deletePartnerInviteSupabase, declinePartnerInviteSupabase, saveSharedChallengeSupabase, linkSharedChallengeSideSupabase, deleteSharedChallengeSupabase, acceptPartnerInviteAtomicSupabase, markNotificationReadSupabase } from '../auth/supabase';
 import type { SharedChallengeSaveResult } from '../auth/supabase';
 import { ilikeExact } from '../auth/usernameRules';
 import type { StoreSetState } from '../store/storeSetState';
@@ -711,6 +711,98 @@ export function usePartnerActions(setState: StoreSetState, stateRef: { current: 
     [state.sharedChallenges, state.partnerships, state.partnership, state.currentUser, state.username]
   );
 
+  // Points MY side of a running challenge at a new goal name (link to one of my habits / bad habits,
+  // change it, or a name that matches none: ticked by hand). Only my own goal text changes on the
+  // server (ascend_pact_link_side); the partner's side, the title, the length, the start date and
+  // every ticked day stay. Like a new challenge, today goes in ticked when the new habit is already
+  // done today (a second, normal save). Throws with a message for the form when it can't be saved.
+  const linkSharedChallengeSide = useCallback(
+    async (challengeId: string, goal: string): Promise<{ changed: boolean; tickedToday: boolean; todayTickFailed: boolean }> => {
+      const latest = stateRef.current;
+      const challenge = (latest.sharedChallenges || []).find((c) => c.id === challengeId);
+      if (!challenge) throw new Error('This challenge no longer exists.');
+      const partnership =
+        (latest.partnerships || []).find((p) => p.id === challenge.partnershipId) ||
+        (latest.partnership?.id === challenge.partnershipId ? latest.partnership : null);
+      if (!partnership) throw new Error("Couldn't change the link. Try again.");
+      const isUser1 = isPartnershipUser1(partnership, latest.currentUser?.id, latest.username);
+      const today = todayKey();
+      const check = pactSideLinkCheck({
+        challenge,
+        isUser1,
+        goal,
+        habits: latest.habits || [],
+        badHabits: latest.badHabits || [],
+        badHabitLogs: latest.badHabitLogs || [],
+        today,
+      });
+      if (!check.ok) throw new Error(check.error);
+      if (check.unchanged) return { changed: false, tickedToday: false, todayTickFailed: false };
+
+      const ownKey = isUser1 ? 'user1Target' : 'user2Target';
+      const previousGoal = challenge[ownKey];
+      const setOwnGoal = (value: string | undefined) =>
+        setState((prev) => ({
+          ...prev,
+          sharedChallenges: prev.sharedChallenges.map((c) => (c.id === challengeId ? { ...c, [ownKey]: value } : c)),
+        }));
+      setOwnGoal(check.goal);
+
+      let finalGoal = check.goal;
+      let tickSent: SharedChallenge | null = null;
+      let tickResult: SharedChallengeSaveResult | null = null;
+      let todayTickFailed = false;
+      try {
+        await trackPledgeWrite(
+          challengeId,
+          (async () => {
+            const linked = await linkSharedChallengeSideSupabase(challengeId, check.goal);
+            const storedGoal = linked.stored ? pactSideGoal(linked.stored, isUser1) || check.goal : check.goal;
+            if (storedGoal !== check.goal) setOwnGoal(storedGoal);
+            finalGoal = storedGoal;
+            if (!check.ticksToday) return;
+            const current = stateRef.current.sharedChallenges.find((c) => c.id === challengeId) ?? challenge;
+            const { updated } = applyPledgeToggle(withPactSideGoal(current, isUser1, storedGoal), isUser1, true);
+            setState((prev) => ({
+              ...prev,
+              sharedChallenges: prev.sharedChallenges.map((c) => (c.id === challengeId ? updated : c)),
+            }));
+            tickSent = updated;
+            try {
+              tickResult = await saveSharedChallengeSupabase(updated);
+            } catch (err) {
+              console.error("Failed to save today's tick after linking a pact:", err);
+              todayTickFailed = true;
+              // The link stays; only today's tick goes back (the linked-pact pass tries it again).
+              setState((prev) => ({
+                ...prev,
+                sharedChallenges: prev.sharedChallenges.map((c) =>
+                  c.id === challengeId ? applyPledgeToggle(c, isUser1, false).updated : c
+                ),
+              }));
+            }
+          })()
+        );
+      } catch (err) {
+        // The link didn't save: my goal goes back to what it was (nothing else was changed).
+        setOwnGoal(previousGoal);
+        throw err;
+      }
+      // Other tabs take the new goal (and today's tick, when it went in).
+      const sentTick = tickSent as SharedChallenge | null;
+      syncBroadcaster.broadcast(
+        'CHALLENGE_UPDATED',
+        sentTick && !todayTickFailed ? sentTick : withPactSideGoal(challenge, isUser1, finalGoal)
+      );
+      // A tick the server left out (another day than the account's) goes back with its own toast.
+      const refused = tickSent !== null && tickResult !== null && settlePactSave(tickSent, tickResult, isUser1);
+      return { changed: true, tickedToday: tickSent !== null && !todayTickFailed && !refused, todayTickFailed };
+    },
+    // False positive: setState/trackPledgeWrite/settlePactSave are stable; the rest is read from stateRef.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
   useEffect(() => {
     if (!linkedPactUserId || !isSupabaseConfigured) return;
     const run = () => {
@@ -780,5 +872,6 @@ export function usePartnerActions(setState: StoreSetState, stateRef: { current: 
     createSharedChallenge,
     logSharedChallengeHabit,
     deleteSharedChallenge,
+    linkSharedChallengeSide,
   };
 }

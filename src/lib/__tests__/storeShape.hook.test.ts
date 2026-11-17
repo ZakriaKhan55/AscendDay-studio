@@ -8,8 +8,8 @@ import { bootHook, story, until, quiet, eq, assert, pass, server, UID } from './
 const blobAt = 'Sun 2026-11-01 5:00 AM PKT (UTC+05:00)';
 
 // Object.keys(useAppState()) at ef21c97 (the 175 members, in order), plus refreshNow (pull-to-refresh),
-// firstLoadFailed / retryFirstLoad (the failed-first-load gate) and isLeagueStandingsStale (Leagues'
-// "couldn't refresh" line).
+// firstLoadFailed / retryFirstLoad (the failed-first-load gate), isLeagueStandingsStale (Leagues'
+// "couldn't refresh" line) and linkSharedChallengeSide (link my side of a running pact later).
 const MEMBERS = [
   'state', 'isAuthChecking', 'isSessionLoading', 'isServerDataApplied', 'firstLoadFailed', 'retryFirstLoad', 'setRankCelebrated',
   'setLastSeenRelease', 'storedSessionWait', 'logout', 'deleteAccount', 'logoutGuest', 'addPresetHabit',
@@ -38,7 +38,7 @@ const MEMBERS = [
   'deleteFollowedVisionReflectionNote', 'copyPublicPlan', 'updatePlanCopyCount', 'deleteFollowedPlan',
   'completePlanStep', 'deletePlan', 'sendPartnerInvite', 'acceptPartnerInvite', 'cancelPartnerInvite',
   'declinePartnerInvite', 'endPartnership', 'getPartnerProfileStats', 'createSharedChallenge',
-  'logSharedChallengeHabit', 'deleteSharedChallenge', 'markNotificationRead', 'markNotificationsRead',
+  'logSharedChallengeHabit', 'deleteSharedChallenge', 'linkSharedChallengeSide', 'markNotificationRead', 'markNotificationsRead',
   'markAllNotificationsRead', 'clearNotifications', 'clearReadNotifications', 'refreshNotifications',
   'notificationsStatus', 'refreshPartners', 'partnersStatus', 'refreshNow', 'createGoal', 'updateGoal', 'deleteGoal',
   'createProject', 'updateProject', 'saveProjectOrder', 'saveListOrder', 'deleteProject', 'createTask',

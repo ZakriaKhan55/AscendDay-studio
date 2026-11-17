@@ -1424,6 +1424,29 @@ export async function saveSharedChallengeSupabase(challenge: SharedChallenge): P
   }
 }
 
+/**
+ * Points the caller's OWN side of a running pact at a new goal name (the name it links to a habit or
+ * bad habit by). The only way a goal changes after creation: ordinary saves never change goals
+ * (shared_challenges_guard), so a stale copy on another device can't undo it. The partner's side,
+ * the title, the length, the start date and every ticked day stay as they are.
+ */
+export async function linkSharedChallengeSideSupabase(challengeId: string, goal: string): Promise<SharedChallengeSaveResult> {
+  if (!isSupabaseConfigured) return { stored: null, serverToday: null };
+  const { data, error } = await supabase.rpc('ascend_pact_link_side', { p_challenge_id: challengeId, p_target: goal });
+  if (error) {
+    console.error('RPC ascend_pact_link_side failed:', error);
+    // PGRST202: the server doesn't have the function yet.
+    throw new Error(error.code === 'PGRST202' ? "Linking isn't available yet. Try again later." : "Couldn't change the link. Try again.");
+  }
+  if (!data?.success) {
+    throw new Error(typeof data?.error === 'string' && data.error ? data.error : "Couldn't change the link. Try again.");
+  }
+  return {
+    stored: data.challenge ? mapSharedChallengeRow(data.challenge) : null,
+    serverToday: typeof data.today === 'string' ? data.today : null,
+  };
+}
+
 /** Null when the fetch failed (the caller keeps what it already shows); [] means none. */
 export async function fetchSharedChallengesSupabase(partnershipIds: string | string[]): Promise<SharedChallenge[] | null> {
   if (!isSupabaseConfigured) return [];

@@ -494,6 +494,85 @@ export function tickLinkedBadHabitPacts(
   return { challenges: next, ticks };
 }
 
+// ── Link later (my side of a running challenge) ──────────────────────────────────────────────
+// After a challenge starts, each viewer can point THEIR side at another name: one of their daily
+// habits (a Do side, Reading included) or active bad habits (a Resist side), or a name that matches
+// none (ticked by hand). The kind of side never changes, and neither does the partner's side, the
+// title, the length, the start date or any ticked day (the server's ascend_pact_link_side changes
+// only the caller's own goal text). Today follows the create-time rule: a new link whose habit is
+// already done today ticks today; a hand tick for today is never taken back by a link.
+
+/** The longest goal name a side can have (the New challenge dialog's limit, checked by the server too). */
+export const PACT_GOAL_MAX_LENGTH = 80;
+
+/** A goal name as the server stores it: trimmed, inner spaces collapsed. */
+export function normalizePactGoal(goal: string): string {
+  return goal.trim().replace(/\s+/g, ' ');
+}
+
+/** Whether the viewer can still change their side's link: the challenge runs and their last day isn't over. */
+export function canChangePactLink(challenge: SharedChallenge, today: string = todayKey()): boolean {
+  return challenge.status === 'active' && pactDayNumber(challenge, today) <= (challenge.durationDays || 7);
+}
+
+/** The challenge with the viewer's own goal text replaced (the partner's side as it is). */
+export function withPactSideGoal(challenge: SharedChallenge, isUser1: boolean, goal: string): SharedChallenge {
+  return isUser1 ? { ...challenge, user1Target: goal } : { ...challenge, user2Target: goal };
+}
+
+export type PactSideLinkCheck =
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      /** The name to store (normalized). */
+      goal: string;
+      /** The same name as now: nothing to save. */
+      unchanged: boolean;
+      /** The habit / bad habit name the side links to with this goal, or null (ticked by hand). */
+      linksTo: string | null;
+      /** Today goes in ticked right after the link (the new habit is already done today). */
+      ticksToday: boolean;
+    };
+
+/** Whether this new goal for the viewer's side can be saved, and what it does to today. */
+export function pactSideLinkCheck(input: {
+  challenge: SharedChallenge;
+  isUser1: boolean;
+  goal: string;
+  habits: readonly Habit[];
+  badHabits: readonly BadHabit[];
+  badHabitLogs: readonly BadHabitLog[];
+  today: string;
+}): PactSideLinkCheck {
+  const { challenge, isUser1, habits, badHabits, badHabitLogs, today } = input;
+  if (!canChangePactLink(challenge, today)) {
+    return { ok: false, error: 'This challenge has ended, so it can no longer change.' };
+  }
+  const resist = isResistSide(challenge, isUser1);
+  const goal = normalizePactGoal(input.goal);
+  if (!goal) return { ok: false, error: resist ? 'Write what you will resist every day.' : 'Write what you will do every day.' };
+  if (goal.length > PACT_GOAL_MAX_LENGTH) return { ok: false, error: `Use ${PACT_GOAL_MAX_LENGTH} characters or fewer.` };
+  const unchanged = goal === normalizePactGoal(pactSideGoal(challenge, isUser1));
+  const habit = resist ? null : habitForPactGoal(goal, habits);
+  const badHabit = resist ? badHabitForPactGoal(goal, badHabits) : null;
+  const linksTo = habit?.name ?? badHabit?.name ?? null;
+  if (unchanged || !linksTo) return { ok: true, goal, unchanged, linksTo, ticksToday: false };
+  const doneToday = habit
+    ? habitDoneOn(habit, today)
+    : badHabitStatusOn(badHabit!.id, badHabitLogs, today) === 'resisted';
+  if (pactSideDoneOn(challenge, isUser1, today) && !doneToday) {
+    // The habit and the challenge tick together, so the minute pass would take today's tick back.
+    const first = badHabit
+      ? `Log ${linksTo} Resisted today first`
+      : habit?.linkedModule === 'reading'
+      ? 'Log reading today first'
+      : `Finish ${linksTo} today first`;
+    return { ok: false, error: `You ticked today already. ${first}, or link it tomorrow.` };
+  }
+  const ticksToday = doneToday && !pactSideDoneOn(challenge, isUser1, today) && !pactNotStartedYet(challenge, today);
+  return { ok: true, goal, unchanged, linksTo, ticksToday };
+}
+
 // ── Day chain and "can it still finish" (every challenge) ─────────────────────────────────────
 
 export type PactDayCellState = 'both' | 'one' | 'missed' | 'open' | 'future';
