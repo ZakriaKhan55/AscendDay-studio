@@ -338,7 +338,6 @@ export function applyReadingAwardsInternal(
   return { points, readingLogs: nextLogs };
 }
 
-/** Local midnight of a day key, in ms (the start of "today" for the earlier-day rule). */
 /**
  * Whether a block's done tick can change now: any block of today, or until 02:00 (the grace
  * window) yesterday's last block when it isn't skipped. Past days are read-only otherwise.

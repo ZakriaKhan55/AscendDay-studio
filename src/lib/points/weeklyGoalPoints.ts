@@ -105,6 +105,7 @@ export function groupWeeklyGoalEntriesByWeekKey(
   return { weeklyGoalsMap, otherHistory };
 }
 
+/** Local midnight of a day key, in ms (the start of "today" for the earlier-day rule). */
 const localDayStartMs = (day: string): number => new Date(`${day}T00:00:00`).getTime();
 
 /** The week's reflection award row is live and was earned on today's local day. */
