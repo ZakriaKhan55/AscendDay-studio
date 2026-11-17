@@ -43,7 +43,7 @@ export const recovery: FeatureContent = {
     name: 'recovery-phone',
     width: 540,
     height: 1246,
-    alt: `The Recovery page on a phone: 46 days smoking free, 43 days 11 hours left to the ${days(ninety.hours)}-day milestone and 2 cravings this week`,
+    alt: `The Recovery page on a phone: 46 days smoking free, 43 days 6 hours left to the ${days(ninety.hours)}-day milestone, 2 cravings this week and the daily check-in with Clean today and Slipped`,
   },
   body: (
     <>
@@ -206,7 +206,7 @@ export const recovery: FeatureContent = {
     name: 'recovery-desktop',
     width: 1400,
     height: 924,
-    alt: `The Recovery page on a computer: the ${week.label}, ${month.label} and ${ninety.label} milestones, the medical disclaimer with the SAMHSA helpline, and the latest cravings with their triggers and what helped`,
+    alt: `The Recovery page on a computer: the daily check-in with Clean today and Slipped, the ${week.label}, ${month.label} and ${ninety.label} milestones, and the medical disclaimer with the crisis helplines, SAMHSA among them`,
     caption: 'The Recovery page on a computer, with the demo user Ali’s tracker.',
   },
   facts: [
