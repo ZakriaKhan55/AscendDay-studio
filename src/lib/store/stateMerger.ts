@@ -912,6 +912,10 @@ function mergeAppStateInternal(
         // The alias fields follow the same copy, so the spread cannot keep an older finish time.
         merged.startedAt = primary.startedAt;
         merged.completedAt = primary.completedAt;
+        // unitSwitches too: switchBookUnit deletes the key when no switch is kept, so an absent key
+        // in the newer copy means none and the spread must not keep the older copy's list.
+        if (primary.unitSwitches) merged.unitSwitches = primary.unitSwitches;
+        else delete merged.unitSwitches;
       }
       return merged;
     }
