@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { BookOpen, Check, Clock, Flame, Plus, Ban, RotateCcw, Trash2, UserPlus, UserMinus, Users, WifiOff, X, Zap } from 'lucide-react';
+import { BookOpen, Check, Clock, Flame, Link2, Plus, Ban, RotateCcw, Trash2, UserPlus, UserMinus, Users, WifiOff, X, Zap } from 'lucide-react';
 import { AscendLoadingIndicator } from '@/components/ui/AscendLoadingIndicator';
 import { useAsyncAction, useAsyncActionKey } from '@/lib/actions/useAsyncAction';
 import { AppStore } from '@/lib/store/store';
@@ -30,6 +30,7 @@ import { sameName } from '@/lib/items/uniqueNames';
 import {
   badHabitForPactGoal,
   badHabitStatusOn,
+  canChangePactLink,
   habitForPactGoal,
   isPactLinkableHabit,
   isResistSide,
@@ -41,6 +42,8 @@ import {
   pactDayNumber,
   pactHabitToAdd,
   pactSideGoal,
+  pactSideLinkCheck,
+  PACT_GOAL_MAX_LENGTH,
   resistPactTitle,
   type PactDayCellState,
 } from '@/lib/partners/pactLifecycle';
@@ -97,6 +100,7 @@ export function AccountabilityPartner({ store, onNavigate }: { store: AppStore; 
   const { showSuccessToast, showInfoToast, showErrorToast } = useToast();
   const { isLoading: isSubmittingInvite, executeFn: executeSendInvite } = useAsyncAction();
   const { isLoading: isSubmittingChallenge, executeFn: executeCreateChallenge } = useAsyncAction();
+  const { isLoading: isSavingLink, executeFn: executeSaveLink } = useAsyncAction();
   const { isKeyLoading, executeWithKey } = useAsyncActionKey();
 
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
@@ -115,6 +119,9 @@ export function AccountabilityPartner({ store, onNavigate }: { store: AppStore; 
   const [differentGoal, setDifferentGoal] = useState(false);
   const [partnerGoal, setPartnerGoal] = useState('');
   const [lengthDays, setLengthDays] = useState(14);
+  // "Link a habit" / "Change link" on a running challenge: my side only.
+  const [linkTarget, setLinkTarget] = useState<SharedChallenge | null>(null);
+  const [linkGoal, setLinkGoal] = useState('');
 
   const [nudgedOn, setNudgedOn] = useState<Record<string, string>>(() => {
     try {
@@ -349,6 +356,59 @@ export function AccountabilityPartner({ store, onNavigate }: { store: AppStore; 
   const challengeForm = useUnsavedChanges(challengeModalOpen, [challengeKind, myGoal, differentGoal, partnerGoal, lengthDays]);
   const inviteIssues = useFormController();
   const challengeIssues = useFormController();
+  const linkForm = useUnsavedChanges(Boolean(linkTarget), linkGoal);
+  const linkIssues = useFormController();
+  const linkResist = Boolean(linkTarget && isResistSide(linkTarget, amUser1));
+  // The pickers follow the text (as in the New challenge dialog): they show what the name links to.
+  const linkPickedHabitId = linkResist ? '' : habitForPactGoal(linkGoal, linkableHabits)?.id ?? '';
+  const linkPickedBadHabitId = linkResist ? badHabitForPactGoal(linkGoal, activeBadHabits)?.id ?? '' : '';
+
+  const openLinkForm = (c: SharedChallenge) => {
+    setLinkGoal(pactSideGoal(c, amUser1));
+    setLinkTarget(c);
+  };
+
+  const handleSaveLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkTarget || isSavingLink) return;
+    const current = store.state.sharedChallenges.find((c) => c.id === linkTarget.id) ?? linkTarget;
+    const check = pactSideLinkCheck({
+      challenge: current,
+      isUser1: amUser1,
+      goal: linkGoal,
+      habits: habits || [],
+      badHabits: allBadHabits,
+      badHabitLogs,
+      today: todayKey(),
+    });
+    if (!check.ok) {
+      linkIssues.showError(check.error, 'link-my-goal');
+      return;
+    }
+    if (check.unchanged) {
+      setLinkTarget(null);
+      return;
+    }
+    const wasLinked = Boolean(linkedHabitFor(current, amUser1, habits || []) || linkedBadHabitFor(current, amUser1, allBadHabits));
+    await executeSaveLink(async () => {
+      try {
+        const { tickedToday, todayTickFailed } = await store.linkSharedChallengeSide(current.id, check.goal);
+        setLinkTarget(null);
+        if (todayTickFailed) {
+          showErrorToast('Challenge linked', `Today's tick from your ${linkResist ? 'bad habit log' : 'habit'} didn't save. It will try again soon.`);
+        } else if (check.linksTo) {
+          showSuccessToast(
+            'Challenge linked',
+            `It follows ${check.linksTo} now${tickedToday ? (linkResist ? '. Today is ticked from your log.' : '. Today is ticked from your habit.') : '.'}`
+          );
+        } else {
+          showSuccessToast(wasLinked ? 'Link removed' : 'Challenge updated', 'You tick this challenge by hand.');
+        }
+      } catch (err: any) {
+        linkIssues.showError(toUserMessage(err, "Couldn't change the link. Try again."));
+      }
+    });
+  };
 
   const openChallengeForm = (from?: SharedChallenge, replace = false) => {
     const resist = Boolean(from && isResistSide(from, amUser1));
@@ -613,6 +673,9 @@ export function AccountabilityPartner({ store, onNavigate }: { store: AppStore; 
       : undefined;
     const canAddHabit = !resist && !linked && pactHabitToAdd(c, amUser1, habits || [], today) !== null;
     const canAddBadHabit = resist && !linked && pactBadHabitToAdd(c, amUser1, allBadHabits, today) !== null;
+    // Link my side later (or change / remove the link): running challenges with days left for me,
+    // when there is something to link to (or a link to change).
+    const canLink = canChangePactLink(c, today) && (linked || (resist ? activeBadHabits.length > 0 : linkableHabits.length > 0));
     const doneWord = resist ? 'resisted' : 'done';
     const cells = pactDayCells(c, amUser1, today, partnerToday);
     const canFinish = pactCanStillFinish(cells);
@@ -703,6 +766,17 @@ export function AccountabilityPartner({ store, onNavigate }: { store: AppStore; 
                   className={cx('font-medium text-brand-text hover:underline underline-offset-2 rounded', TAP_TARGET_Y, FOCUS_RING)}
                 >
                   {resist ? 'Add to my bad habits' : 'Add as a daily habit'}
+                </button>
+              )}
+              {canLink && (
+                <button
+                  type="button"
+                  onClick={() => openLinkForm(c)}
+                  aria-label={`${linked ? 'Change link' : resist ? 'Link a bad habit' : 'Link a habit'} for ${heading}`}
+                  className={cx('inline-flex items-center gap-1 font-medium text-brand-text hover:underline underline-offset-2 rounded', TAP_TARGET_Y, FOCUS_RING)}
+                >
+                  <Link2 size={13} aria-hidden="true" />
+                  <span>{linked ? 'Change link' : resist ? 'Link a bad habit' : 'Link a habit'}</span>
                 </button>
               )}
               {streak > 0 && (
@@ -1375,6 +1449,85 @@ export function AccountabilityPartner({ store, onNavigate }: { store: AppStore; 
               ))}
             </div>
           </div>
+        </Form>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(linkTarget)}
+        preventClose={isSavingLink}
+        dirty={linkForm.dirty}
+        onClose={() => setLinkTarget(null)}
+        title={linkTarget ? `Your side of "${challengeName(linkTarget, amUser1)}"` : 'Your side'}
+        description={`Only your side changes. ${partnerName || 'Your partner'}'s side and the days already ticked stay as they are.`}
+        initialFocus="link-my-goal"
+        footer={
+          <>
+            <button
+              type="button"
+              disabled={isSavingLink}
+              onClick={() => linkForm.confirmDiscard(() => setLinkTarget(null))}
+              className="btn-secondary"
+            >
+              Cancel
+            </button>
+            <button type="submit" form="challenge-link-form" disabled={isSavingLink} className="btn-primary">
+              {isSavingLink ? <AscendLoadingIndicator size="sm" /> : <Link2 size={16} />}
+              <span>{isSavingLink ? 'Saving…' : 'Save'}</span>
+            </button>
+          </>
+        }
+      >
+        <Form id="challenge-link-form" onSubmit={handleSaveLink} controller={linkIssues} className="space-y-5">
+          {linkResist ? (
+            <Select
+              id="link-my-bad-habit"
+              label="Link one of your bad habits"
+              hint="Logging Resisted on Bad habits ticks the challenge. A slip shows only to you."
+              value={linkPickedBadHabitId}
+              onChange={(e) => {
+                const picked = activeBadHabits.find((b) => b.id === e.target.value);
+                // Not linked clears a linked name (the picker follows the text, so it would snap back).
+                setLinkGoal(picked ? picked.name : linkPickedBadHabitId ? '' : linkGoal);
+              }}
+            >
+              <option value="">Not linked</option>
+              {activeBadHabits.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <Select
+              id="link-my-habit"
+              label="Link one of your habits"
+              hint="The habit and the challenge tick together."
+              value={linkPickedHabitId}
+              onChange={(e) => {
+                const picked = linkableHabits.find((h) => h.id === e.target.value);
+                // Not linked clears a linked goal (the picker follows the text, so it would snap back).
+                setLinkGoal(picked ? picked.name : linkPickedHabitId ? '' : linkGoal);
+              }}
+            >
+              <option value="">Not linked</option>
+              {linkableHabits.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name}
+                </option>
+              ))}
+            </Select>
+          )}
+
+          <Input
+            id="link-my-goal"
+            label={linkResist ? 'What will you resist every day?' : 'What will you do every day?'}
+            hint={`${partnerName || 'Your partner'} sees this name. Not linked: you tick it by hand.`}
+            placeholder={linkResist ? 'e.g. Doomscrolling' : 'e.g. Read 20 pages'}
+            value={linkGoal}
+            onChange={(e) => setLinkGoal(e.target.value)}
+            maxLength={PACT_GOAL_MAX_LENGTH}
+            autoComplete="off"
+          />
         </Form>
       </Dialog>
 
