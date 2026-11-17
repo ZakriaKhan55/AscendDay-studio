@@ -207,51 +207,68 @@ const inFlightByRef = new Map<string, Promise<Response>>();
 
 const LOOKUP_PAGES = 3; // newest 300 issues: a retry comes seconds or minutes after the first send
 
-type Lookup = { found: true } | { found: false; filedToday?: number; publicToday?: number } | { error: Response };
+/**
+ * filedToday / publicToday: issues filed in the last 24 hours, all and from signed-out senders (the
+ * daily caps). windowCounted: the counts cover the whole 24 hours (the list reached an issue older
+ * than that, or its end), or already hit a cap so the true number can only be higher. Without it the
+ * counts are a lower bound: the signed-out path refuses rather than risk passing its cap.
+ */
+type Lookup =
+  | { found: true }
+  | { found: false; filedToday?: number; publicToday?: number; windowCounted?: boolean }
+  | { error: Response };
+
+type IssueRow = {
+  title?: string;
+  body?: string | null;
+  created_at?: string;
+  labels?: Array<{ name?: string } | string>;
+};
+
+const isPublicIssue = (i: IssueRow) =>
+  (i.labels ?? []).some((label) => (typeof label === 'string' ? label : label?.name) === CONTACT_LABEL) ||
+  (i.body ?? '').includes(PUBLIC_SENDER_NOTE);
 
 /**
  * Is there already an issue for this ref? Uses the issues list (consistent right after a create),
  * not the Search API (its index lags, which is exactly when a retry comes). Also counts the issues
- * filed in the last 24 hours on the first page, all and from signed-out senders (the daily caps).
+ * filed in the last 24 hours on every page it reads (newest first), so the daily caps are exact and
+ * not limited to the newest 100.
  */
 async function findIssueByRef(token: string, repo: string, ref: string): Promise<Lookup> {
   const titlePrefix = `[${ref}]`;
   const bodyMarker = `_Ref ${ref}_`;
+  const since = Date.now() - DAY_MS;
   let filedToday: number | undefined;
   let publicToday: number | undefined;
+  let windowCounted = false;
+  const counts = () => ({ found: false as const, filedToday, publicToday, windowCounted });
   for (let page = 1; page <= LOOKUP_PAGES; page += 1) {
     let res: Response;
     try {
       res = await github(token, repo, `/issues?state=all&sort=created&direction=desc&per_page=100&page=${page}`, 'GET');
     } catch {
-      return { found: false }; // can't look: file it rather than lose it
+      return counts(); // can't look: file it rather than lose it (the signed-out cap decides on its own)
     }
     if (res.status === 401) return { error: json(502, { error: 'token_invalid' }) };
     if (res.status === 403 || res.status === 404) return { error: json(502, { error: 'token_no_access' }) };
-    if (!res.ok) return { found: false };
-    const issues = (await res.json().catch(() => [])) as Array<{
-      title?: string;
-      body?: string | null;
-      created_at?: string;
-      labels?: Array<{ name?: string } | string>;
-    }>;
-    if (!Array.isArray(issues)) return { found: false };
-    if (page === 1) {
-      const since = Date.now() - DAY_MS;
+    if (!res.ok) return counts();
+    const issues = (await res.json().catch(() => [])) as IssueRow[];
+    if (!Array.isArray(issues)) return counts();
+    if (!windowCounted) {
       const today = issues.filter((i) => Date.parse(i.created_at ?? '') > since);
-      filedToday = today.length;
-      publicToday = today.filter(
-        (i) =>
-          (i.labels ?? []).some((label) => (typeof label === 'string' ? label : label?.name) === CONTACT_LABEL) ||
-          (i.body ?? '').includes(PUBLIC_SENDER_NOTE)
-      ).length;
+      filedToday = (filedToday ?? 0) + today.length;
+      publicToday = (publicToday ?? 0) + today.filter(isPublicIssue).length;
+      // Newest first: a page with an older issue (or a short last page) ends the 24 hours.
+      if (today.length < issues.length || issues.length < 100) windowCounted = true;
+      if (filedToday >= DAILY_MAX || publicToday >= PUBLIC_DAILY_MAX) windowCounted = true;
     }
     if (issues.some((i) => (i.title ?? '').startsWith(titlePrefix) || (i.body ?? '').includes(bodyMarker))) {
       return { found: true };
     }
-    if (issues.length < 100) return { found: false, filedToday, publicToday };
+    if (issues.length < 100) return counts();
   }
-  return { found: false, filedToday, publicToday };
+  return counts();
 }
 
 /** Uploads one screenshot; a file already there under this ref (an earlier try) is reused. */
@@ -455,7 +472,12 @@ async function fileReport(
   const filedToday = 'filedToday' in lookup ? (lookup.filedToday ?? 0) : 0;
   const publicToday = 'publicToday' in lookup ? (lookup.publicToday ?? 0) : 0;
   if (filedToday >= DAILY_MAX) return json(429, { error: 'daily_limit' });
-  if (sender.type === 'public' && publicToday >= PUBLIC_DAILY_MAX) return json(429, { error: 'daily_limit' });
+  if (sender.type === 'public') {
+    // Fail closed for signed-out senders: counts that don't cover the whole day (GitHub failed
+    // part-way) can't prove the cap isn't reached.
+    if (!('windowCounted' in lookup) || lookup.windowCounted !== true) return json(502, { error: 'github_error' });
+    if (publicToday >= PUBLIC_DAILY_MAX) return json(429, { error: 'daily_limit' });
+  }
 
   const context = (input.context ?? {}) as Record<string, unknown>;
   // Signed-out senders can't attach screenshots (nothing ties a file to a person).

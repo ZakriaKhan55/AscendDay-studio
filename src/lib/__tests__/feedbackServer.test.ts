@@ -60,6 +60,8 @@ env.SUPABASE_PUBLISHABLE_KEY = 'pk';
 
 let calls: Call[] = [];
 let issueList: Array<{ title: string; body: string; created_at: string; labels: string[] }> = [];
+let listFailsFrom = Infinity;
+let listFailure: 'throw' | '500' = 'throw';
 let siteverify: { success: boolean; action?: string } = { success: true, action: 'contact' };
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = String(input);
@@ -70,7 +72,12 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     return new Response('{}', { status: 401 });
   }
   if (url.includes('turnstile/v0/siteverify')) return Response.json(siteverify);
-  if (url.includes('/issues?')) return Response.json(issueList);
+  if (url.includes('/issues?')) {
+    // Pages of 100, newest first, like GitHub; listFailsFrom makes that page (and later) fail.
+    const page = Number(new URL(url).searchParams.get('page') ?? '1');
+    if (page >= listFailsFrom) return listFailure === 'throw' ? Promise.reject(new TypeError('network')) : new Response('oops', { status: 500 });
+    return Response.json(issueList.slice((page - 1) * 100, page * 100));
+  }
   if (url.endsWith('/issues')) return Response.json({ number: 1 }, { status: 201 });
   return new Response('not found', { status: 404 });
 }) as typeof fetch;
@@ -157,6 +164,47 @@ assert((await status(await POST(request(contactBody(), 'good')))) === '200 ok', 
 issueList = Array.from({ length: 20 }, () => ({ ...unlabelled, body: 'signed-in report' }));
 calls = [];
 assert((await status(await POST(request(contactBody())))) === '200 ok', 'signed out: signed-in issues do not count toward the cap');
+issueList = [];
+
+// The daily count reads every page the lookup reads (newest first), not only the newest 100, and
+// fails closed for signed-out senders when it can't cover the whole day.
+// (With DAILY_MAX 50 under a page of 100, a page 1 that is all today is already over the overall cap,
+// so these check the page handling rather than a signed-out count that only page 2 could reach.)
+// eslint-disable-next-line no-restricted-syntax -- the server compares with its own clock
+const createdYesterday = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString();
+const oldIssue = { title: '[ASC-OLD] y', body: 'signed-in report', created_at: createdYesterday, labels: [] };
+const listCalls = () => calls.filter((c) => c.url.includes('/issues?')).length;
+
+// The day ends inside page 1: page 2 is still read for the ref, and its older contact issues don't count.
+issueList = [
+  ...Array.from({ length: 19 }, () => unlabelled),
+  ...Array.from({ length: 81 }, () => oldIssue),
+  ...Array.from({ length: 50 }, () => ({ ...unlabelled, created_at: createdYesterday })),
+];
+calls = [];
+assert((await status(await POST(request(contactBody())))) === '200 ok', 'signed out: 19 today is under the cap; older ones not counted');
+assert(listCalls() === 2, 'the ref lookup still reads page 2');
+
+// Page 2 failing keeps page 1's counts. Before, the failure dropped them and the message was filed.
+issueList = Array.from({ length: 100 }, () => unlabelled).concat(Array.from({ length: 5 }, () => oldIssue));
+listFailsFrom = 2;
+calls = [];
+assert((await status(await POST(request(contactBody())))) === '429 daily_limit', 'signed out: page 2 failing keeps page 1\'s counts');
+assert(githubPosts().length === 0, 'page 2 failing at the cap: nothing filed');
+
+// Page 1 failing (network or 5xx): signed out refuses, it can't prove the cap isn't reached;
+// signed in still files, as before.
+issueList = [];
+for (const failure of ['throw', '500'] as const) {
+  listFailure = failure;
+  listFailsFrom = 1;
+  calls = [];
+  assert((await status(await POST(request(contactBody())))) === '502 github_error', `signed out, list ${failure}: fails closed`);
+  assert(githubPosts().length === 0, `signed out, list ${failure}: nothing filed`);
+  calls = [];
+  assert((await status(await POST(request(contactBody(), 'good')))) === '200 ok', `signed in, list ${failure}: still filed`);
+}
+listFailsFrom = Infinity;
 issueList = [];
 
 // Bots: the honeypot still answers a quiet ok and files nothing.
