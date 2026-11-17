@@ -186,6 +186,20 @@ function mergedRemoteItem(collection: SyncedCollection, local: unknown, change: 
 }
 
 /**
+ * A live row event for a collection that drops older events, older than the copy this device holds
+ * (the item's own updatedAt): a late echo of an earlier write, such as the details save's echo
+ * arriving after the finish was already saved. The server keeps the newer row, so the event is not
+ * taken (and its hash not accepted); a pull still reads the row as it stands. A delete is never
+ * dropped (its updated_at is the delete time, not the item's).
+ */
+export function isOlderRowEvent(collection: SyncedCollection, local: unknown, row: Record<string, unknown>): boolean {
+  if (!collection.dropsOlderEvents || !local || row.deleted_at) return false;
+  const localAt = (local as { updatedAt?: unknown }).updatedAt;
+  const rowAt = (collection.fromRow(row) as { updatedAt?: unknown }).updatedAt;
+  return typeof localAt === 'string' && typeof rowAt === 'string' && rowAt < localAt;
+}
+
+/**
  * Returns prev itself when nothing changes, so no save is triggered. With userId, also records the
  * rows the result now holds as this tab's versions (noteHeldRows); without it, pure.
  */

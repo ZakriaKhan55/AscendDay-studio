@@ -54,6 +54,12 @@ export interface SyncedCollection<K extends keyof AppState = keyof AppState> {
    * deletes them, and the server's copy always replaces the local one.
    */
   serverOwnedId?: (id: string) => boolean;
+  /**
+   * A live (realtime) row event older than the device's copy, by the item's own updatedAt, is
+   * dropped (isOlderRowEvent): a late echo of an earlier write. Only for tables whose server keeps
+   * the newer row whole (keep-newer, no server-side merge), so the device's newer copy is the row.
+   */
+  dropsOlderEvents?: boolean;
   /** Baseline and change key when several collections share one state key (the time tracker). */
   key?: string;
   /** Items of a collection nested inside a state key (default: state[stateKey]). */
@@ -560,7 +566,8 @@ export const SYNCED_COLLECTIONS = [
   tasks as unknown as SyncedCollection,
   documentCollection('habits', 'habits', byCreatedAt),
   documentCollection('workouts', 'workouts', byCreatedAt),
-  documentCollection('libraryBooks', 'reading_books', (b) => b.addedAt),
+  // A late echo of an earlier book save (the details form) must not undo a newer one (finish, restart).
+  { ...documentCollection('libraryBooks', 'reading_books', (b) => b.addedAt), dropsOlderEvents: true },
   documentCollection('readingLogs', 'reading_logs', byCreatedAt),
   documentCollection('skills', 'skills', byCreatedAt),
   documentCollection('skillLogs', 'skill_logs', byCreatedAt),
