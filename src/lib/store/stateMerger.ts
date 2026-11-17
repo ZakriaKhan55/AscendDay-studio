@@ -884,7 +884,12 @@ function mergeAppStateInternal(
           : (primary.status as UserBookStatus);
       }
 
-      return {
+      // When updatedAt tells which copy is newer, its target date, dates and takeaway win, an absent
+      // one included: the app removes them on purpose (restart clears the finish date, the form
+      // clears the target date or takeaway), so the older copy must not bring them back. Legacy
+      // copies without updatedAt keep the old fallback.
+      const timed = Boolean(baseUpdated || incUpdated);
+      const merged: UserBook = {
         ...secondary,
         ...primary,
         status: resolvedStatus,
@@ -894,11 +899,21 @@ function mergeAppStateInternal(
         // Length comes from the same copy as unit and progress, so the three stay one set.
         totalAmount: primary.totalAmount ?? primary.totalPages ?? secondary.totalAmount ?? secondary.totalPages,
         totalPages: primary.totalPages ?? primary.totalAmount ?? secondary.totalPages ?? secondary.totalAmount,
-        targetFinishDate: incB.targetFinishDate ?? baseB.targetFinishDate,
-        dateStarted: incB.dateStarted ?? baseB.dateStarted ?? incB.startedAt ?? baseB.startedAt,
-        dateCompleted: incB.dateCompleted ?? baseB.dateCompleted ?? incB.completedAt ?? baseB.completedAt,
-        reflection: incB.reflection ?? baseB.reflection,
+        targetFinishDate: timed ? primary.targetFinishDate : incB.targetFinishDate ?? baseB.targetFinishDate,
+        dateStarted: timed
+          ? primary.dateStarted ?? primary.startedAt
+          : incB.dateStarted ?? baseB.dateStarted ?? incB.startedAt ?? baseB.startedAt,
+        dateCompleted: timed
+          ? primary.dateCompleted ?? primary.completedAt
+          : incB.dateCompleted ?? baseB.dateCompleted ?? incB.completedAt ?? baseB.completedAt,
+        reflection: timed ? primary.reflection : incB.reflection ?? baseB.reflection,
       };
+      if (timed) {
+        // The alias fields follow the same copy, so the spread cannot keep an older finish time.
+        merged.startedAt = primary.startedAt;
+        merged.completedAt = primary.completedAt;
+      }
+      return merged;
     }
   );
 
