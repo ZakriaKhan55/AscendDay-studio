@@ -1,5 +1,5 @@
 import { LeagueType, LeagueCompetitor, LeagueArchive, PointsEntry, UserProfile, AppState } from '@/types';
-import { getCachedFirstActiveAt, getRegisteredCompetitors } from '../auth/auth';
+import { getCachedFirstActiveAt, getCachedTieKeys, getRegisteredCompetitors } from '../auth/auth';
 import {
   getWeekStart,
   getWeekEnd,
@@ -270,6 +270,7 @@ export function generateCompetitors(
     stats: userStats,
     season_history: currentUser?.season_history || userStats?.season_history,
     firstActiveAt: getCachedFirstActiveAt(currentUserId, type),
+    ...getCachedTieKeys(currentUserId, type, now),
   };
 
   // 2. All other registered real users
@@ -287,20 +288,46 @@ export function generateCompetitors(
   return allCompetitors;
 }
 
+/** Smaller first; a missing value sorts after every present one. */
+function ascMissingLast(a: number | undefined, b: number | undefined): number {
+  if (a === b) return 0;
+  if (a === undefined) return 1;
+  if (b === undefined) return -1;
+  return a - b;
+}
+
+/** Larger first; a missing value sorts after every present one. */
+function descMissingLast(a: number | undefined, b: number | undefined): number {
+  if (a === b) return 0;
+  if (a === undefined) return 1;
+  if (b === undefined) return -1;
+  return b - a;
+}
+
 /**
- * Board order: period points descending; members with 0 points by first activity in the period
- * (first come first, none yet last); then lower-cased name, then id (as the server's archives).
+ * Board order: period points descending (rounded, as the server sums them). Members with points tie
+ * as ascend_league_boards orders them: more active days, fewer penalty points, reached first (earlier
+ * last positive entry), then the server's own order (its per-period hash); a missing key sorts last.
+ * Members with 0 points (unranked) by first activity in the period (first come first, none yet last),
+ * then lower-cased name. Id last, so the order never depends on input order.
  */
 export function compareCompetitors(a: LeagueCompetitor, b: LeagueCompetitor): number {
-  if (b.points !== a.points) return b.points - a.points;
-  if (Math.round(a.points) <= 0 && a.firstActiveAt !== b.firstActiveAt) {
-    if (a.firstActiveAt === undefined) return 1;
-    if (b.firstActiveAt === undefined) return -1;
-    return a.firstActiveAt - b.firstActiveAt;
+  const aPoints = Math.round(a.points);
+  const bPoints = Math.round(b.points);
+  if (bPoints !== aPoints) return bPoints - aPoints;
+  if (aPoints > 0) {
+    const tie =
+      descMissingLast(a.activeDays, b.activeDays) ||
+      ascMissingLast(a.penaltyPoints, b.penaltyPoints) ||
+      ascMissingLast(a.lastEarnedAt, b.lastEarnedAt) ||
+      ascMissingLast(a.serverOrder, b.serverOrder);
+    if (tie !== 0) return tie;
+  } else {
+    if (a.firstActiveAt !== b.firstActiveAt) return ascMissingLast(a.firstActiveAt, b.firstActiveAt);
+    const aName = a.name.toLowerCase();
+    const bName = b.name.toLowerCase();
+    if (aName !== bName) return aName < bName ? -1 : 1;
   }
-  const aName = a.name.toLowerCase();
-  const bName = b.name.toLowerCase();
-  if (aName !== bName) return aName < bName ? -1 : 1;
   const aId = a.id ?? '';
   const bId = b.id ?? '';
   return aId < bId ? -1 : aId > bId ? 1 : 0;

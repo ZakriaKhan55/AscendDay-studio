@@ -25,6 +25,7 @@ import {
   setCachedProfiles,
   setCachedSeasonPoints,
   setCachedLeaguePoints,
+  setCachedLeagueTies,
 } from '../auth/auth';
 import { useTimeTrackerActions } from '../actions/useTimeTrackerActions';
 import { useWorkoutActions } from '../actions/useWorkoutActions';
@@ -394,11 +395,12 @@ export function useAppState() {
       fetchBoards: fetchLeagueBoardsFromSupabase,
       now: leagueNow,
       isOnline: () => typeof navigator === 'undefined' || navigator.onLine !== false,
-      apply: ({ profiles, points, seasonPoints }) => {
+      apply: ({ profiles, points, seasonPoints, ties }) => {
         if (profiles) setCachedProfiles(profiles);
         // A live poll moves the season board with week and month (full sets carry it in profiles).
         else if (seasonPoints) setCachedSeasonPoints(seasonPoints);
         if (points) setCachedLeaguePoints(points);
+        if (ties) setCachedLeagueTies(ties);
         setLeagueDataVersion((v) => v + 1);
       },
       onStatusChange: () => setLeagueDataVersion((v) => v + 1),
@@ -433,6 +435,7 @@ export function useAppState() {
     leagueRefresher.reset();
     setCachedProfiles([]);
     setCachedLeaguePoints(null);
+    setCachedLeagueTies(null);
     setLeagueDataVersion((v) => v + 1);
   }, [leagueRefresher]);
 

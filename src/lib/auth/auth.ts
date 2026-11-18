@@ -1,4 +1,4 @@
-import { LeagueCompetitor, LeagueType, SeasonHistoryEntry, NotificationPreferenceKey } from '@/types';
+import { LeagueCompetitor, LeagueTieKeys, LeagueType, SeasonHistoryEntry, NotificationPreferenceKey } from '@/types';
 import { newPasswordProblem } from './passwordRules';
 import { leagueNow, getSeasonNumber, getWeekPeriodId, getMonthPeriodId } from '../time/leagueTime';
 import { clearSyncStorage } from '../sync/outbox';
@@ -41,6 +41,36 @@ let cachedLeaguePoints: Record<string, Record<string, number>> = {};
 /** null = none yet (signed out): standings read as 0. */
 export function setCachedLeaguePoints(points: Record<string, Record<string, number>> | null) {
   cachedLeaguePoints = points ?? {};
+}
+
+/** Tie-break keys per period id (weekly, monthly, season 'S:<n>'), then per member id (ascend_league_boards). */
+let cachedLeagueTies: Record<string, Record<string, LeagueTieKeys>> = {};
+
+/** null = none (signed out, or a server that sends none): ties fall back to the board's own order. */
+export function setCachedLeagueTies(ties: Record<string, Record<string, LeagueTieKeys>> | null) {
+  cachedLeagueTies = ties ?? {};
+}
+
+/**
+ * A member's tie keys on the board for `now`'s period, as competitor fields; none for a closed season
+ * (its order comes from season history, which has no keys).
+ */
+export function getCachedTieKeys(
+  memberId: string | undefined,
+  type: LeagueType,
+  now: Date
+): Pick<LeagueCompetitor, 'activeDays' | 'penaltyPoints' | 'lastEarnedAt' | 'serverOrder'> {
+  if (!memberId) return {};
+  let periodId: string;
+  if (type === 'ninetyDay') {
+    const season = getSeasonNumber(now);
+    if (season !== getSeasonNumber(leagueNow())) return {};
+    periodId = `S:${season}`;
+  } else {
+    periodId = type === 'weekly' ? getWeekPeriodId(now) : getMonthPeriodId(now);
+  }
+  const keys = cachedLeagueTies[periodId]?.[memberId];
+  return keys ? { ...keys } : {};
 }
 
 export function computeCompetitorLeaguePoints(
@@ -934,6 +964,7 @@ export function getRegisteredCompetitors(
       isProfilePublic: p.is_profile_public ?? true,
       isActive: p.active === true,
       firstActiveAt: firstActiveAtOf(p, type),
+      ...getCachedTieKeys(p.id, type, now),
       // The member list carries no stats or past seasons: the profile dialog fetches them on tap.
     });
   }

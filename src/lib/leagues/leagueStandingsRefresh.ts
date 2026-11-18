@@ -1,3 +1,4 @@
+import type { LeagueTieKeys } from '@/types';
 import { getMonthPeriodId, getSeasonNumber, getWeekPeriodId } from '../time/leagueTime';
 
 /** Polls, tab switches and mounts closer together than this share one fetch (unless `full`). */
@@ -24,11 +25,16 @@ export interface LeagueStandingsResult {
    * the server sent no season board (older SQL): the cached season points stay as they are.
    */
   seasonPoints?: Record<string, number> | null;
+  /**
+   * Tie-break keys per period id (weekly, monthly and, when sent, the season 'S:<n>'), then per member
+   * id. Absent from results built without them (tests); a key the server did not send is absent.
+   */
+  ties?: Record<string, Record<string, LeagueTieKeys>>;
 }
 
 const BOARD_POINT_TYPES = ['weekly', 'monthly'] as const;
 
-/** [member id, points] pairs of one board, as ascend_league_boards sends them; null if malformed. */
+/** [member id, points, ...tie keys] rows of one board, as ascend_league_boards sends them; null if malformed. */
 function pointsById(rows: unknown): Record<string, number> | null {
   if (!Array.isArray(rows)) return null;
   const byId: Record<string, number> = {};
@@ -36,6 +42,28 @@ function pointsById(rows: unknown): Record<string, number> | null {
     if (!Array.isArray(row) || typeof row[0] !== 'string' || typeof row[1] !== 'number') return null;
     byId[row[0]] = row[1];
   }
+  return byId;
+}
+
+const numberOrUndefined = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+
+/**
+ * Tie keys of a board pointsById accepted: [id, points, active days, penalty points, last earned ms],
+ * plus each row's position (the server's order). Keys missing (older server) or not numbers are absent.
+ */
+function tiesById(rows: unknown[]): Record<string, LeagueTieKeys> {
+  const byId: Record<string, LeagueTieKeys> = {};
+  rows.forEach((row, serverOrder) => {
+    const r = row as unknown[];
+    const keys: LeagueTieKeys = { serverOrder };
+    const activeDays = numberOrUndefined(r[2]);
+    const penaltyPoints = numberOrUndefined(r[3]);
+    const lastEarnedAt = numberOrUndefined(r[4]);
+    if (activeDays !== undefined) keys.activeDays = activeDays;
+    if (penaltyPoints !== undefined) keys.penaltyPoints = penaltyPoints;
+    if (lastEarnedAt !== undefined) keys.lastEarnedAt = lastEarnedAt;
+    byId[r[0] as string] = keys;
+  });
   return byId;
 }
 
@@ -48,22 +76,26 @@ export function parseLeagueBoards(data: unknown, slim: boolean): LeagueStandings
   if (!data || typeof data !== 'object') return null;
   const boards = data as Record<string, any>;
   const points: Record<string, Record<string, number>> = {};
+  const ties: Record<string, Record<string, LeagueTieKeys>> = {};
   for (const type of BOARD_POINT_TYPES) {
     const periodId = boards[type]?.period_id;
     const byId = pointsById(boards[type]?.points);
     if (typeof periodId !== 'string' || !byId) return null;
     points[periodId] = byId;
+    ties[periodId] = tiesById(boards[type].points);
   }
   const seasonPoints = pointsById(boards.ninetyDay?.points);
+  const seasonId = boards.ninetyDay?.period_id;
+  if (seasonPoints && typeof seasonId === 'string') ties[seasonId] = tiesById(boards.ninetyDay.points);
   // Slim: the season board is optional (servers before 2026-11-07 send none, a malformed one is
   // ignored), so the live week/month points still apply and the cached season points stay.
-  if (slim) return seasonPoints ? { profiles: null, points, seasonPoints } : { profiles: null, points };
+  if (slim) return seasonPoints ? { profiles: null, points, seasonPoints, ties } : { profiles: null, points, ties };
 
   const members = boards.members;
   // A real member list always holds at least the signed-in member.
   if (!seasonPoints || !Array.isArray(members) || members.length === 0) return null;
   const profiles = members.map((m: any) => ({ ...m, season_points: seasonPoints[String(m?.id)] ?? 0 }));
-  return { profiles, points };
+  return { profiles, points, ties };
 }
 
 export interface LeagueStandingsDeps {
@@ -97,6 +129,8 @@ export function createLeagueStandingsRefresher(deps: LeagueStandingsDeps) {
   /** When the last full set came back, and the points it held (live polls merge into it). */
   let fullSetMs = -Infinity;
   let knownPoints: Record<string, Record<string, number>> | null = null;
+  /** Tie keys per period, merged like knownPoints. */
+  let knownTies: Record<string, Record<string, LeagueTieKeys>> = {};
   let knownMemberIds = new Set<string>();
 
   function refresh({ full = false }: { full?: boolean } = {}): Promise<void> {
@@ -152,10 +186,12 @@ export function createLeagueStandingsRefresher(deps: LeagueStandingsDeps) {
         thisRun.full = hasNewMember;
         if (!hasNewMember) {
           knownPoints = merged;
+          knownTies = { ...knownTies, ...live.ties };
+          const ties = live.ties ? { ties: knownTies } : {};
           deps.apply(
             live.seasonPoints
-              ? { profiles: null, points: merged, seasonPoints: live.seasonPoints }
-              : { profiles: null, points: merged }
+              ? { profiles: null, points: merged, seasonPoints: live.seasonPoints, ...ties }
+              : { profiles: null, points: merged, ...ties }
           );
           lastSuccessMs = now.getTime();
           succeeded = true;
@@ -170,6 +206,7 @@ export function createLeagueStandingsRefresher(deps: LeagueStandingsDeps) {
       fetchedPeriodKey = leaguePeriodKey(now);
       fullSetMs = now.getTime();
       knownPoints = result.points;
+      knownTies = result.ties ?? {};
       knownMemberIds = new Set(result.profiles.map((p: any) => String(p?.id)));
       lastSuccessMs = now.getTime();
       fetchedUserId = userId;
@@ -205,6 +242,7 @@ export function createLeagueStandingsRefresher(deps: LeagueStandingsDeps) {
     lastAttemptFailed = false;
     fullSetMs = -Infinity;
     knownPoints = null;
+    knownTies = {};
     knownMemberIds = new Set();
   }
 

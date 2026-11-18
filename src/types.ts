@@ -150,8 +150,26 @@ export interface LeagueCompetitor {
   isActive?: boolean;
   /** First activity in this board's period, epoch ms (server; active members only): orders 0-point rows. */
   firstActiveAt?: number;
+  /** Tie-break keys from the server for this board's period (absent: none yet, older server). */
+  activeDays?: number;
+  penaltyPoints?: number;
+  /** Latest positive entry in the period, epoch ms; earlier wins a tie. */
+  lastEarnedAt?: number;
+  /** Position in the server's ordered board (0 = best); the last tie-break. */
+  serverOrder?: number;
   stats?: UserStats;
   season_history?: SeasonHistoryEntry[];
+}
+
+/**
+ * One member's tie-break keys on one board, as ascend_league_boards sends them: active days, penalty
+ * points, last earned (epoch ms) and the row's position in the server's order.
+ */
+export interface LeagueTieKeys {
+  activeDays?: number;
+  penaltyPoints?: number;
+  lastEarnedAt?: number;
+  serverOrder: number;
 }
 
 export interface LeagueArchive {
