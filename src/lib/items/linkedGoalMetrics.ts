@@ -1,6 +1,6 @@
 import { AppState, ReadingLog, UserBook, WeeklyGoalItem, WorkoutLog } from '@/types';
 import { parseDate, weekKey } from '../time/dates';
-import { PAGES_PER_CHAPTER_TENTH, isChapterBook, logUnit, readingAmountPages, snapReadingAmount } from '../points/readingAwards';
+import { PAGES_PER_CHAPTER_TENTH, countedReadingAmounts, isChapterBook, logUnit, readingAmountPages, snapReadingAmount } from '../points/readingAwards';
 import { workoutMeasureOf, workoutTypeKey, type WorkoutMeasure } from '../content/workoutTypes';
 import { findDrill, logDrillCount, parseDrillMetricKey } from '../content/skillDrills';
 
@@ -60,32 +60,36 @@ export const linkedBook = (state: Pick<AppState, 'libraryBooks'>, bookId: string
  * converted (1 chapter = 20 pages; pages count in tenths of a chapter, 0.1 per 2 pages, as they add
  * up). Chapter amounts are snapped to tenths (snapReadingAmount). A goal on any book
  * counts the logs written in its metric's unit (a log whose book is gone counts in its own unit,
- * else as pages). Finish logs count (Zakria 2026-10-19).
+ * else as pages). Finish logs count (Zakria 2026-10-19). Each log adds what it counts
+ * (countedReadingAmounts): pages logged again from the same place (two devices) count once, as for
+ * points; older logs count in full.
  */
 const readingEntries = (chapters: boolean) => (state: AppState, item: WeeklyGoalItem, dateStrings: string[]): MetricEntry[] => {
   const unit = chapters ? 'chapters' : 'pages';
   const books = new Map((state.libraryBooks || []).filter(Boolean).map((b) => [b.id, b]));
   const unitOf = (l: ReadingLog) => logUnit(l, books.get(l.bookId ?? ''));
-  const logs = (state.readingLogs || []).filter((l) => dateStrings.includes(l.date));
+  const logs = (state.readingLogs || []).filter((l) => l && dateStrings.includes(l.date));
+  const counted = countedReadingAmounts(logs, state.libraryBooks || []);
+  const amountOf = (l: ReadingLog) => counted.get(l) ?? 0;
   const entry = (l: ReadingLog, value: number): MetricEntry => ({ id: l.id, at: l.createdAt || dayInstant(l.date), value });
   if (!item.linkedItemId) {
-    return logs.filter((l) => unitOf(l) === unit).map((l) => entry(l, snapReadingAmount(l.pagesRead || 0, unit)));
+    return logs.filter((l) => unitOf(l) === unit).map((l) => entry(l, snapReadingAmount(amountOf(l), unit)));
   }
   const book = linkedBook(state, item.linkedItemId);
   const ids = new Set([item.linkedItemId, book?.id, book?.linkedBookId].filter(Boolean));
   const own = logs.filter((l) => Boolean(l.bookId && ids.has(l.bookId)));
   if (!chapters) {
-    return own.map((l) => entry(l, readingAmountPages(l.pagesRead || 0, unitOf(l))));
+    return own.map((l) => entry(l, readingAmountPages(amountOf(l), unitOf(l))));
   }
   // A chapters goal: pages logs add 0.1 chapter each time their running total (in time order) passes 2 more pages.
   let pages = 0;
   return own
-    .map((l) => ({ l, e: entry(l, snapReadingAmount(l.pagesRead || 0, 'chapters')) }))
+    .map((l) => ({ l, e: entry(l, snapReadingAmount(amountOf(l), 'chapters')) }))
     .sort((a, b) => (a.e.at < b.e.at ? -1 : a.e.at > b.e.at ? 1 : 0))
     .map(({ l, e }) => {
       if (unitOf(l) === 'chapters') return e;
       const before = Math.floor(pages / PAGES_PER_CHAPTER_TENTH);
-      pages += l.pagesRead || 0;
+      pages += amountOf(l);
       return { ...e, value: (Math.floor(pages / PAGES_PER_CHAPTER_TENTH) - before) / 10 };
     });
 };
