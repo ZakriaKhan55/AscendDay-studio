@@ -6,7 +6,8 @@ import { Block, Cards, Note, Rules, Steps, type FeatureContent } from '../blocks
 
 /* /features/leagues. Sources: lib/leagueTime.ts (UTC week/month/season windows, Season 1 start and
    length: the defaults the server's ascend_season_config also holds), lib/leagues.ts (periods
-   clamped to the season start, table order points → name → id, reset time shown in local time),
+   clamped to the season start, table order points → active days → fewer auto penalties → reached
+   first → per-period fixed order (ascend_league_boards), reset time shown in local time),
    components/views/Leagues.tsx (tabs Weekly / Monthly / Season, Your place, countdown, rank badge
    from season points on every tab, past standings, "Final standings in up to 2 days", guest
    banner), lib/auth.ts (everyone with a profile is in the table), and the Privacy Policy (league
@@ -104,7 +105,7 @@ export const leagues: FeatureContent = {
             </p>
             <p>
               The server keeps the points ledger and adds up each member’s total, so a table cannot be changed from the
-              app. Members with more points sit higher; equal points are ordered by username.
+              app. Members with more points sit higher.
             </p>
           </>
         }
@@ -126,6 +127,10 @@ export const leagues: FeatureContent = {
             ranks page
           </a>
           .
+        </Note>
+        <Note title="Same points.">
+          The member with more active days goes first. An active day is a day you earned at least one point. If that
+          is equal too, fewer penalty points win, then whoever reached that score first. Names never decide.
         </Note>
       </Block>
 
@@ -223,6 +228,10 @@ export const leagues: FeatureContent = {
     {
       q: 'Can I lose places by missing habits?',
       a: 'Yes. Points lost to a missed library habit, a bad-habit slip or an unlogged bad-habit day come off your league totals too.',
+    },
+    {
+      q: 'What happens if two people have the same points?',
+      a: 'The one with more active days goes first. An active day is a day you earned at least one point. If that is the same, fewer penalty points win: points lost to missed habits or bad-habit days you didn’t log. A slip you report yourself doesn’t count here. If that is the same too, whoever reached that score first goes higher. In the rare case everything matches, a fixed order for that week, month or season decides. Names never decide.',
     },
     {
       q: 'What do other members see about me?',

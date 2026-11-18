@@ -150,7 +150,7 @@ const guides: [string, HowItWorksGuide, (string | number)[]][] = [
       'Breaks, decisions and emotions earn no points',
     ],
   ],
-  ['leagues', leaguesGuide, ['no points of their own', '00:00 UTC', 'sets your rank']],
+  ['leagues', leaguesGuide, ['no points of their own', '00:00 UTC', 'sets your rank', 'active days', 'Names never decide']],
   ['plans', plansGuide, ['Milestones', 'Target', 'Habit journey', 'Vision', 'earn no points']],
   [
     'recovery',

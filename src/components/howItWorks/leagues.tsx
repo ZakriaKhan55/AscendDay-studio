@@ -3,7 +3,8 @@ import { getSeasonStartByNumber } from '@/lib/time/leagueTime';
 
 /**
  * Leagues. From lib/leagueTime.ts (UTC boundaries, season length), ascend_league_boards (points =
- * the ledger after every page's caps and penalties, more points higher), Leagues.tsx (three tabs,
+ * the ledger after every page's caps and penalties, more points higher; ties: active days → fewer
+ * auto penalties → reached first → the server's per-period fixed order), Leagues.tsx (three tabs,
  * resets shown on your clock, Past weeks/months/seasons) and marketing leagues.tsx. No points of their own.
  */
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -23,5 +24,7 @@ export const leaguesGuide: HowItWorksGuide = {
     'Leagues add no points of their own. Each table adds up what every page earns, after its daily cap.',
     'Points lost to missed habits or slips come off in all three tables too.',
     'More points sit higher.',
+    'Same points: more active days go first. An active day is any day you earned a point.',
+    'Still equal: fewer points lost to missed habits and unlogged bad-habit days, then whoever reached the score first. Names never decide.',
   ],
 };

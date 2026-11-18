@@ -47,6 +47,11 @@ const ogTitleOf = (title: string) => (title.endsWith(BRAND_SUFFIX) ? title.slice
  */
 const SITE_COPY_UPDATED = '2026-11-07'; // 2026-11-07: footer Contact link, About's feedback lines
 
+/** A feature page whose own text changed after SITE_COPY_UPDATED. */
+const FEATURE_UPDATED: Partial<Record<FeatureSlug, string>> = {
+  leagues: '2026-11-18', // equal points: active days, penalty points, reached first; names never decide
+};
+
 const featureRoutes: MarketingRoute[] = FEATURE_SLUGS.map((slug) => {
   const f = FEATURES[slug];
   return {
@@ -60,7 +65,7 @@ const featureRoutes: MarketingRoute[] = FEATURE_SLUGS.map((slug) => {
     ogImage: slug,
     ogAlt: f.ogAlt,
     index: true,
-    updated: SITE_COPY_UPDATED,
+    updated: FEATURE_UPDATED[slug] ?? SITE_COPY_UPDATED,
   };
 });
 
