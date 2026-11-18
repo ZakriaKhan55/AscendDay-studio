@@ -57,7 +57,10 @@ export interface SyncedCollection<K extends keyof AppState = keyof AppState> {
   /**
    * A live (realtime) row event older than the device's copy, by the item's own updatedAt, is
    * dropped (isOlderRowEvent): a late echo of an earlier write. Only for tables whose server keeps
-   * the newer row whole (keep-newer, no server-side merge), so the device's newer copy is the row.
+   * the newer row whole (keep-newer, no server-side merge or data rewrite), whose client never merges
+   * two copies (no mergeConflict) and whose every content change stamps updatedAt, so the device's
+   * newer copy is the row. Opted in (2026-11-18): reading_books, skills, tasks (updatedAt = the
+   * row's updated_at), time_tracker_templates, list_orders.
    */
   dropsOlderEvents?: boolean;
   /** Baseline and change key when several collections share one state key (the time tracker). */
@@ -330,9 +333,12 @@ const projects: SyncedCollection<'projects'> = {
   ownTimestamp: (p) => p.createdAt,
 };
 
+// A late echo of an earlier task save (one subtask ticked) must not undo a newer one (the next tick).
+// The row's updatedAt is its updated_at, the server's own keep-newer order.
 const tasks: SyncedCollection<'tasks'> = {
   stateKey: 'tasks',
   table: 'tasks',
+  dropsOlderEvents: true,
   toRow: (t: Task) => ({
     id: t.id,
     title: t.title ?? '',
@@ -418,16 +424,20 @@ const timeTrackerActivities = timeTrackerCollection<TimeTrackerActivity>(
   true
 );
 
-const timeTrackerTemplates = timeTrackerCollection<TimeTrackerTemplate>(
-  'templates',
-  'time_tracker_templates',
-  (tt) => tt.templates || [],
-  (tt, templates) => ({ ...tt, templates }),
-  (t) => t.id,
-  datedCreatedAt,
-  datedOwnTimestamp,
-  true
-);
+// Every template change stamps updatedAt: a late echo of an earlier save must not undo a newer one.
+const timeTrackerTemplates: SyncedCollection<'timeTracker'> = {
+  ...timeTrackerCollection<TimeTrackerTemplate>(
+    'templates',
+    'time_tracker_templates',
+    (tt) => tt.templates || [],
+    (tt, templates) => ({ ...tt, templates }),
+    (t) => t.id,
+    datedCreatedAt,
+    datedOwnTimestamp,
+    true
+  ),
+  dropsOlderEvents: true,
+};
 
 const dayStart = (day: TimeTrackerDay) => `${day.date}T00:00:00.000Z`;
 
@@ -569,7 +579,9 @@ export const SYNCED_COLLECTIONS = [
   // A late echo of an earlier book save (the details form) must not undo a newer one (finish, restart).
   { ...documentCollection('libraryBooks', 'reading_books', (b) => b.addedAt), dropsOlderEvents: true },
   documentCollection('readingLogs', 'reading_logs', byCreatedAt),
-  documentCollection('skills', 'skills', byCreatedAt),
+  // Every skill change (rename, drills, cleared totals) stamps updatedAt: a late echo of an earlier save
+  // must not undo a newer one.
+  { ...documentCollection('skills', 'skills', byCreatedAt), dropsOlderEvents: true },
   documentCollection('skillLogs', 'skill_logs', byCreatedAt),
   documentCollection('badHabits', 'bad_habits', byCreatedAt),
   { ...documentCollection('badHabitLogs', 'bad_habit_logs', byCreatedAt), serverOwnedId: isServerOwnedBadHabitLogId },
@@ -600,7 +612,8 @@ export const SYNCED_COLLECTIONS = [
   addictionTracker as unknown as SyncedCollection,
   lessonReads as unknown as SyncedCollection,
   // The user's order of each list (one row per list key): a reorder writes only this row.
-  documentCollection('listOrders', 'list_orders', byCreatedAt),
+  // Each reorder stamps updatedAt; the echo of an earlier reorder must not undo the next one.
+  { ...documentCollection('listOrders', 'list_orders', byCreatedAt), dropsOlderEvents: true },
   // Recovery check-ins (one row per local day, id = the day): the server awards the point and keeps
   // each row as first written (recovery_checkins_guard), so a second device's tap changes nothing.
   // Undo of today's check-in removes the item (mirrored as a soft delete, no tombstone id: a day id
