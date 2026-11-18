@@ -209,6 +209,41 @@ const last = <T,>(xs: T[]) => xs[xs.length - 1];
     assert(calls.slice(4).join() === 'full', 'a full ask during a poll that took the full set adds no call');
   }
 
+  // Tie keys: a full set replaces them; a slim poll merges its periods over the known ones (a period
+  // the poll does not send keeps its keys); a result without keys applies none; sign-out forgets them.
+  {
+    let nowMs = Date.UTC(2026, 9, 21, 9, 0, 0);
+    const applied: LeagueStandingsResult[] = [];
+    let next: LeagueStandingsResult = {
+      profiles: [{ id: 'me' }, { id: 'a' }],
+      points: { W: { me: 5, a: 5 } },
+      ties: { W: { a: { serverOrder: 0, activeDays: 2 }, me: { serverOrder: 1, activeDays: 1 } }, 'S:1': { a: { serverOrder: 0 } } },
+    };
+    const refresher = createLeagueStandingsRefresher({
+      sessionUserId: async () => 'me',
+      fetchBoards: async () => next,
+      now: () => new Date(nowMs),
+      isOnline: () => true,
+      apply: (r) => applied.push(r),
+    });
+    await refresher.refresh();
+    assert(last(applied).ties?.W.a.activeDays === 2, 'full set applies its tie keys');
+    nowMs += MIN;
+    next = { profiles: null, points: { W: { me: 6, a: 5 } }, ties: { W: { me: { serverOrder: 0, activeDays: 2 }, a: { serverOrder: 1, activeDays: 2 } } } };
+    await refresher.refresh();
+    const merged = last(applied).ties!;
+    assert(merged.W.me.serverOrder === 0 && merged.W.a.serverOrder === 1, 'slim poll replaces the period it sends');
+    assert(merged['S:1'].a.serverOrder === 0, 'a period the poll does not send keeps its keys');
+    nowMs += MIN;
+    next = { profiles: null, points: { W: { me: 7, a: 5 } } };
+    await refresher.refresh();
+    assert(last(applied).ties === undefined, 'a slim result without keys applies none (the cache keeps them)');
+    refresher.reset();
+    next = { profiles: [{ id: 'me' }, { id: 'a' }], points: { W: { me: 7 } }, ties: { W: { me: { serverOrder: 0 } } } };
+    await refresher.refresh();
+    assert(Object.keys(last(applied).ties!).join() === 'W' && !('a' in last(applied).ties!.W), 'after sign-out only the new full set');
+  }
+
   console.log('leagueStandingsRefresh: all assertions passed');
   // An assertion that throws rejects this promise; Node then exits non-zero (unhandled rejection).
 })();
