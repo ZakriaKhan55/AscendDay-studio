@@ -48,13 +48,13 @@ export function releaseNoteGroups(note: ReleaseNote): { key: ReleaseNoteGroupKey
 }
 
 export const RELEASE_NOTE: ReleaseNote | null = {
-  id: 3,
-  releasedAt: '2026-11-14T10:00:00+05:00',
-  title: "What's new in 1.4.0",
-  new: [
-    'Focus sessions of 35 min or more get up to 2 breaks. Press Continue within 10 min after a break ends.',
-    "Recovery has a Slipped button. A reset now takes back today's check-in and its point.",
-    'A quote of the day on the Dashboard.',
+  id: 4,
+  releasedAt: '2026-11-18T13:10:00+05:00',
+  title: "What's new in 1.5.0",
+  new: ['Link a habit to a running pact anytime, or change the link for your side.'],
+  improved: ['Same points in a league? More active days rank higher, then fewer penalties. Names never decide.'],
+  fixed: [
+    'Reading the same pages on two devices now counts them once, in points and totals.',
+    'A focus session started offline keeps its break when you come back online.',
   ],
-  changed: ['Finishing a book earns 20 points. A bad-habit slip costs what a resist earns.'],
 };
