@@ -111,7 +111,7 @@ export function FinishBookDialog({
                 <p className="text-xs leading-relaxed text-content-muted">
                   No finish bonus yet. The <span className="figure">+{READING_POINTS.completionBonus}</span> bonus needs reading
                   logged on {READING_BONUS_MIN_LOG_DAYS} separate days, the first at least {READING_BONUS_MIN_SPAN_DAYS} days
-                  ago. Keep logging to earn it, or finish now without it. Page points you already earned stay.
+                  ago. Keep logging to earn it, or finish now without it. Points you already earned for this book stay.
                 </p>
               </div>
               <div className="space-y-2 border-t border-overlay-subtle pt-3">
