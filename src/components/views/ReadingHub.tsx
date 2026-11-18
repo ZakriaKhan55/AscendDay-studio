@@ -11,7 +11,7 @@ import { CURATED_BOOKS, BOOK_CATEGORIES } from '@/lib/reading/books';
 import type { BookCategory, CuratedBook, ReadingLog, UserBook } from '@/types';
 import { formatDateLong, weekKey, formatWeekdayDate, formatWeekdayShort, calculateStreak, parseDate } from '@/lib/time/dates';
 import { READING_POINTS } from '@/lib/points/pointsConfig';
-import { bookRemovalPoints, chapterTenths, isRetiredAppReadingAward, logUnit } from '@/lib/points/readingAwards';
+import { bookRemovalPoints, chapterTenths, countedReadingAmounts, isRetiredAppReadingAward, logUnit } from '@/lib/points/readingAwards';
 import { getCapStatus } from '@/lib/points/capStatus';
 import { readingAmountText } from '@/lib/reading/readingAmount';
 import { ptsText } from '@/lib/leagues/leagues';
@@ -117,9 +117,17 @@ export function ReadingHub({ store }: { store: AppStore }) {
   // gone counts as pages), as for points and weekly goals.
   const bookById = useMemo(() => new Map(libraryBooks.filter(Boolean).map((b) => [b.id, b])), [libraryBooks]);
   const inChapters = (l: ReadingLog) => logUnit(l, bookById.get(l.bookId ?? '')) === 'chapters';
-  const pagesByDay = sumPerDay(readingLogs, pageDays, (l) => (inChapters(l) ? 0 : l.pagesRead));
+  // Each log as it counts (countedReadingAmounts): the same pages logged from the same place on two
+  // devices show once, as for points; older logs count in full.
+  const firstPageDay = pageDays[0];
+  const counted = useMemo(
+    () => countedReadingAmounts(readingLogs.filter((l) => l && l.date >= firstPageDay), libraryBooks),
+    [readingLogs, libraryBooks, firstPageDay]
+  );
+  const amountOf = (l: ReadingLog) => counted.get(l) ?? 0;
+  const pagesByDay = sumPerDay(readingLogs, pageDays, (l) => (inChapters(l) ? 0 : amountOf(l)));
   // Chapters add up in whole tenths, so 0.1 + 0.2 reads 0.3.
-  const chapterTenthsByDay = sumPerDay(readingLogs, pageDays, (l) => (inChapters(l) ? chapterTenths(l.pagesRead) : 0));
+  const chapterTenthsByDay = sumPerDay(readingLogs, pageDays, (l) => (inChapters(l) ? chapterTenths(amountOf(l)) : 0));
   const chaptersByDay = chapterTenthsByDay.map((t) => t / 10);
   const pagesThisWeek = pagesByDay.reduce((sum, p) => sum + p, 0);
   const chaptersThisWeek = chapterTenthsByDay.reduce((sum, t) => sum + t, 0) / 10;

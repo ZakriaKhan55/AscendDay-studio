@@ -152,6 +152,92 @@ export function readingLateDay(log: Pick<ReadingLog, 'date'> | null | undefined,
   return log && log.date === yesterday ? yesterday : null;
 }
 
+/** One event of a reading day: a log's pages, or a unit switch's change of the book's place (unitSwitchChange). */
+type ReadingDayEvent = { at: number; kind: 0 | 1; key: string; bookId: string; pages: number; log?: ReadingLog };
+
+/**
+ * The day's logs (as given) and the unit switches of that day of the books in `bookById`, in the
+ * server's order: time (unknown last), logs before switches, then id byte order.
+ */
+function readingDayEvents(dayLogs: ReadingLog[], bookById: Map<string, UserBook>, day: string): ReadingDayEvent[] {
+  const events: ReadingDayEvent[] = dayLogs.map((l) => ({
+    at: timeOf(l.createdAt),
+    kind: 0,
+    key: l.id,
+    bookId: String(l.bookId ?? ''),
+    pages: logPageAmount(l, bookById.get(l.bookId ?? '')),
+    log: l,
+  }));
+  for (const b of bookById.values()) {
+    (Array.isArray(b.unitSwitches) ? b.unitSwitches : []).forEach((s, i) => {
+      if (s && s.date === day && typeof s.pagesBefore === 'number' && typeof s.pagesAfter === 'number') {
+        events.push({ at: timeOf(s.at), kind: 1, key: `${b.id}#${i + 1}`, bookId: b.id, pages: unitSwitchChange(s) });
+      }
+    });
+  }
+  events.sort((a, b) => a.at - b.at || a.kind - b.kind || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  return events;
+}
+
+/**
+ * The covered-range rule of one day, shared by the page award and the shown totals: for each event
+ * (same index), the pages it counts. A log with a start place (logRange) counts only the part of
+ * its range that earlier logs of that book, unit and read did not already cover that day; a unit
+ * switch starts the book's covered ranges over (and counts its own change, which the award's
+ * owed/best rule then handles). A log without fromAmount, and a Finish log, counts its whole amount
+ * and covers nothing.
+ */
+function coverReadingDayEvents(events: ReadingDayEvent[], bookById: Map<string, UserBook>): number[] {
+  const covered = new Map<string, Map<string, [number, number][]>>();
+  return events.map((ev) => {
+    if (!ev.log) {
+      covered.delete(ev.bookId);
+      return ev.pages;
+    }
+    const range = ev.log.finish === true ? null : logRange(ev.log, bookById.get(ev.bookId));
+    if (!range) return ev.pages;
+    const byKey = covered.get(ev.bookId) ?? new Map<string, [number, number][]>();
+    const { added, ranges } = addRange(byKey.get(range.key) ?? [], range.lo, range.hi);
+    byKey.set(range.key, ranges);
+    covered.set(ev.bookId, byKey);
+    return range.key.startsWith('chapters|') ? added * PAGES_PER_CHAPTER_TENTH : added;
+  });
+}
+
+/**
+ * What each log counts in totals shown to the user (the Reading chart, linked weekly goals), in
+ * the log's own unit (logUnit): pages, or chapters to a tenth. Uses the page award's covered-range
+ * rule (coverReadingDayEvents) per day, so two devices logging 20 -> 30 from the same place show
+ * 10 pages, not 20; a log without fromAmount (older logs, app 1.4.1) and a Finish log count in
+ * full, as before. Unlike the award, logs of books no longer in the library are kept (they count
+ * among themselves). Keyed by the log object. Server mirror for the member card:
+ * ascend_reading_log_counted (20261118110000_member_card_reading_dedupe.sql).
+ */
+export function countedReadingAmounts(logs: ReadingLog[], books: UserBook[]): Map<ReadingLog, number> {
+  const bookById = new Map(books.filter(Boolean).map((b) => [b.id, b]));
+  const byDay = new Map<string, ReadingLog[]>();
+  for (const l of logs) {
+    if (!l || typeof l.date !== 'string') continue;
+    const list = byDay.get(l.date);
+    if (list) list.push(l);
+    else byDay.set(l.date, [l]);
+  }
+  const out = new Map<ReadingLog, number>();
+  for (const [day, dayLogs] of byDay) {
+    const events = readingDayEvents(dayLogs, bookById, day);
+    const counted = coverReadingDayEvents(events, bookById);
+    events.forEach((ev, i) => {
+      if (!ev.log) return;
+      const pages = counted[i];
+      out.set(
+        ev.log,
+        logUnit(ev.log, bookById.get(ev.bookId)) === 'chapters' ? Math.round(pages / PAGES_PER_CHAPTER_TENTH) / 10 : pages
+      );
+    });
+  }
+  return out;
+}
+
 /** Last millisecond of a local day (a new award row is never stamped after it). */
 const dayLastMs = (day: string): number => new Date(`${addDayKeys(day, 1)}T00:00:00`).getTime() - 1;
 
@@ -189,48 +275,17 @@ export function computeReadingDayAward(
 ): { entry: PointsEntry | null; logPoints: Map<string, number> } {
   const bookById = new Map(books.filter(Boolean).map((b) => [b.id, b]));
   const dayLogs = logs.filter((l) => l && l.date === day && l.finish !== true && Boolean(l.bookId && bookById.has(l.bookId)));
-
-  // A log's pages, or a switch's change of the place (unitSwitchChange).
-  type DayEvent = { at: number; kind: 0 | 1; key: string; bookId: string; pages: number; log?: ReadingLog };
-  const events: DayEvent[] = dayLogs.map((l) => ({
-    at: timeOf(l.createdAt),
-    kind: 0,
-    key: l.id,
-    bookId: l.bookId as string,
-    pages: logPageAmount(l, bookById.get(l.bookId as string)),
-    log: l,
-  }));
-  for (const b of bookById.values()) {
-    (Array.isArray(b.unitSwitches) ? b.unitSwitches : []).forEach((s, i) => {
-      if (s && s.date === day && typeof s.pagesBefore === 'number' && typeof s.pagesAfter === 'number') {
-        events.push({ at: timeOf(s.at), kind: 1, key: `${b.id}#${i + 1}`, bookId: b.id, pages: unitSwitchChange(s) });
-      }
-    });
-  }
-  // Same order as the server: time (unknown last), logs before switches, then id byte order.
-  events.sort((a, b) => a.at - b.at || a.kind - b.kind || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  const events = readingDayEvents(dayLogs, bookById, day);
+  const counted = coverReadingDayEvents(events, bookById);
 
   const logPoints = new Map<string, number>();
   const running = new Map<string, { total: number; best: number; owed: number }>();
-  // Per book: covered ranges per logRange key; cleared by a unit switch of that book.
-  const covered = new Map<string, Map<string, [number, number][]>>();
   let pages = 0;
   let used = 0;
   let firstMs: number | null = null;
-  for (const ev of events) {
+  for (const [i, ev] of events.entries()) {
     const book = running.get(ev.bookId) ?? { total: 0, best: 0, owed: 0 };
-    let evPages = ev.pages;
-    if (!ev.log) covered.delete(ev.bookId);
-    else {
-      const range = logRange(ev.log, bookById.get(ev.bookId));
-      if (range) {
-        const byKey = covered.get(ev.bookId) ?? new Map<string, [number, number][]>();
-        const { added, ranges } = addRange(byKey.get(range.key) ?? [], range.lo, range.hi);
-        byKey.set(range.key, ranges);
-        covered.set(ev.bookId, byKey);
-        evPages = range.key.startsWith('chapters|') ? added * PAGES_PER_CHAPTER_TENTH : added;
-      }
-    }
+    const evPages = counted[i];
     if (ev.log || ev.pages < 0) book.total += evPages;
     else book.total += Math.min(ev.pages, book.owed);
     if (!ev.log) book.owed = Math.max(0, book.owed - ev.pages);
