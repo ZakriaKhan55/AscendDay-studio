@@ -185,7 +185,8 @@ function readingDayEvents(dayLogs: ReadingLog[], bookById: Map<string, UserBook>
  * its range that earlier logs of that book, unit and read did not already cover that day; a unit
  * switch starts the book's covered ranges over (and counts its own change, which the award's
  * owed/best rule then handles). A log without fromAmount, and a Finish log, counts its whole amount
- * and covers nothing.
+ * and covers nothing. Server: the one SQL copy is ascend_reading_log_counted, which the page award
+ * also reads (20261118131000_reading_awards_use_counted_helper.sql).
  */
 function coverReadingDayEvents(events: ReadingDayEvent[], bookById: Map<string, UserBook>): number[] {
   const covered = new Map<string, Map<string, [number, number][]>>();
