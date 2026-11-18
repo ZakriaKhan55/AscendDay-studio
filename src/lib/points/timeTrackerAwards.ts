@@ -1,6 +1,7 @@
 import type { PointsEntry, TimeTrackerBlock } from '@/types';
 import { calculateTimeTrackerDailyPoints } from './pointsConfig';
 import { addDays, todayKey } from '../time/dates';
+import { awardGainedAt, gainedAtField } from './awardGainedAt';
 
 /**
  * Time tracker points are written by the server (supabase/migrations/20261015250000_server_time_tracker_awards.sql):
@@ -29,6 +30,7 @@ export function timeTrackerGraceDay(now: Date): string | null {
  * Mirror of ascend_recompute_time_tracker_award: the award entry of one local day, or null when
  * the day earns nothing. The percentage is rounded half up with integers, as in SQL. An existing row
  * (existing, the live ledger row) keeps its time when the score changes; a new row is stamped now.
+ * A rise over the existing row stamps gainedAt (awardGainedAt).
  */
 export function computeTimeTrackerAward(
   blocks: TimeTrackerBlock[],
@@ -41,6 +43,7 @@ export function computeTimeTrackerAward(
 
   const percentage = Math.floor((200 * completedCount + effectiveDenominator) / (2 * effectiveDenominator));
   const id = timeTrackerAwardId(day);
+  const kept = existing && existing.id === id ? existing : null;
   return {
     id,
     amount: pointsAwarded,
@@ -48,5 +51,6 @@ export function computeTimeTrackerAward(
     source: 'time_tracker',
     timestamp: existing && existing.id === id ? existing.timestamp : new Date(nowMs).toISOString(),
     metadata: { date: day, percentage, pointsAwarded },
+    ...gainedAtField(awardGainedAt(kept, pointsAwarded, nowMs)),
   };
 }

@@ -1,6 +1,7 @@
 import type { FocusSessionLog, PointsEntry } from '@/types';
 import { PFC_POINTS, calculateFocusPoints } from './pointsConfig';
 import { addDays, localDayStartMs, todayKey, localDayOf } from '../time/dates';
+import { awardGainedAt, gainedAtField } from './awardGainedAt';
 import { FOCUS_MILESTONES, FOCUS_MIN_MINUTES, finishBonus, focusDayPoints, milestonePoints, type FocusDayTally } from './focusPoints';
 
 /**
@@ -227,7 +228,8 @@ export function focusDayTally(logs: FocusSessionLog[], day: string): FocusDayTal
  * The row's time follows the server: a day whose row already exists (existing, the live ledger row)
  * keeps that row's time and only the amount changes; a new row is stamped at the day's first
  * earning item, clamped to [dayStartMs, nowMs]. `floor` (the day before today): the amount can
- * only go up, and an existing row is never removed.
+ * only go up, and an existing row is never removed. A rise over the existing row stamps gainedAt
+ * (awardGainedAt).
  */
 export function computeFocusAwards(
   logs: FocusSessionLog[],
@@ -269,6 +271,7 @@ export function computeFocusAwards(
       source: 'focus',
       timestamp: kept ? kept.timestamp : new Date(at).toISOString(),
       metadata: { date: day, sessions: sessions.size },
+      ...gainedAtField(awardGainedAt(kept, used, nowMs)),
     },
     sessionPoints,
   };

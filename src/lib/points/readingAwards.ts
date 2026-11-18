@@ -1,6 +1,7 @@
 import type { BookUnitSwitch, PointsEntry, ReadingLog, UserBook } from '@/types';
 import { READING_POINTS } from './pointsConfig';
 import { addDays as addDayKeys, localDayOf, timeMsOr } from '../time/dates';
+import { awardGainedAt, gainedAtField } from './awardGainedAt';
 
 /**
  * Reading points are written by the server (supabase/migrations/20261015160000_server_reading_awards.sql):
@@ -264,6 +265,7 @@ const dayLastMs = (day: string): number => new Date(`${addDayKeys(day, 1)}T00:00
  * earning log, clamped to [dayStartMs, nowMs] and never after the day's last millisecond.
  * `floor` (yesterday, for a late log): the amount can only go up, and an existing row is kept as it
  * is when the recomputed amount is not above it.
+ * A rise over the existing row stamps gainedAt (awardGainedAt).
  */
 export function computeReadingDayAward(
   logs: ReadingLog[],
@@ -314,6 +316,7 @@ export function computeReadingDayAward(
       source: 'reading',
       timestamp: existing && existing.id === id ? existing.timestamp : new Date(at).toISOString(),
       metadata: { date: day, logs: dayLogs.length },
+      ...gainedAtField(awardGainedAt(kept, used, nowMs)),
     },
     logPoints,
   };

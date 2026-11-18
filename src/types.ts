@@ -234,6 +234,12 @@ export interface PointsEntry {
   source: string;
   timestamp: string;
   metadata?: Record<string, any>;
+  /**
+   * Server award rows only (workout, skill, reading, focus, time tracker days): when the row's amount
+   * last rose after it was first written (ascend_award_gained_at). timestamp keeps the first earning;
+   * this is read only by the league tie-break ("reached first").
+   */
+  gainedAt?: string;
 }
 
 // Module 1: Exercise Tracker

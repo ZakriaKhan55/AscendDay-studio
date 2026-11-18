@@ -1,6 +1,7 @@
 import type { PointsEntry, WorkoutLog } from '@/types';
 import { WORKOUT_POINTS, calculateWorkoutPoints } from './pointsConfig';
 import { localDayOf, timeMsOr } from '../time/dates';
+import { awardGainedAt, gainedAtField } from './awardGainedAt';
 
 /**
  * Workout points are written by the server (supabase/migrations/20261015140000_server_workout_awards.sql):
@@ -37,7 +38,7 @@ const timeOf = (value: string): number => timeMsOr(value, Infinity);
  * day earns nothing), and each workout's share of the cap in log order (shown on the workout).
  * The row's time follows the server: a day whose row already exists (existing, the live ledger row)
  * keeps that row's time and only the amount changes; a new row is stamped at the day's first
- * earning log, clamped to [dayStartMs, nowMs].
+ * earning log, clamped to [dayStartMs, nowMs]. A rise over the existing row stamps gainedAt (awardGainedAt).
  */
 export function computeWorkoutAwards(
   workouts: WorkoutLog[],
@@ -63,6 +64,7 @@ export function computeWorkoutAwards(
 
   const at = Math.min(Math.max(firstMs !== null && Number.isFinite(firstMs) ? firstMs : nowMs, dayStartMs), nowMs);
   const id = workoutAwardId(day);
+  const kept = existing && existing.id === id ? existing : null;
   return {
     entry: {
       id,
@@ -71,6 +73,7 @@ export function computeWorkoutAwards(
       source: 'exercise',
       timestamp: existing && existing.id === id ? existing.timestamp : new Date(at).toISOString(),
       metadata: { date: day, workouts: dayWorkouts.length },
+      ...gainedAtField(awardGainedAt(kept, used, nowMs)),
     },
     workoutPoints,
   };

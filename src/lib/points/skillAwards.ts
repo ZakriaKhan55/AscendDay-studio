@@ -1,6 +1,7 @@
 import type { PointsEntry, Skill, SkillSessionLog } from '@/types';
 import { SKILLS_POINTS, calculateSkillPoints } from './pointsConfig';
 import { addDays, localDayOf, timeMsOr } from '../time/dates';
+import { awardGainedAt, gainedAtField } from './awardGainedAt';
 
 /**
  * Skill practice points are written by the server (supabase/migrations/20261015150000_server_skill_awards.sql):
@@ -63,6 +64,7 @@ const dayLastMs = (day: string): number => new Date(`${addDays(day, 1)}T00:00:00
  * earning log, clamped to [dayStartMs, nowMs] and never after the day's last millisecond.
  * `floor` (yesterday, for a late session): the amount can only go up, and an existing row is kept
  * as it is when the recomputed amount is not above it.
+ * A rise over the existing row stamps gainedAt (awardGainedAt).
  */
 export function computeSkillAwards(
   logs: SkillSessionLog[],
@@ -101,6 +103,7 @@ export function computeSkillAwards(
       source: 'skill',
       timestamp: existing && existing.id === id ? existing.timestamp : new Date(at).toISOString(),
       metadata: { date: day, sessions: daySessions.length },
+      ...gainedAtField(awardGainedAt(kept, used, nowMs)),
     },
     sessionPoints,
   };
