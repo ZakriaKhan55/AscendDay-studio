@@ -1,5 +1,6 @@
 import { Habit, PointsEntry } from '@/types';
 import { addDays, parseDate, todayKey } from './dates';
+import { isDailyHabit } from '../points/habitAwards';
 
 /** The last `count` local date keys, oldest first, ending today. */
 export function lastDayKeys(count: number, today = todayKey()): string[] {
@@ -73,7 +74,7 @@ export function habitsDueToday(habits: Habit[], isDone: (habit: Habit) => boolea
  * week, so they have no per-day completion to count.
  */
 export function dailyHabitCompletions(habits: Habit[], days: string[]): DayHabits[] {
-  const daily = habits.filter((h) => h.frequency === 'daily');
+  const daily = habits.filter(isDailyHabit);
   return days.map((day) => {
     let done = 0;
     let total = 0;

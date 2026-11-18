@@ -1,7 +1,8 @@
 // habitsDueToday (lib/weeklyActivity.ts): the Dashboard's "today" (ring + "All done for today")
 // counts every daily habit, and a weekly habit only once it is done this week or on Sunday.
 import type { Habit } from '@/types';
-const { habitsDueToday } = await import('../time/weeklyActivity');
+const { habitsDueToday, dailyHabitCompletions } = await import('../time/weeklyActivity');
+const { periodKey, previousPeriodKey, calculateStreak } = await import('../time/dates');
 
 function assert(condition: boolean, msg: string) {
   if (!condition) throw new Error(`Assertion failed: ${msg}`);
@@ -34,5 +35,14 @@ assert(habitsDueToday([weeklyOpen], isDone, '2026-11-11').length === 0, 'only an
 assert(habitsDueToday([], isDone, '2026-11-15').length === 0, 'no habits');
 // Order is kept (the Today card order).
 assert(ids(habitsDueToday([weeklyDone, daily], isDone, '2026-11-11')) === 'weeklyDone,daily', 'order kept');
+
+// A habit with no frequency (legacy row) counts as daily, as in SQL coalesce(frequency, 'daily').
+const noFreq = { ...habit('noFreq', 'daily'), frequency: undefined, completions: { '2026-11-11': { done: true, updatedAt: '' } } } as unknown as Habit;
+const perDay = dailyHabitCompletions([noFreq], ['2026-11-10', '2026-11-11']);
+assert(perDay[0].total === 1 && perDay[0].done === 0 && perDay[1].total === 1 && perDay[1].done === 1, 'missing frequency counted as a daily habit');
+const wed = new Date(2026, 10, 11, 12);
+assert(periodKey(noFreq.frequency, wed) === '2026-11-11', 'missing frequency: period key is the day');
+assert(previousPeriodKey(noFreq.frequency, 1, wed) === '2026-11-10', 'missing frequency: previous period is yesterday');
+assert(calculateStreak(['2026-11-10', '2026-11-11'], noFreq.frequency, wed) === 2, 'missing frequency: streak counts days');
 
 console.log('habitsDueToday: all passed');

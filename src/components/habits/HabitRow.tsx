@@ -2,6 +2,7 @@ import { AlertTriangle, Check, Flame, Pencil, Trash2, Undo2 } from 'lucide-react
 import type { Habit } from '@/types';
 import { calculateBestStreak, calculateStreak, periodKey, previousPeriodKey } from '@/lib/time/dates';
 import { getHabitConsecutiveMisses, getMissPenaltyMultiplier } from '@/lib/points/habitPenalties';
+import { isDailyHabit } from '@/lib/points/habitAwards';
 import { ptsText } from '@/lib/leagues/leagues';
 import { SwipeRow } from '@/components/ui/SwipeRow';
 import { cx, FOCUS_RING, TAP_TARGET, TRANSITION } from '@/components/ui/primitives/shared';
@@ -24,7 +25,7 @@ function completionOf(habit: Habit, key: string): { done: boolean; pointsAwarded
  * the habit existed are faint dashes and are not counted.
  */
 function HabitHistory({ habit, className }: { habit: Habit; className?: string }) {
-  const unit = habit.frequency === 'daily' ? 'day' : 'week';
+  const unit = isDailyHabit(habit) ? 'day' : 'week';
   const created = habit.createdAtPeriod || '';
   const periods = Array.from({ length: HISTORY_PERIODS }, (_, i) => {
     const key = previousPeriodKey(habit.frequency, HISTORY_PERIODS - 1 - i);

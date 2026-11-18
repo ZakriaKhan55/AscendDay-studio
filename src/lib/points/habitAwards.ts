@@ -1,7 +1,7 @@
 import type { Habit, PointsEntry } from '@/types';
 import { findPresetHabit } from '../content/presets';
 import { PRESET_HABIT_POINTS, recomputeTodayPresetPoints, type PresetHabitCapItem } from './pointsConfig';
-import { timeMsOr } from '../time/dates';
+import { isDailyFrequency, timeMsOr } from '../time/dates';
 
 /**
  * Habit awards are written by the server (supabase/migrations/20261015120000_server_habit_awards.sql).
@@ -35,7 +35,7 @@ export const isRetiredAppHabitAward = (entry: PointsEntry): boolean =>
  * (habitPenalties.ts `habit.frequency || 'daily'`; SQL `coalesce(data->>'frequency', 'daily')`).
  * Award code must use this, not `frequency === 'daily'` (CR-09-10).
  */
-export const isDailyHabit = (habit: Pick<Habit, 'frequency'>): boolean => (habit.frequency || 'daily') === 'daily';
+export const isDailyHabit = (habit: Pick<Habit, 'frequency'>): boolean => isDailyFrequency(habit.frequency);
 
 /** Points of a daily custom habit's tick (ascend_preset_habit_points); weekly custom habits earn 0. */
 export const CUSTOM_HABIT_POINTS = 1;

@@ -42,14 +42,21 @@ export function weekKey(date?: Date): string {
   return `${y}-W${String(weekNum).padStart(2, '0')}`;
 }
 
+/**
+ * A missing habit frequency counts as daily (SQL `coalesce(data->>'frequency', 'daily')`).
+ * The one place this default lives; habitAwards.isDailyHabit uses it too.
+ */
+export const isDailyFrequency = (frequency: 'daily' | 'weekly' | undefined | null): boolean =>
+  (frequency || 'daily') === 'daily';
+
 /** Returns the period key for a habit based on its frequency */
 export function periodKey(frequency: 'daily' | 'weekly', date?: Date): string {
-  return frequency === 'daily' ? todayKey(date) : weekKey(date);
+  return isDailyFrequency(frequency) ? todayKey(date) : weekKey(date);
 }
 
 /** Returns the period key for N periods ago */
 export function previousPeriodKey(frequency: 'daily' | 'weekly', periodsAgo: number, date?: Date): string {
-  if (frequency === 'daily') {
+  if (isDailyFrequency(frequency)) {
     const d = new Date(date || trustedNow());
     d.setDate(d.getDate() - periodsAgo);
     return todayKey(d);
@@ -87,7 +94,7 @@ export function calculateStreak(
   for (let i = 0; i < 1000; i++) {
     if (!done.has(key)) break;
     streak++;
-    key = frequency === 'daily' ? addDays(key, -1) : addWeeks(key, -1);
+    key = isDailyFrequency(frequency) ? addDays(key, -1) : addWeeks(key, -1);
   }
 
   return streak;
@@ -110,7 +117,7 @@ export function calculateBestStreak(
   for (let i = 1; i < sorted.length; i++) {
     const prev = sorted[i - 1];
     const curr = sorted[i];
-    const expected = frequency === 'daily'
+    const expected = isDailyFrequency(frequency)
       ? addDays(prev, 1)
       : addWeeks(prev, 1);
 

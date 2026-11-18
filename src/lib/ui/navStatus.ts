@@ -3,6 +3,7 @@ import type { View } from '@/lib/app/views';
 import { todayKey } from '@/lib/time/dates';
 import { dayProgress } from '@/lib/timeTracker/timeTracker';
 import { getActiveBadHabitsOrdered } from '@/lib/points/badHabitEligibility';
+import { isDailyHabit } from '@/lib/points/habitAwards';
 import { trustedNow } from '../time/clock';
 import { recoveryCheckinBlock } from '@/lib/points/recoveryAwards';
 
@@ -39,7 +40,7 @@ export function getNavStatuses(state: AppState, isHabitDone: (habit: Habit) => b
       // Done shows the tick (no meta), like Journal/Exercise/Reading.
       statuses.habits = { tone: 'done', label: 'all habits done' };
     } else {
-      const dailyOpen = open.some((h) => h.frequency === 'daily');
+      const dailyOpen = open.some(isDailyHabit);
       statuses.habits = {
         tone: late && dailyOpen ? 'risk' : 'pending',
         meta: `${open.length} left`,

@@ -8,6 +8,7 @@ import { Habit } from '@/types';
 import { trustedNow } from '@/lib/time/clock';
 import { weekKey, formatWeekdayDate, formatWeekdayShort } from '@/lib/time/dates';
 import { getEffectiveSeasonPoints } from '@/lib/leagues/leagues';
+import { isDailyHabit } from '@/lib/points/habitAwards';
 import { leagueNow } from '@/lib/time/leagueTime';
 import { actionFeedback } from '@/lib/ui/actionFeedback';
 import { useLocalDayKey } from '@/lib/time/useLocalDayKey';
@@ -51,7 +52,7 @@ export function HabitTracker({ store }: { store: AppStore }) {
   const isDone = (h: Habit) => store.isHabitDone(h);
   const toDo = habits.filter((h) => !isDone(h));
   const done = habits.filter(isDone);
-  const hasDailyHabits = habits.some((h) => h.frequency === 'daily');
+  const hasDailyHabits = habits.some(isDailyHabit);
   // Read once for every row's miss cost (the same value as the season league's points).
   const seasonPoints = getEffectiveSeasonPoints(store.state, leagueNow());
 
