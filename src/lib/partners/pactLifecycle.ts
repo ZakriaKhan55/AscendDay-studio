@@ -1,7 +1,7 @@
 import { AppState, BadHabit, BadHabitLog, Habit, SharedChallenge } from '@/types';
 import { isPartnershipUser1 } from './partnershipSide';
 import { trustedNow } from '../time/clock';
-import { todayKey, previousPeriodKey, addDays, parseDate, localDayStartMs } from '../time/dates';
+import { todayKey, previousPeriodKey, addDays, parseDate, localDayStartMs, isDailyFrequency } from '../time/dates';
 import { sameName } from '../items/uniqueNames';
 import { PRESET_BAD_HABITS, PRESET_CATEGORIES, type PresetBadHabit, type PresetHabit } from '../content/presets';
 
@@ -312,7 +312,7 @@ export function pactSideGoal(challenge: SharedChallenge, isUser1: boolean): stri
 
 /** Whether this habit can be linked to a pact. */
 export function isPactLinkableHabit(habit: Habit): boolean {
-  return habit.frequency === 'daily';
+  return isDailyFrequency(habit.frequency);
 }
 
 /** The linkable habit this goal text names, if any (the New challenge dialog's habit picker). */
