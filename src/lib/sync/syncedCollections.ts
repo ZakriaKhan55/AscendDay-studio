@@ -63,6 +63,14 @@ export interface SyncedCollection<K extends keyof AppState = keyof AppState> {
    * row's updated_at), time_tracker_templates, list_orders.
    */
   dropsOlderEvents?: boolean;
+  /**
+   * A live row event (not a delete) older than the updated_at the server stored for this device's
+   * own last write of the row is dropped (ownWrites.ts): a late echo of an earlier save. For column
+   * tables whose items carry no updatedAt and whose server keeps the newer row whole (keep-newer, no
+   * server-side merge or rewrite, so a row's updated_at never goes down): journal_entries,
+   * decision_logs, emotion_logs, craving_logs, focus_logs, goals, projects (2026-11-18).
+   */
+  dropsOwnStaleEchoes?: boolean;
   /** Baseline and change key when several collections share one state key (the time tracker). */
   key?: string;
   /** Items of a collection nested inside a state key (default: state[stateKey]). */
@@ -142,6 +150,7 @@ const weeklyGoalsCollection: SyncedCollection<'weeklyGoals'> = {
 const decisionLogs: SyncedCollection<'decisionLogs'> = {
   stateKey: 'decisionLogs',
   table: 'decision_logs',
+  dropsOwnStaleEchoes: true,
   toRow: (d: DecisionLog) => ({
     id: d.id,
     title: d.title,
@@ -168,6 +177,7 @@ const decisionLogs: SyncedCollection<'decisionLogs'> = {
 const emotionLogs: SyncedCollection<'emotionLogs'> = {
   stateKey: 'emotionLogs',
   table: 'emotion_logs',
+  dropsOwnStaleEchoes: true,
   toRow: (e: EmotionLog) => ({
     id: e.id,
     logged_at: e.date || e.createdAt,
@@ -196,6 +206,7 @@ const optional = <K extends string, V>(key: K, value: unknown, cast: (v: unknown
 const cravingLogs: SyncedCollection<'cravingLogs'> = {
   stateKey: 'cravingLogs',
   table: 'craving_logs',
+  dropsOwnStaleEchoes: true,
   toRow: (c: CravingLog) => ({
     id: c.id,
     logged_at: c.date || c.createdAt,
@@ -218,6 +229,7 @@ const cravingLogs: SyncedCollection<'cravingLogs'> = {
 const journalEntries: SyncedCollection<'journalEntries'> = {
   stateKey: 'journalEntries',
   table: 'journal_entries',
+  dropsOwnStaleEchoes: true,
   toRow: (j: JournalEntry) => ({
     id: j.id,
     entry_date: j.date,
@@ -240,6 +252,7 @@ const journalEntries: SyncedCollection<'journalEntries'> = {
 const focusLogs: SyncedCollection<'focusLogs'> = {
   stateKey: 'focusLogs',
   table: 'focus_logs',
+  dropsOwnStaleEchoes: true,
   toRow: (f: FocusSessionLog) => ({
     id: f.id,
     log_date: f.date,
@@ -276,6 +289,7 @@ const focusLogs: SyncedCollection<'focusLogs'> = {
 const goals: SyncedCollection<'goals'> = {
   stateKey: 'goals',
   table: 'goals',
+  dropsOwnStaleEchoes: true,
   toRow: (g: Goal) => ({
     id: g.id,
     title: g.title ?? '',
@@ -304,6 +318,7 @@ const goals: SyncedCollection<'goals'> = {
 const projects: SyncedCollection<'projects'> = {
   stateKey: 'projects',
   table: 'projects',
+  dropsOwnStaleEchoes: true,
   toRow: (p: Project) => ({
     id: p.id,
     title: p.title ?? '',

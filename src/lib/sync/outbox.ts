@@ -7,6 +7,7 @@ import { clearTabSyncedHashes, setTabSyncedHashes, tabSyncedHashes, type Baselin
 import { hashRow } from './rowHash';
 import { clearEditTimes, editTimeOf, pruneEditTimes, readEditTimes, type EditTimes } from './editTimes';
 import { reportError } from '../app/errorReporting';
+import { clearOwnWrites, noteOwnWrites } from './ownWrites';
 
 /**
  * Relational sync outbox (DB normalization, S2 dual-write).
@@ -382,6 +383,7 @@ export function clearSyncStorage(userId: string): void {
   } catch {
     /* ignore */
   }
+  clearOwnWrites();
 }
 
 /** Data, constraint and permission errors: retrying the same op can never succeed. */
@@ -469,14 +471,21 @@ export function clearRefusedRows(userId: string, table: string, ids: string[]): 
   }
 }
 
+/** Tables whose live events are judged against this device's own stored writes (ownWrites.ts). */
+const OWN_ECHO_TABLES = new Set(SYNCED_COLLECTIONS.filter((c) => c.dropsOwnStaleEchoes).map((c) => c.table));
+
 async function sendUpserts(userId: string, table: string, ops: UpsertOp[]): Promise<boolean> {
   // deleted_at null: a points entry re-awarded after a delete comes back (point_entries
   // allows newer revivals); the other tables ignore writes to deleted rows.
   const toRow = (op: UpsertOp) => ({ ...op.row, user_id: userId, updated_at: op.updatedAt, deleted_at: null });
   // Returns the rows stored: a row a trigger refused (keep-newer: a newer edit is there; a deleted
   // row; a day guard) is missing and answers no error, so it is re-read instead of left diverged.
-  const { data, error } = await supabase.from(table).upsert(ops.map(toRow), { onConflict: 'user_id,id' }).select('id');
+  // Column tables also read the stored updated_at, so a late echo of an earlier save is dropped.
+  const ownEcho = OWN_ECHO_TABLES.has(table);
+  const columns = ownEcho ? 'id, updated_at' : 'id';
+  const { data, error } = await supabase.from(table).upsert(ops.map(toRow), { onConflict: 'user_id,id' }).select(columns);
   if (!error) {
+    if (ownEcho) noteOwnWrites(userId, table, data);
     noteRefused(userId, table, ops, data);
     settle(userId, ops);
     return true;
@@ -485,12 +494,15 @@ async function sendUpserts(userId: string, table: string, ops: UpsertOp[]): Prom
 
   // One bad row must not block the rest: retry singly and drop only the rows that fail.
   for (const op of ops) {
-    const single = await supabase.from(table).upsert(toRow(op), { onConflict: 'user_id,id' }).select('id');
+    const single = await supabase.from(table).upsert(toRow(op), { onConflict: 'user_id,id' }).select(columns);
     if (single.error && !isPermanent(single.error)) return false;
     if (single.error) {
       console.error(`[SYNC OUTBOX] Dropped ${table}:${op.id}:`, single.error.message);
       noteDropped(userId, table, 'upsert', [op.id], single.error);
-    } else noteRefused(userId, table, [op], single.data);
+    } else {
+      if (ownEcho) noteOwnWrites(userId, table, single.data);
+      noteRefused(userId, table, [op], single.data);
+    }
     settle(userId, [op]);
   }
   return true;

@@ -75,6 +75,7 @@ import { SYNC_BEHIND_EVENT, SYNC_VERSIONS_EVENT, flushOutbox, hasPendingSyncOps,
 import { setTabSyncedHashes, storeTabSyncedHashes, tabSyncedHashes, type Baseline } from '../sync/tabVersions';
 import { noteEditTimes } from '../sync/editTimes';
 import { clearDirtyAfterSave, dirtyMark, markDirty } from '../sync/dirtyFlag';
+import { isStaleOwnEcho } from '../sync/ownWrites';
 import { adoptTabState, applyRemoteChanges, isOlderRowEvent, prepareRemoteRows, pullSyncedRows, takePeerVersions, type RemoteChange } from '../sync/pull';
 import { SYNCED_COLLECTIONS, cacheWithHydratedCollections, itemsOf, rowIdOf, syncKeyOf } from '../sync/syncedCollections';
 import { mergeAppState, mergeAppStateWithGuardResult, signInMergeBase } from './stateMerger';
@@ -700,6 +701,7 @@ export function useAppState() {
           // A late echo of an earlier save must not undo a newer copy already on this device.
           const local = itemsOf(collection, stateRef.current).find((item) => rowIdOf(collection, item) === row.id);
           if (isOlderRowEvent(collection, local, row)) return;
+          if (collection.dropsOwnStaleEchoes && isStaleOwnEcho(syncedUserId, collection.table, row)) return;
           const changes = prepareRemoteRows(syncedUserId, collection, [row]);
           if (changes.length === 0) return;
           lowerUserDataWatermark(syncedUserId, countRemoteRemovals(stateRef.current, changes));
