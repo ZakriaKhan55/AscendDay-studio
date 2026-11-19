@@ -153,6 +153,12 @@ export function readingLateDay(log: Pick<ReadingLog, 'date'> | null | undefined,
   return log && log.date === yesterday ? yesterday : null;
 }
 
+/**
+ * A Finish log (the unread pages Finish adds): no page points and covers nothing. Same test as the
+ * server's `(data->>'finish') = 'true'`, so a string "true" counts too (the app writes a boolean).
+ */
+const isFinishLog = (log: Pick<ReadingLog, 'finish'>): boolean => (log.finish as unknown) === true || (log.finish as unknown) === 'true';
+
 /** One event of a reading day: a log's pages, or a unit switch's change of the book's place (unitSwitchChange). */
 type ReadingDayEvent = { at: number; kind: 0 | 1; key: string; bookId: string; pages: number; log?: ReadingLog };
 
@@ -196,7 +202,7 @@ function coverReadingDayEvents(events: ReadingDayEvent[], bookById: Map<string, 
       covered.delete(ev.bookId);
       return ev.pages;
     }
-    const range = ev.log.finish === true ? null : logRange(ev.log, bookById.get(ev.bookId));
+    const range = isFinishLog(ev.log) ? null : logRange(ev.log, bookById.get(ev.bookId));
     if (!range) return ev.pages;
     const byKey = covered.get(ev.bookId) ?? new Map<string, [number, number][]>();
     const { added, ranges } = addRange(byKey.get(range.key) ?? [], range.lo, range.hi);
@@ -277,7 +283,7 @@ export function computeReadingDayAward(
   opts: { floor?: boolean } = {}
 ): { entry: PointsEntry | null; logPoints: Map<string, number> } {
   const bookById = new Map(books.filter(Boolean).map((b) => [b.id, b]));
-  const dayLogs = logs.filter((l) => l && l.date === day && l.finish !== true && Boolean(l.bookId && bookById.has(l.bookId)));
+  const dayLogs = logs.filter((l) => l && l.date === day && !isFinishLog(l) && Boolean(l.bookId && bookById.has(l.bookId)));
   const events = readingDayEvents(dayLogs, bookById, day);
   const counted = coverReadingDayEvents(events, bookById);
 
@@ -302,12 +308,18 @@ export function computeReadingDayAward(
     used = earned;
     if (firstMs === null && used > 0) firstMs = ev.at;
   }
+  // The award is the whole day's pages, as the server's v_used after its loop: a unit switch after
+  // the day's last log that gives back owed pages counts too (no log's points carry it).
+  used = Math.min(Math.floor(pages / READING_POINTS.pagesPerPoint), READING_POINTS.dailyCap);
   const id = readingAwardId(day);
   const kept = existing && existing.id === id ? existing : null;
   if (opts.floor && used <= (kept?.amount ?? 0)) return { entry: kept, logPoints };
   if (used <= 0) return { entry: null, logPoints };
 
-  const at = Math.min(Math.max(firstMs !== null && Number.isFinite(firstMs) ? firstMs : nowMs, dayStartMs), nowMs, dayLastMs(day));
+  // No log earned the first point (only a later switch did): the server's v_first stays NULL and
+  // greatest() ignores it, so the award's time is the day's start. A log with no time counts as now.
+  const firstAt = firstMs === null ? dayStartMs : Number.isFinite(firstMs) ? firstMs : nowMs;
+  const at = Math.min(Math.max(firstAt, dayStartMs), nowMs, dayLastMs(day));
   return {
     entry: {
       id,

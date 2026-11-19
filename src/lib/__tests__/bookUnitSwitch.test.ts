@@ -178,4 +178,28 @@ assert(PAGES_PER_CHAPTER === 20, 'config: 1 chapter = 20 pages');
   assert(points([...logs, log('c1', 1, 3, { unit: 'chapters' })], [upOnly]) === 10, 'a raise with nothing owed adds nothing; real reading still earns');
 }
 
+// 10. A raising switch after the day's last log gives back owed pages, as the server counts them
+// (v_used after its loop, 2026-11-19): the preview's award includes them, no log's points carry them.
+{
+  const sw = (hour: number, pagesBefore: number, pagesAfter: number) => ({ date: DAY, at: at(hour), pagesBefore, pagesAfter });
+  const b = book({ currentAmount: 154, totalAmount: 300, unitSwitches: [sw(2, 150, 140), sw(4, 144, 154)] });
+  const logs = [log('p1', 10, 1, { unit: 'pages' }), log('p2', 4, 3, { unit: 'pages' })];
+  const r = computeReadingDayAward(logs, [b], DAY, START, NOW);
+  assert(r.entry?.amount === 7, `10 - 10 + 4 + 10 given back = 14 pages = 7 pts (got ${r.entry?.amount})`);
+  assert(r.logPoints.get('p1') === 5 && r.logPoints.get('p2') === 0, 'the logs show +5 and +0; the switch carries the rest');
+  assert(r.entry?.timestamp === at(1), 'award time = the log that earned the first point');
+  // Only the switch reaches the first point: no log earned one, so the time is the day's start (SQL v_first NULL).
+  const c = book({ currentAmount: 12, totalAmount: 300, unitSwitches: [sw(2, 150, 140), sw(4, 141, 151)] });
+  const first = computeReadingDayAward([log('q1', 1, 1, { unit: 'pages' }), log('q2', 1, 3, { unit: 'pages' })], [c], DAY, START, NOW);
+  assert(first.entry?.amount === 1 && first.entry?.timestamp === at(0), `1 - 10 + 1 + 10 = 2 pages = 1 pt at the day's start (${JSON.stringify(first.entry)})`);
+}
+
+// 11. A Finish log is recognised as the server does it ((data->>'finish') = 'true'): a string "true" too.
+{
+  const b = book({ currentAmount: 300, totalAmount: 300 });
+  const fin = log('f1', 290, 2, { unit: 'pages', finish: 'true' as unknown as boolean });
+  assert(points([log('p1', 10, 1, { unit: 'pages' }), fin], [b]) === 5, 'a string "true" Finish log earns no page points');
+  assert(points([log('p1', 10, 1, { unit: 'pages' }), { ...fin, finish: true }], [b]) === 5, 'a boolean Finish log earns none either');
+}
+
 console.log('All book unit switch tests passed.');
