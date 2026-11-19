@@ -68,12 +68,28 @@ export class FakeServer {
     }
     return null;
   }
-  guardToday(table: string, NEW: any, OLD: any): boolean {
+  // Port of reading_logs_guard_today / skill_logs_guard_today (live bodies read 2026-11-19). An
+  // upsert meets the BEFORE INSERT pass and, when the row exists, the BEFORE UPDATE pass too; a
+  // PATCH meets only the UPDATE pass.
+  guardToday(table: string, NEW: any, OLD: any, op: 'upsert' | 'update'): boolean {
     if (!['reading_logs', 'skill_logs'].includes(table) || NEW.deleted_at) return true;
+    if (op === 'update') return this.guardTodayPass(table, NEW, OLD, 'UPDATE');
+    return this.guardTodayPass(table, NEW, OLD, 'INSERT') && (!OLD || this.guardTodayPass(table, NEW, OLD, 'UPDATE'));
+  }
+  guardTodayPass(table: string, NEW: any, OLD: any, TG_OP: 'INSERT' | 'UPDATE'): boolean {
     const today = this.accountToday();
-    if (NEW.data?.date !== today) return false;
-    if (OLD && OLD.data?.date !== today) return false;
-    return true;
+    const date = NEW.data?.date;
+    if (date === today && (TG_OP === 'INSERT' || OLD?.data?.date === today)) return true;
+    // A new log of yesterday that reaches the server today (late-day, 20261105160000).
+    const yesterday = new Date(Date.parse(`${today}T12:00:00.000Z`) - 24 * 3600 * 1000).toISOString().slice(0, 10);
+    if (TG_OP === 'INSERT' && date === yesterday) return true;
+    if (table !== 'skill_logs') return false;
+    // Skill logs only: an upsert or edit that keeps an existing live log's day, skill, minutes and
+    // createdAt (CR-10-12 upsert, 20261105180000 edit of an earlier day's note).
+    const same = (o: any) => Boolean(o) && !o.deleted_at
+      && ['date', 'skillId', 'createdAt'].every((k) => (NEW.data?.[k] ?? null) === (o.data?.[k] ?? null))
+      && JSON.stringify(NEW.data?.durationMinutes ?? null) === JSON.stringify(o.data?.durationMinutes ?? null);
+    return same(OLD);
   }
   keepNewer(table: string, NEW: any, OLD: any): any {
     if (REVIVABLE.has(table)) return ts(NEW.updated_at) < ts(OLD.updated_at) ? null : NEW;
@@ -156,7 +172,7 @@ export class FakeServer {
     }
     for (const [r, OLD] of staged) {
       if (SERVER_OWNED_TABLES.has(table)) { this.note('dropped', table, r.id, 'server-owned table refuses app writes', who); continue; }
-      if (!this.guardToday(table, r, OLD)) { this.note('dropped', table, r.id, `guard_today ${r.data?.date}`, who); continue; }
+      if (!this.guardToday(table, r, OLD, 'upsert')) { this.note('dropped', table, r.id, `guard_today ${r.data?.date}`, who); continue; }
       if (!OLD) {
         const row = this.capFuture({ created_at: this.nowIso(), deleted_at: null, ...r, server_updated_at: this.stamp() });
         this.t(table).set(`${r.user_id}:${r.id}`, row);
@@ -194,7 +210,7 @@ export class FakeServer {
       const OLD = this.row(table, uid, id);
       if (!OLD) continue;
       if (SERVER_OWNED_TABLES.has(table)) { this.note('dropped', table, id, 'server-owned table refuses app writes', who); continue; }
-      if (!this.guardToday(table, { ...OLD, ...patch }, OLD)) { this.note('dropped', table, id, `guard_today ${patch?.data?.date ?? OLD.data?.date}`, who); continue; }
+      if (!this.guardToday(table, { ...OLD, ...patch }, OLD, 'update')) { this.note('dropped', table, id, `guard_today ${patch?.data?.date ?? OLD.data?.date}`, who); continue; }
       const NEW = this.keepNewer(table, { ...OLD, ...patch }, OLD);
       if (!NEW) { this.note('dropped', table, id, `update refused by keep_newer ${JSON.stringify(patch)}`, who); continue; }
       const row = this.capFuture({ ...NEW, server_updated_at: this.stamp() });

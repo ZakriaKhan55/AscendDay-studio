@@ -7,6 +7,10 @@
 //   H3  a socket closed before its open timer ran stays closed: no onopen, no realtime subscriber.
 //   H4  a PATCH on a server-owned table (point_entries, league_archives) changes nothing, a soft
 //       delete included (their *_guard_server_owned triggers are BEFORE INSERT OR UPDATE, RETURN NULL).
+//   H5  guard_today's other live branches (reading_logs_guard_today / skill_logs_guard_today): a new
+//       log of yesterday is kept (late-day), an upsert of an existing yesterday log is still dropped;
+//       skill logs only: an upsert that keeps an existing log's day, skill, minutes and createdAt is
+//       kept, and an earlier day's log can be edited (note) while those four stay.
 import { story, assert, eq, pass, server, sockets, UID } from './harness/bootHook';
 import { FakeSocket, REF } from './harness/fakeSupabase';
 
@@ -60,4 +64,26 @@ await story('harnessRules.hook (fake database and socket rules)', async () => {
     eq([edit.status, row?.data?.amount, row?.deleted_at, row?.updated_at], [204, 5, null, at], `H4: a PATCH on ${table} changes nothing`);
   }
   pass('H4 PATCH meets the server-owned table guards');
+
+  // H5
+  const yesterday = dayFrom(today, -1);
+  const twoAgo = dayFrom(today, -2);
+  for (const table of ['reading_logs', 'skill_logs']) {
+    const id = `h-late-${table}`;
+    server.upsert(table, [{ id, user_id: UID, data: { id, date: yesterday, note: 'a' }, updated_at: stampIn(0) }], 'test');
+    eq(server.row(table, UID, id)?.data?.date, yesterday, `H5: a new ${table} row of yesterday is kept`);
+    server.upsert(table, [{ id, user_id: UID, data: { id, date: yesterday, note: 'b' }, updated_at: stampIn(1000) }], 'test');
+    eq(server.row(table, UID, id)?.data?.note, table === 'skill_logs' ? 'b' : 'a', `H5: ${table} upsert of an existing yesterday row (same fields)`);
+    server.upsert(table, [{ id: `${id}-old`, user_id: UID, data: { id: `${id}-old`, date: twoAgo }, updated_at: stampIn(0) }], 'test');
+    assert(!server.row(table, UID, `${id}-old`), `H5: a new ${table} row of two days ago is dropped`);
+  }
+  const sk = { skillId: 's1', durationMinutes: 30, createdAt: stampIn(-3 * DAY) };
+  server.t('skill_logs').set(`${UID}:h-sk1`, { user_id: UID, id: 'h-sk1', data: { id: 'h-sk1', date: twoAgo, ...sk, note: 'x' }, created_at: stampIn(-3 * DAY), updated_at: stampIn(-3 * DAY), deleted_at: null, server_updated_at: server.stamp() });
+  server.update('skill_logs', UID, ['h-sk1'], { data: { id: 'h-sk1', date: twoAgo, ...sk, note: 'y' }, updated_at: stampIn(1000) }, 'test');
+  eq(server.row('skill_logs', UID, 'h-sk1')?.data?.note, 'y', "H5: an earlier day's skill log note edit is kept");
+  server.update('skill_logs', UID, ['h-sk1'], { data: { id: 'h-sk1', date: twoAgo, ...sk, durationMinutes: 90, note: 'z' }, updated_at: stampIn(2000) }, 'test');
+  eq(server.row('skill_logs', UID, 'h-sk1')?.data?.durationMinutes, 30, "H5: changing an earlier day's minutes is dropped");
+  server.upsert('skill_logs', [{ id: 'h-sk1', user_id: UID, data: { id: 'h-sk1', date: twoAgo, ...sk, note: 'w' }, updated_at: stampIn(3000) }], 'test');
+  eq(server.row('skill_logs', UID, 'h-sk1')?.data?.note, 'w', "H5: an upsert keeping an earlier day's skill log fields is kept");
+  pass('H5 guard_today late-day and skill-log edit branches');
 });
