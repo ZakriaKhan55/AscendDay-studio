@@ -56,11 +56,14 @@ export function CtaBand({
   id,
   title,
   featuresLink = true,
+  appHref,
   children,
 }: {
   id: string;
   title: string;
   featuresLink?: boolean;
+  /** Where the button goes for a visitor with a saved session (client.ts); the dashboard when unset. */
+  appHref?: string;
   children: ReactNode;
 }) {
   return (
@@ -71,7 +74,7 @@ export function CtaBand({
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed text-content-tertiary">{children}</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <a href="/signup" data-cta="" className="btn-primary min-h-12 px-6 text-base">
+          <a href="/signup" data-cta="" data-cta-app={appHref} className="btn-primary min-h-12 px-6 text-base">
             <span data-cta-label="">Start free</span>
             <ArrowRight size={18} aria-hidden="true" />
           </a>

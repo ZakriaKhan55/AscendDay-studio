@@ -42,6 +42,15 @@ export const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('ascend_
  */
 export const LANDING_REDIRECT_SCRIPT = `(function(){try{if(location.pathname!=='/')return;var h=location.hash,s=location.search,go=null;if(h.indexOf('#/')===0){var id=decodeURIComponent(h.slice(2)).replace(/^\\/+|\\/+$/g,'').toLowerCase();var r={'':'dashboard','index.html':'dashboard',books:'reading',prefrontal:'prefrontal-cortex'};if(Object.prototype.hasOwnProperty.call(r,id))id=r[id];if(!/^[a-z0-9-]+$/.test(id))id='dashboard';go='/'+id+s;}else if(/[#&](access_token|error)=/.test(h)||/[?&](code|quick-log)(=|&|$)/.test(s)){go='/dashboard'+s+h;}else{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(!k||!/^sb-[a-z0-9]+-auth-token$/.test(k))continue;var v=JSON.parse(localStorage.getItem(k)||'null');if(v&&typeof v.refresh_token==='string'&&v.refresh_token){go='/dashboard'+s+h;break;}}}if(go){document.documentElement.style.visibility='hidden';location.replace(go);}}catch(e){}})();`;
 
+/**
+ * Every marketing page, before first paint: a session saved on this device (signed in or guest;
+ * same test as lib/supabase.ts storedAuthSession and LANDING_REDIRECT_SCRIPT) sets `data-session`
+ * on <html>. marketing.css hides `[data-signed-out-only]` (the Sign in links) from then on, and
+ * client.ts reads the same attribute to swap the calls to action, so the two always agree. Inline,
+ * so its sha256 is in vercel.json's CSP (checkSeo fails on a missing hash).
+ */
+export const SESSION_SCRIPT = `(function(){try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(!k||!/^sb-[a-z0-9]+-auth-token$/.test(k))continue;var v=JSON.parse(localStorage.getItem(k)||'null');if(v&&typeof v.refresh_token==='string'&&v.refresh_token){document.documentElement.setAttribute('data-session','');break;}}}catch(e){}})();`;
+
 const ogImageUrl = (name: string) => `${SITE_URL}/og/${name}.png?v=${OG_IMAGE_VERSION}`;
 
 /** Title, description, canonical, robots and the link-preview tags of one page. */
@@ -191,6 +200,7 @@ export function marketingHead(route: MarketingRoute, assets: PageAssets): string
     ...ICON_TAGS,
     `<meta name="theme-color" content="#0a0b0f" />`,
     `<script>${THEME_SCRIPT}</script>`,
+    `<script>${SESSION_SCRIPT}</script>`,
     ...assets.fonts.map((href) => `<link rel="preload" as="font" type="font/woff2" crossorigin href="${href}" />`),
     ...assets.css.map((href) => `<link rel="stylesheet" crossorigin href="${href}" />`),
     ...(assets.js ? [`<script type="module" crossorigin src="${assets.js}"></script>`] : []),

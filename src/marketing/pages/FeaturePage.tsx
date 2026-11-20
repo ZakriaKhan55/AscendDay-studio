@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { cx, FOCUS_RING } from '@/components/ui/primitives/shared';
+import { pathForView } from '@/lib/app/routes';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { MarketingLayout } from '../components/MarketingLayout';
 import { Screenshot } from '../components/Screenshot';
@@ -21,6 +22,8 @@ function Dot({ muted }: { muted?: boolean }) {
 export function FeaturePage({ slug }: { slug: FeatureSlug }) {
   const feature = FEATURES[slug];
   const content = FEATURE_CONTENT[slug];
+  // A visitor with a saved session opens this feature's own app page (catalog: the first appView).
+  const appHref = pathForView(feature.appViews[0]);
   const crumbs = [{ name: 'Home', href: '/' }, { name: 'Features', href: '/features' }, { name: feature.name }];
 
   return (
@@ -43,7 +46,7 @@ export function FeaturePage({ slug }: { slug: FeatureSlug }) {
               {content.intro}
             </div>
             <div className="m-enter mt-8 flex flex-wrap gap-3" style={enter(3)}>
-              <a href="/signup" data-cta="" className="btn-primary min-h-12 px-6 text-base">
+              <a href="/signup" data-cta="" data-cta-app={appHref} className="btn-primary min-h-12 px-6 text-base">
                 <span data-cta-label="">Start free</span>
                 <ArrowRight size={18} aria-hidden="true" />
               </a>
@@ -141,7 +144,7 @@ export function FeaturePage({ slug }: { slug: FeatureSlug }) {
         </ul>
       </Block>
 
-      <CtaBand id="cta-title" title={content.cta.title}>
+      <CtaBand id="cta-title" title={content.cta.title} appHref={appHref}>
         {content.cta.text}
       </CtaBand>
     </MarketingLayout>

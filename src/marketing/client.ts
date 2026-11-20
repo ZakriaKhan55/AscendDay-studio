@@ -1,7 +1,7 @@
 /**
  * The marketing pages' only script (landing, /features, feature pages, 404). The pages are static
  * HTML and work without it; this adds the theme switch, closes the Features menu on an outside
- * click or Escape, swaps "Get started" for "Open Ascend" when a session is saved on this device,
+ * click or Escape, swaps "Get started" for "Open app" when a session is saved on this device (head.ts SESSION_SCRIPT),
  * and turns on the app's scroll rise, card spotlight and analytics. Also the CSS entry
  * (marketing.css: the app's fonts, tokens and components, so the pages look exactly like the app).
  * Imports only DOM-level helpers from lib/ (no React), so the pages load a few KB of script.
@@ -117,20 +117,8 @@ function installMenus() {
   });
 }
 
-/** A saved session on this device (lib/supabase.ts storedAuthSession; env-free key match). */
-function hasSavedSession(): boolean {
-  try {
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (!key || !/^sb-[a-z0-9]+-auth-token$/.test(key)) continue;
-      const saved = JSON.parse(localStorage.getItem(key) || 'null') as { refresh_token?: unknown } | null;
-      if (typeof saved?.refresh_token === 'string' && saved.refresh_token) return true;
-    }
-  } catch {
-    // Storage blocked: treat as signed out.
-  }
-  return false;
-}
+/** A saved session on this device: set before first paint by head.ts SESSION_SCRIPT. */
+const hasSavedSession = () => document.documentElement.hasAttribute('data-session');
 
 /** Signed-in visitors get a way into the app instead of the sign-up call to action. */
 function swapCallsToAction() {

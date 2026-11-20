@@ -6,6 +6,10 @@
 @import '@fontsource/instrument-serif/400.css';
 @import '../index.css';
 
+/* A session is saved on this device (head.ts SESSION_SCRIPT, before first paint): the Sign in
+   links go, so a signed-in visitor never sees them, not even for a frame. */
+[data-session] [data-signed-out-only] { display: none !important; }
+
 /* Theme switch: the icon of the theme you would switch to, turning as it swaps (as the app's). */
 .m-theme-icon {
   transition: opacity var(--duration-base) var(--ease-emphasized), transform var(--duration-base) var(--ease-emphasized);

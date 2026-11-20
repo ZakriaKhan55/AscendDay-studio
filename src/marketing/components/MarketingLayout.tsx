@@ -94,7 +94,7 @@ function Header() {
           <a href="/about" className={cx(NAV_LINK, 'max-sm:hidden')}>
             About
           </a>
-          <a href="/login" className={cx(NAV_LINK, 'max-[479px]:hidden')}>
+          <a href="/login" data-signed-out-only="" className={cx(NAV_LINK, 'max-[479px]:hidden')}>
             Sign in
           </a>
         </nav>
@@ -157,7 +157,11 @@ function Footer() {
             <a href="/terms" className={cx('inline-flex min-h-9 items-center rounded hover:text-content-primary', FOCUS_RING)}>
               Terms
             </a>
-            <a href="/login" className={cx('inline-flex min-h-9 items-center rounded hover:text-content-primary', FOCUS_RING)}>
+            <a
+              href="/login"
+              data-signed-out-only=""
+              className={cx('inline-flex min-h-9 items-center rounded hover:text-content-primary', FOCUS_RING)}
+            >
               Sign in
             </a>
           </nav>

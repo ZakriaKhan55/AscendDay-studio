@@ -64,6 +64,13 @@ for (const route of MARKETING_ROUTES) {
   assert(/<meta property="og:image" content="https:\/\/[^"]+\.png\?v=\d+"/.test(html), `${route.path}: absolute og:image`);
   for (const m of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) JSON.parse(m[1]);
   assert(!/href="#"|href=""/.test(html), `${route.path}: no empty links`);
+  // Sign in links hide for signed-in visitors (SESSION_SCRIPT sets data-session on <html>).
+  // The landing page is skipped: LANDING_REDIRECT_SCRIPT sends a saved session to the app first.
+  if (route.kind !== 'landing') {
+    const loginLinks = html.match(/<a [^>]*href="\/login"[^>]*>/g) ?? [];
+    assert(loginLinks.every((tag) => tag.includes('data-signed-out-only')), `${route.path}: every Sign in link is data-signed-out-only`);
+    if (route.kind === 'feature') assert(loginLinks.length === 2, `${route.path}: header + footer Sign in present`);
+  }
   assert(route.title.includes(SITE_NAME), `${route.path}: title carries ${SITE_NAME}`);
   assert(html.includes(`<meta property="og:site_name" content="${SITE_NAME}" />`), `${route.path}: og:site_name is ${SITE_NAME}`);
   // The name is in the footer of every page drawn with the marketing layout (legal pages are the
