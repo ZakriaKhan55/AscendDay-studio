@@ -1288,7 +1288,7 @@ export function useAppState() {
           // `hydration` adopts a load that is still running, so a slow answer is not thrown away).
           const loadAccount = async (
             myGeneration: number,
-            background?: { hydration?: ReturnType<typeof hydrateUserSession> }
+            background?: { hydration?: ReturnType<typeof hydrateUserSession>; hydrationSeq?: number }
           ): Promise<void> => {
             retryFirstLoadRef.current = null;
             recoverLoadRef.current = null;
@@ -1298,6 +1298,9 @@ export function useAppState() {
             const timeoutMs = background ? 60000 : 15000;
             const timeoutError = new Error(`Auth hydration timed out after ${timeoutMs / 1000}s`);
             const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(timeoutError), timeoutMs));
+            // Pact writes counted when the read starts (a reused read keeps its own start; 0 when
+            // unknown keeps every written pact): a write after it is newer than what the read returns.
+            const hydrationSeq = background?.hydration ? (background.hydrationSeq ?? 0) : pledgeWriteSeq.current;
             const hydration = background?.hydration ?? hydrateUserSession(userId, email, session.user, signupDefaults);
 
             try {
@@ -1322,6 +1325,7 @@ export function useAppState() {
                 // A background load starts from the server's state, as a reload would (the device copy
                 // on screen comes in below only when it holds unsaved changes).
                 let baseCurrentState = background ? sanitizedState : signInMergeBase(stateRef.current, sanitizedState, userId);
+                let refreshAfterHoldBack = false;
                 if (typeof window !== 'undefined' && userId) {
                   try {
                     const isDirty = Boolean(localStorage.getItem(`ascend_dirty_${userId}`));
@@ -1341,14 +1345,16 @@ export function useAppState() {
                             readBaseline(userId)
                           );
                           // Pacts and partnerships as hydration read them (the cache when that read
-                          // failed); a pact we are still writing keeps the copy on screen, and one
-                          // refresh runs once that write settles (as the partner refresh does).
+                          // failed); a pact written since the read started keeps the copy on screen
+                          // (as the partner refresh does): a write still on its way refreshes once it
+                          // settles, a settled one refreshes after this state is applied.
                           const writingPactIds = new Set<string>();
                           if (background) {
                             for (const [id, write] of pledgeWrites.current) {
-                              if (write.inFlight === 0) continue;
+                              if (write.inFlight === 0 && write.lastSeq <= hydrationSeq) continue;
                               writingPactIds.add(id);
-                              write.skipped = true;
+                              if (write.inFlight > 0) write.skipped = true;
+                              else refreshAfterHoldBack = true;
                             }
                           }
                           baseCurrentState = withHydratedPartnerData(baseCurrentState, sanitizedState, writingPactIds);
@@ -1385,6 +1391,7 @@ export function useAppState() {
                 setState(reconciledMergedState);
                 // Same batch as the state: the first render that sees the flag sees the server data.
                 setIsServerDataApplied(tablesRead && !guardResult.hasSuspiciousDrop);
+                if (refreshAfterHoldBack) afterCommit(() => void partnersRefreshRef.current?.());
 
                 if (guardResult.hasSuspiciousDrop) {
                   const isZeroOut = guardResult.mergedCount === 0;
@@ -1458,7 +1465,7 @@ export function useAppState() {
                   if (e === timeoutError) {
                     afterCommit(() => {
                       if (myGeneration !== authGenerationRef.current || isHydrated.current) return;
-                      void runRecovery(() => loadAccount(myGeneration, { hydration }));
+                      void runRecovery(() => loadAccount(myGeneration, { hydration, hydrationSeq }));
                     });
                   }
                 } else if (stateRef.current.currentUser?.id !== userId) {

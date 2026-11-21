@@ -9,8 +9,12 @@
 //      partnership are still shown.
 //   B3 background load (pull after a failed load) while my pact tick is still being saved: the tick
 //      on screen is kept; the rest of the partner data comes from the server.
+//   B4 background load whose read ran before my pact tick, with the tick saved (settled) before the
+//      load applies: the tick on screen is kept and the partner data is fetched again once.
 // Mutation proof: without withHydratedPartnerData in store.ts, B1 fails (old goal, ghost pact, p0);
-// with it but no in-flight hold-back (empty writingPactIds), B3 fails (the tick vanishes).
+// with it but no in-flight hold-back (empty writingPactIds), B3 fails (the tick vanishes); holding
+// back only writes still in flight (no lastSeq > hydrationSeq check), B4 fails (tick reverts); without
+// the afterCommit partner refresh, B4 fails (no refetch).
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { bootHook, story, until, eq, assert, pass, server, fake, UID } from './harness/bootHook';
 
@@ -24,6 +28,7 @@ const GHOST = '66666666-6666-4666-8666-666666666666';
 
 const tbl = (t: string) => server.g(t) as any[];
 let partnershipsDown = false;
+let partnershipReads = 0;
 const base = globalThis.fetch;
 const answer = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 (globalThis as any).fetch = async (input: any, init?: any) => {
@@ -31,6 +36,7 @@ const answer = (body: unknown, status = 200) => new Response(JSON.stringify(body
   const url = new URL(req.url);
   if (req.method === 'GET' && url.searchParams.has('or')) {
     if (url.pathname === '/rest/v1/partnerships') {
+      partnershipReads++;
       if (partnershipsDown) return answer({ message: 'down' }, 500);
       return answer(tbl('partnerships').filter((r) => r.user1_id === UID || r.user2_id === UID));
     }
@@ -156,4 +162,42 @@ await story('bootPactCache.hook (dirty boot shows server pacts first)', async ()
   await until(() => tbl('shared_challenges').find((r) => r.id === PACT).user1_done_dates.includes(today), 'B3: tick reached the server', 5000);
   await until(() => mine().includes(today), 'B3: tick still on screen after the save');
   pass('B3 background load with a pact write in flight keeps the tick on screen');
+
+  // B4: as B3 (opened from the copy, then pull-to-refresh), but the tick is sent after the load's
+  // read and saved before the load applies (the load waits on the held season-config read, which
+  // only loadAccount asks for, after hydration). The settled tick is kept, and one partner refresh
+  // runs for it.
+  await until(() => (fake.inFlight.get('user_data') ?? 0) === 0, 'B4: saves settled');
+  await h.supabase.auth.signOut();
+  await until(() => h.s().state.currentUser === null, 'B4: signed out');
+  // The server row without my tick (the save also set the legacy one-day column).
+  Object.assign(tbl('shared_challenges').find((r) => r.id === PACT), { user1_done_dates: [], user1_done_date: null });
+  h.storage.setItem(cacheKey, JSON.stringify(cache));
+  h.storage.setItem(dirtyKey, 'seed-4');
+  const own4 = profiles.splice(profiles.findIndex((p) => p.id === UID), 1);
+  fake.fail('profiles', 500, ['POST']);
+  await h.signIn();
+  await until(() => h.s().state.currentUser?.id === UID && !h.s().isSessionLoading, 'B4: opened from the device copy');
+  assert(!h.s().isServerDataApplied, 'B4: copy, not server data');
+  await until(() => !mine().includes(today), 'B4: no tick on screen yet');
+  profiles.push(...own4);
+  fake.unfail('profiles');
+  const afterRead = fake.hold((r) => r.table === 'rpc/ascend_season_config');
+  first = null;
+  wasApplied = false;
+  const refreshing = h.s().refreshNow();
+  await until(() => afterRead.hits > 0, 'B4: load read done, waiting to apply');
+  assert(!h.s().isServerDataApplied, 'B4: the load has not applied yet');
+  void h.s().logSharedChallengeHabit(PACT);
+  await until(() => tbl('shared_challenges').find((r) => r.id === PACT).user1_done_dates.includes(today), 'B4: tick reached the server');
+  await until(() => (fake.inFlight.get('rpc/save_shared_challenge_atomic') ?? 0) === 0, 'B4: tick save settled');
+  const readsBefore = partnershipReads;
+  await until(() => first, 'B4: first render with server data', 10_000);
+  const kept4 = first.pacts.find((p: any) => p.id === PACT);
+  assert(kept4?.done.includes(today), `B4: the settled tick on screen is kept (got ${JSON.stringify(kept4?.done)})`);
+  await until(() => partnershipReads > readsBefore, 'B4: partner data fetched again after the load', 5000);
+  await until(() => mine().includes(today), 'B4: tick still on screen after the refresh');
+  afterRead.release();
+  await refreshing;
+  pass('B4 background load with a pact write settled after its read keeps the tick and refreshes once');
 }, 60_000);
