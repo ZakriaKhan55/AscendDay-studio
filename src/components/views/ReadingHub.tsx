@@ -9,7 +9,7 @@ import { Badge, Dialog, EmptyState, PageColumns, ProgressBar, Switch, TabPanel, 
 import { TAP_TARGET, cx } from '@/components/ui/primitives/shared';
 import { CURATED_BOOKS, BOOK_CATEGORIES } from '@/lib/reading/books';
 import type { BookCategory, CuratedBook, ReadingLog, UserBook } from '@/types';
-import { formatDateLong, weekKey, formatWeekdayDate, formatWeekdayShort, calculateStreak, parseDate } from '@/lib/time/dates';
+import { formatDateLong, weekKey, formatWeekdayDate, formatWeekdayShort, calculateStreak, parseDate, todayKey } from '@/lib/time/dates';
 import { READING_POINTS } from '@/lib/points/pointsConfig';
 import { bookRemovalPoints, chapterTenths, countedReadingAmounts, isRetiredAppReadingAward, logUnit } from '@/lib/points/readingAwards';
 import { getCapStatus } from '@/lib/points/capStatus';
@@ -234,13 +234,16 @@ export function ReadingHub({ store }: { store: AppStore }) {
   const handleProgressSave = (newCurrent: number) => {
     if (!progressBook) return;
     const { current, total } = bookProgress(progressBook);
-    // Points this log adds today: the same preview the dialog shows, read before the save.
+    // Points this log adds today: the same preview the dialog shows, read before the save. The day
+    // is read now (todayKey), the same way updateReadingProgress dates the log, so a save just after
+    // midnight previews the day it is saved to (useLocalDayKey can lag up to 30 s).
+    const day = todayKey();
     const { before, after } = readingProgressPreview(
       store.state.readingLogs || [],
       store.state.libraryBooks || [],
       progressBook.id,
       newCurrent,
-      today,
+      day,
       trustedNow().toISOString()
     );
     store.updateReadingProgress(progressBook.id, newCurrent - current, newCurrent);
