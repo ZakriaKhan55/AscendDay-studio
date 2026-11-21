@@ -10,13 +10,6 @@ import { todayKey, periodKey, previousPeriodKey, addDays, addWeeks } from '../ti
  */
 export const MAX_RETROACTIVE_PENALTY_DAYS = 90;
 
-export interface StreakSourceInfo {
-  days: number;
-  source: string;
-  priority?: number;
-  bestDays?: number;
-}
-
 export { getMissPenaltyMultiplier } from './missPenalty';
 
 /**

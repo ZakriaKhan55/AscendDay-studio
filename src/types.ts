@@ -256,8 +256,6 @@ export interface WorkoutLog {
   createdAt: string;
 }
 
-export type ExerciseLog = WorkoutLog;
-
 // Module 2: Reading Tracker
 export interface Book {
   id: string;
@@ -292,8 +290,6 @@ export interface ReadingLog {
   pointsAwarded?: number;
   finish?: boolean; // unread pages added by Finish: no page points, still a reading day
 }
-
-export type ReadingProgressLog = ReadingLog;
 
 // Self Improvement Books - Curated Library & User Library
 export type BookCategory =
@@ -617,12 +613,6 @@ export interface PlanReflectionNote {
   createdAt: string;
   date?: string;
   reviewCadence?: 'weekly' | 'monthly' | null;
-}
-
-export interface VisionReflectionNote {
-  id: string;
-  date: string;
-  note: string;
 }
 
 export interface ImprovementPlan {
