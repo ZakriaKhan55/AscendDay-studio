@@ -78,6 +78,7 @@ export function BookFormDialog({
   book,
   initialStatus = 'reading',
   onClose,
+  onSaved,
 }: {
   store: AppStore;
   open: boolean;
@@ -85,6 +86,8 @@ export function BookFormDialog({
   book: UserBook | null;
   initialStatus?: UserBookStatus;
   onClose: () => void;
+  /** After a save: the book's title, whether an existing book was edited, and the status it was added with. */
+  onSaved?: (title: string, edited: boolean, status: UserBookStatus) => void;
 }) {
   const [values, setValues] = useState<BookFormValues>(() => valuesFrom(book, initialStatus));
   const guard = useUnsavedChanges(open ? book?.id ?? 'new-book' : null, values, { key: 'book-form', restore: setValues });
@@ -152,6 +155,7 @@ export function BookFormDialog({
         finished ? values.reflection.trim() || undefined : undefined
       );
     }
+    onSaved?.(values.title.trim(), Boolean(book), values.status);
     onClose();
   };
 

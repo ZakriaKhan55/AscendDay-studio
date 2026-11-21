@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Dialog, Form } from '@/components/ui/primitives';
+import { useToast } from '@/components/ui/Toast';
 import type { AppStore } from '@/lib/store/store';
 import { isNewPastDate, todayKey } from '@/lib/time/dates';
 import { useUnsavedChanges } from '@/lib/ui/unsavedChanges';
@@ -47,6 +48,7 @@ export function EditPlanDialog({
   const isCopy = owner === 'copy';
   const type = planTypeOf(plan);
   const [values, setValues] = useState<PlanFormValues>(() => valuesFrom(plan));
+  const { showSuccessToast } = useToast();
   const guard = useUnsavedChanges(plan.id, values, { key: 'plan-edit', restore: setValues });
 
   const update = (patch: Partial<PlanFormValues>) => setValues((v) => ({ ...v, ...patch }));
@@ -68,6 +70,7 @@ export function EditPlanDialog({
     } else {
       store.updateImprovementPlan(plan.id, values.title, values.description, values.category, values.isPublic, steps, structure);
     }
+    showSuccessToast('Plan saved', `"${values.title.trim()}" is updated.`);
     onClose();
   };
 

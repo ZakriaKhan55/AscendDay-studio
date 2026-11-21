@@ -185,8 +185,14 @@ export function WeeklyGoalsView({
     setFormOpen(true);
   };
   const saveGoal = (payload: GoalPayload) => {
-    if (editingGoal) store.updateWeeklyGoalItem(selectedWeekKey, editingGoal.id, payload);
-    else store.addWeeklyGoalItem(selectedWeekKey, payload);
+    // The store throws on a refused change (a past week), so the toast only follows a save.
+    if (editingGoal) {
+      store.updateWeeklyGoalItem(selectedWeekKey, editingGoal.id, payload);
+      showSuccessToast('Goal saved', `"${payload.title}" is updated.`);
+    } else {
+      store.addWeeklyGoalItem(selectedWeekKey, payload);
+      showSuccessToast('Goal added', `"${payload.title}" is on your list.`);
+    }
   };
 
   const [deletingGoal, setDeletingGoal] = useState<WeeklyGoalItem | null>(null);

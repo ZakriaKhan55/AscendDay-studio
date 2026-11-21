@@ -79,6 +79,7 @@ export function ReflectionsCard({
     if (!newContent.trim()) return;
     try {
       store.addWeeklyReflection(weekKey, newContent.trim());
+      showSuccessToast('Reflection saved');
       setNewContent('');
       setAdding(false);
       focusNext('write-reflection');
@@ -91,6 +92,7 @@ export function ReflectionsCard({
     if (!editing || !editContent.trim()) return;
     try {
       store.updateWeeklyReflection(weekKey, editing.id, editContent.trim());
+      showSuccessToast('Reflection updated');
       focusNext(`edit-reflection-${editing.id}`);
       setEditing(null);
       setEditContent('');

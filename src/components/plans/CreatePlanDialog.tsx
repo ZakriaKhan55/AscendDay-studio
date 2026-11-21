@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { Badge, Dialog, Form } from '@/components/ui/primitives';
+import { useToast } from '@/components/ui/Toast';
 import type { AppStore } from '@/lib/store/store';
 import type { PlanType } from '@/types';
 import { addDays, isNewPastDate, todayKey } from '@/lib/time/dates';
@@ -58,6 +59,7 @@ type Choice = { key: string; type: PlanType; values: PlanFormValues };
  */
 export function CreatePlanDialog({ store, open, onClose }: { store: AppStore; open: boolean; onClose: () => void }) {
   const [choice, setChoice] = useState<Choice | null>(null);
+  const { showSuccessToast } = useToast();
   const values = choice?.values;
   // The draft returns once the same type or template is picked again.
   const guard = useUnsavedChanges(open && choice ? choice.key : null, values ?? null, {
@@ -95,6 +97,7 @@ export function CreatePlanDialog({ store, open, onClose }: { store: AppStore; op
         reviewCadence: type === 'vision' ? v.reviewCadence || 'weekly' : v.reviewCadence,
       }
     );
+    showSuccessToast('Plan created', `"${v.title.trim()}" is in your plans.`);
     onClose();
   };
 

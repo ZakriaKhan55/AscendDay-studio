@@ -234,7 +234,18 @@ export function ReadingHub({ store }: { store: AppStore }) {
   const handleProgressSave = (newCurrent: number) => {
     if (!progressBook) return;
     const { current, total } = bookProgress(progressBook);
+    // Points this log adds today: the same preview the dialog shows, read before the save.
+    const { before, after } = readingProgressPreview(
+      store.state.readingLogs || [],
+      store.state.libraryBooks || [],
+      progressBook.id,
+      newCurrent,
+      today,
+      trustedNow().toISOString()
+    );
     store.updateReadingProgress(progressBook.id, newCurrent - current, newCurrent);
+    const earned = after - before;
+    showSuccessToast('Progress logged', earned > 0 && !timezoneWait ? ptsText(earned, true) : `${progressBook.title} saved.`);
     if (newCurrent >= total) openFinish(progressBook);
   };
 
@@ -762,6 +773,9 @@ export function ReadingHub({ store }: { store: AppStore }) {
         book={formBook}
         initialStatus={bookForm.status}
         onClose={() => setBookForm((f) => ({ ...f, open: false }))}
+        onSaved={(title, edited, status) =>
+          showSuccessToast(edited ? 'Book updated' : status === 'reading' ? 'Started reading' : status === 'completed' ? 'Book added' : 'Saved to library', title)
+        }
       />
 
       <StartReadingDialog
@@ -770,6 +784,7 @@ export function ReadingHub({ store }: { store: AppStore }) {
         book={startBook}
         open={Boolean(startBook)}
         onClose={() => setStartBookId((s) => ({ ...s, id: null }))}
+        onStarted={(title) => showSuccessToast('Started reading', title, `book_start_${startBook?.id ?? ''}`)}
       />
 
       <StartReadingDialog
