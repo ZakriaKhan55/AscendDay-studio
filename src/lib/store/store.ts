@@ -77,7 +77,7 @@ import { noteEditTimes } from '../sync/editTimes';
 import { clearDirtyAfterSave, dirtyMark, markDirty } from '../sync/dirtyFlag';
 import { isStaleOwnEcho } from '../sync/ownWrites';
 import { adoptTabState, applyRemoteChanges, isOlderRowEvent, prepareRemoteRows, pullSyncedRows, takePeerVersions, type RemoteChange } from '../sync/pull';
-import { SYNCED_COLLECTIONS, cacheWithHydratedCollections, itemsOf, rowIdOf, syncKeyOf } from '../sync/syncedCollections';
+import { SYNCED_COLLECTIONS, cacheWithHydratedCollections, itemsOf, rowIdOf, syncKeyOf, withHydratedPartnerData } from '../sync/syncedCollections';
 import { mergeAppState, mergeAppStateWithGuardResult, signInMergeBase } from './stateMerger';
 import { toUserMessage } from '../app/userMessage';
 import { disablePush } from '../app/push';
@@ -1340,6 +1340,18 @@ export function useAppState() {
                             sanitizedState,
                             readBaseline(userId)
                           );
+                          // Pacts and partnerships as hydration read them (the cache when that read
+                          // failed); a pact we are still writing keeps the copy on screen, and one
+                          // refresh runs once that write settles (as the partner refresh does).
+                          const writingPactIds = new Set<string>();
+                          if (background) {
+                            for (const [id, write] of pledgeWrites.current) {
+                              if (write.inFlight === 0) continue;
+                              writingPactIds.add(id);
+                              write.skipped = true;
+                            }
+                          }
+                          baseCurrentState = withHydratedPartnerData(baseCurrentState, sanitizedState, writingPactIds);
                           // A signed-out state on screen belongs to no account, so it is merged in too
                           // (as signInMergeBase does on the clean path); else its items would be dropped.
                           if (!stateRef.current.currentUser) {

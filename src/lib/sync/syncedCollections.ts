@@ -716,3 +716,21 @@ export function cacheWithHydratedCollections(cache: AppState, hydrated: AppState
   }
   return base;
 }
+
+/**
+ * Pacts and partnerships for a dirty-cache load, taken from the hydrated state rather than the
+ * device copy. They are server-owned: no pact edit outlives a reload unsent (each one is an awaited
+ * RPC), so a cached copy only holds older goals and ticks, and pacts or partnerships the server has
+ * since deleted or ended. Merged as incoming they won over the rows until the partner refresh.
+ * Hydration falls back to the cache when these fetches fail, so an offline load still shows them.
+ * `keepPactIds`: pacts with a write of ours on its way keep `base`'s copy (the read may predate it).
+ */
+export function withHydratedPartnerData(base: AppState, hydrated: AppState, keepPactIds: ReadonlySet<string> = new Set()): AppState {
+  const held = new Map((base.sharedChallenges || []).map((c) => [c.id, c]));
+  return {
+    ...base,
+    partnerships: hydrated.partnerships,
+    partnership: hydrated.partnership,
+    sharedChallenges: (hydrated.sharedChallenges || []).map((c) => (keepPactIds.has(c.id) && held.get(c.id)) || c),
+  };
+}
