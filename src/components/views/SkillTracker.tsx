@@ -352,8 +352,14 @@ export function SkillTracker({ store, onNavigate }: { store: AppStore; onNavigat
     }));
   };
   const saveDrillGoal = (payload: GoalPayload) => {
-    if (goalForm?.editing) store.updateWeeklyGoalItem(currentWeekKey, goalForm.editing.id, payload);
-    else store.addWeeklyGoalItem(currentWeekKey, payload);
+    const editing = goalForm?.editing;
+    if (editing) {
+      // Deleted meanwhile (another device or tab): the store would skip it silently, so the dialog
+      // stays open and says why instead of a false "saved".
+      const stillThere = store.state.weeklyGoals.some((w) => w.weekKey === currentWeekKey && w.goals.some((g) => g.id === editing.id));
+      if (!stillThere) throw new Error('This goal is no longer there.');
+      store.updateWeeklyGoalItem(currentWeekKey, editing.id, payload);
+    } else store.addWeeklyGoalItem(currentWeekKey, payload);
     // Ticks it at once when this week's counts already reach the target.
     store.syncLinkedWeeklyGoals();
     showSuccessToast(goalForm?.editing ? 'Goal saved' : 'Weekly goal added', 'It counts this week in Weekly goals.');

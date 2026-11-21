@@ -187,6 +187,10 @@ export function WeeklyGoalsView({
   const saveGoal = (payload: GoalPayload) => {
     // The store throws on a refused change (a past week), so the toast only follows a save.
     if (editingGoal) {
+      // Deleted meanwhile (another device or tab): the store would skip it silently, so the dialog
+      // stays open and says why instead of a false "saved".
+      const stillThere = store.state.weeklyGoals.some((w) => w.weekKey === selectedWeekKey && w.goals.some((g) => g.id === editingGoal.id));
+      if (!stillThere) throw new Error('This goal is no longer there.');
       store.updateWeeklyGoalItem(selectedWeekKey, editingGoal.id, payload);
       showSuccessToast('Goal saved', `"${payload.title}" is updated.`);
     } else {
