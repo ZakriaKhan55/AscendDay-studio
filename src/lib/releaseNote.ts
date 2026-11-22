@@ -48,13 +48,8 @@ export function releaseNoteGroups(note: ReleaseNote): { key: ReleaseNoteGroupKey
 }
 
 export const RELEASE_NOTE: ReleaseNote | null = {
-  id: 4,
-  releasedAt: '2026-11-18T13:10:00+05:00',
-  title: "What's new in 1.5.0",
-  new: ['Link a habit to a running pact anytime, or change the link for your side.'],
-  improved: ['Same points in a league? More active days rank higher, then fewer penalties. Names never decide.'],
-  fixed: [
-    'Reading the same pages on two devices now counts them once, in points and totals.',
-    'A focus session started offline keeps its break when you come back online.',
-  ],
+  id: 5,
+  releasedAt: '2026-11-22T11:22:00+05:00',
+  title: "What's new in 1.6.0",
+  new: ["Goals and projects: turn on Set progress by hand, and their linked parts won't move or finish them."],
 };
