@@ -77,8 +77,8 @@ export const projectsGoals: FeatureContent = {
         title="Progress that adds up on its own"
         lead={
           <p>
-            You never type a percentage for something that has parts. AscendDay works it out from the bottom up and changes
-            the status for you.
+            For anything with parts, AscendDay works out progress from the bottom up and changes the status for you. If
+            you’d rather do it yourself, set a goal or project by hand.
           </p>
         }
       >
@@ -98,8 +98,8 @@ export const projectsGoals: FeatureContent = {
               text: 'A project completes itself when all its tasks are done, and a goal is achieved when all its projects are. Untick something and they reopen.',
             },
             {
-              title: 'Manual when it has no parts',
-              text: 'A project with no tasks, or a goal with no projects, has a progress you update by hand. A goal you abandon stays abandoned.',
+              title: 'Or set it by hand',
+              text: 'A project with no tasks, or a goal with no projects, you update by hand. You can also set any goal or project by hand, so its parts never move it. A goal you abandon stays abandoned.',
             },
           ]}
         />
@@ -188,7 +188,7 @@ export const projectsGoals: FeatureContent = {
     },
     {
       q: 'How is a goal’s progress worked out?',
-      a: 'From its projects: the average of their progress, with a completed project counted as 100%. Each project’s progress comes from its tasks and their subtasks.',
+      a: 'From its projects: the average of their progress, with a completed project counted as 100%, unless you set that goal by hand. Each project’s progress comes from its tasks and their subtasks, unless you set that project by hand.',
     },
     {
       q: 'Can I make a task without a project?',

@@ -3,7 +3,7 @@ import type { HowItWorksGuide } from '@/components/ui/HowItWorks';
 
 /**
  * Projects & Goals. Rules from lib/projectProgress.ts (progress bottom-up, automatic status, manual
- * items), components/projects/hierarchy.ts (getLockStatus, goalStatusPatch) and TaskRow.tsx
+ * items, Set progress by hand), components/projects/hierarchy.ts (getLockStatus, goalStatusPatch) and TaskRow.tsx
  * ("Unlocks when … is done", focus button). Earns no points (marketing projectsGoals FAQ).
  */
 export const projectsGoalsGuide: HowItWorksGuide = {
@@ -40,7 +40,8 @@ export const projectsGoalsGuide: HowItWorksGuide = {
   ],
   notes: [
     'A project with no tasks, or a goal with no projects, you update by hand.',
-    'A goal with projects becomes Achieved on its own when all of them are done.',
+    'Turn on Set progress by hand for a goal or project to update it yourself. Its projects or tasks stay linked but never change it.',
+    'A goal with projects becomes Achieved on its own when all of them are done, unless you set it by hand.',
     'Start a focus session from any open task with its timer button.',
     'Tap Reorder to put goals, a goal’s projects, tasks or a task’s subtasks in your own order. Done items stay under Done.',
   ],
