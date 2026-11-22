@@ -1830,6 +1830,8 @@ export function useAppState() {
         }
 
         setState((prev) => {
+          // A read of an account no longer on screen (signed out, switched) changes nothing.
+          if (disposed || prev.currentUser?.id !== userId) return prev;
           if (fetchedInvites && activePartnerships && challenges) {
             partnerReadApplied.current = Math.max(partnerReadApplied.current, readSeq);
           }
