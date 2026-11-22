@@ -152,12 +152,20 @@ export function prepareRemoteRows(
  * The local copy changed since the last sync and the change has not reached the outbox yet.
  * It is kept: the baseline now holds the server hash, so the next save uploads it as a local
  * edit (updatedAt = now). Without a baseline (or a known delete) the server row wins.
+ * A copy equal to the shared baseline before this pull was synced, so it is never an edit, even
+ * when this tab's stored version lags behind it (a cold boot from a cache whose versions were
+ * stored before its last save's diff).
  */
 function isUnsentEdit(collection: SyncedCollection, local: unknown, change: RemoteChange): boolean {
   const base = baseOf(change);
   if (!base || !change.item || collection.serverOwnedId?.(change.id)) return false;
   const localHash = hashRow(collection.toRow(local as never));
-  return localHash !== base && localHash !== hashRow(collection.toRow(change.item as never));
+  return localHash !== base && !isSyncedCopy(localHash, change) && localHash !== hashRow(collection.toRow(change.item as never));
+}
+
+/** The local copy equals the shared baseline as it stood before this pull: it reached the server. */
+function isSyncedCopy(localHash: string, change: RemoteChange): boolean {
+  return change.baseHash !== undefined && localHash === change.baseHash;
 }
 
 /**
@@ -171,7 +179,8 @@ function baseOf(change: RemoteChange): string | undefined {
 /**
  * The server row for an item the device holds, for a collection that merges conflicts (time
  * tracker days). A local copy with its own unsent or pending change is merged with the row (the
- * result is uploaded when it differs from the row); an unchanged local copy takes the row. With no
+ * result is uploaded when it differs from the row); an unchanged local copy (equal to this tab's
+ * version or to the shared baseline) takes the row. With no
  * baseline, only a copy edited on this device since the merge model (it has an edit stamp) is merged.
  */
 function mergedRemoteItem(collection: SyncedCollection, local: unknown, change: RemoteChange): unknown {
@@ -180,7 +189,7 @@ function mergedRemoteItem(collection: SyncedCollection, local: unknown, change: 
   if (localHash === remoteHash) return local;
   const edited = Boolean(collection.editTimestamp?.(local as never));
   const base = baseOf(change);
-  const conflict = change.pending || (base ? localHash !== base : edited);
+  const conflict = change.pending || (base ? localHash !== base && !isSyncedCopy(localHash, change) : edited);
   if (!conflict) return change.item;
   return collection.mergeConflict!(local as never, change.item as never, trustedNow().toISOString(), Boolean(change.pending));
 }
