@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ListOrdered, Trash2 } from 'lucide-react';
+import { Hand, ListOrdered, Trash2 } from 'lucide-react';
 import type { Goal, GoalStatus, Project, ProjectStatus, Task, TaskPriority, TaskSubtask } from '@/types';
 import { Dialog, FieldMessage, FieldRow, Form, Input, Select, Switch, Textarea, useFormController } from '@/components/ui/primitives';
 import { TAP_TARGET } from '@/components/ui/primitives/shared';
@@ -8,6 +8,7 @@ import { useUnsavedChanges } from '@/lib/ui/unsavedChanges';
 import { toUserMessage } from '@/lib/app/userMessage';
 import { nameTaken, sameName } from '@/lib/items/uniqueNames';
 import { dateBounds, sanitizeDate, subtasksToSave } from './hierarchyFormRules';
+import { goalSwitchOffOutcome, projectSwitchOffOutcome } from './hierarchy';
 
 /**
  * Create/edit dialogs for goals, projects and tasks. Each is mounted fresh for every open (the
@@ -29,6 +30,29 @@ const GOAL_CATEGORY_SUGGESTIONS = [
 const pastDateIssue = (value: string, saved: string | undefined, field: string) =>
   isNewPastDate(value, saved) ? { message: 'Pick a later date.', field } : null;
 
+/** The "Set progress by hand" row: same look as "Projects in order", plus a line saying what turning it off will do. */
+function ManualModeRow({ checked, onChange, helper, offLine }: { checked: boolean; onChange: () => void; helper: string; offLine?: string }) {
+  return (
+    <div className="space-y-2 rounded-xl border border-overlay-default p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="space-y-0.5">
+          <p className="flex items-center gap-1.5 text-sm font-medium text-content-secondary">
+            <Hand size={14} className="text-content-muted" aria-hidden="true" />
+            <span>Set progress by hand</span>
+          </p>
+          <p className="text-xs text-content-muted">{helper}</p>
+        </div>
+        <Switch checked={checked} onChange={onChange} label="Set progress by hand" />
+      </div>
+      {offLine && (
+        <p className="text-xs text-content-muted" role="status">
+          {offLine}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function FormFooter({ formId, saveLabel, onCancel }: { formId: string; saveLabel: string; onCancel: () => void }) {
   return (
     <>
@@ -46,13 +70,14 @@ function FormFooter({ formId, saveLabel, onCancel }: { formId: string; saveLabel
 // Goal
 // ----------------------------------------------------------------------------------------------
 
-export type GoalPayload = Pick<Goal, 'title' | 'description' | 'category' | 'targetDate' | 'status' | 'sequentialMode'>;
+export type GoalPayload = Pick<Goal, 'title' | 'description' | 'category' | 'targetDate' | 'status' | 'sequentialMode' | 'manualMode'>;
 
 export function GoalFormDialog({
   open,
   editing,
   goals,
   hasProjects,
+  autoPercent = null,
   onClose,
   onSave,
 }: {
@@ -60,8 +85,10 @@ export function GoalFormDialog({
   editing: Goal | null;
   /** Every goal, so a new or renamed one can't repeat a name. */
   goals: Goal[];
-  /** A goal with projects is achieved when they are all done, not by choice. */
+  /** A goal with projects is achieved when they are all done, not by choice (unless set by hand). */
   hasProjects: boolean;
+  /** The % its projects would give it with "Set progress by hand" off; null with no projects. */
+  autoPercent?: number | null;
   onClose: () => void;
   onSave: (payload: GoalPayload) => void;
 }) {
@@ -71,19 +98,31 @@ export function GoalFormDialog({
   const [targetDate, setTargetDate] = useState(editing?.targetDate ?? '');
   const [status, setStatus] = useState<GoalStatus>(editing?.status ?? 'active');
   const [sequentialMode, setSequentialMode] = useState(editing?.sequentialMode ?? false);
+  const [manualMode, setManualMode] = useState(editing?.manualMode ?? false);
   const issues = useFormController();
-  const form = useUnsavedChanges(open, [title, description, category, targetDate, status, sequentialMode] as const, {
+  const form = useUnsavedChanges(open, [title, description, category, targetDate, status, sequentialMode, manualMode] as const, {
     key: `goal:${editing?.id ?? 'new'}`,
-    restore: ([t, d, c, td, s, seq]) => {
+    restore: ([t, d, c, td, s, seq, man]) => {
       setTitle(t);
       setDescription(d);
       setCategory(c);
       setTargetDate(td);
       setStatus(s);
       setSequentialMode(seq);
+      setManualMode(man);
     },
   });
-  const achievedLocked = hasProjects && editing?.status !== 'achieved';
+  const achievedLocked = hasProjects && !manualMode && editing?.status !== 'achieved';
+  // Turning the switch off on a goal with projects: say what its projects will do to it.
+  const offOutcome = editing?.manualMode && !manualMode ? goalSwitchOffOutcome(autoPercent, status) : null;
+  const offLine =
+    offOutcome === 'complete'
+      ? 'All its projects are done, so it will be marked Achieved.'
+      : offOutcome === 'reopen'
+        ? "Some of its projects aren't done, so it will go back to Active."
+        : offOutcome === 'none' && autoPercent !== null && status !== 'abandoned'
+          ? 'Its progress will come from its projects again.'
+          : undefined;
 
   const handleSubmit = () => {
     if (!title.trim()) return;
@@ -95,6 +134,7 @@ export function GoalFormDialog({
         targetDate: sanitizeDate(targetDate, editing?.targetDate),
         status,
         sequentialMode,
+        manualMode,
       });
       onClose();
     } catch (err) {
@@ -182,6 +222,12 @@ export function GoalFormDialog({
           </div>
           <Switch checked={sequentialMode} onChange={() => setSequentialMode(!sequentialMode)} label="Projects in order" />
         </div>
+        <ManualModeRow
+          checked={manualMode}
+          onChange={() => setManualMode(!manualMode)}
+          helper="Its projects won't move this goal or finish it. You update it yourself."
+          offLine={offLine}
+        />
         <FieldRow>
           <Input
             id="pg-goal-target-date"
@@ -210,7 +256,7 @@ export function GoalFormDialog({
 // Project
 // ----------------------------------------------------------------------------------------------
 
-export type ProjectPayload = Pick<Project, 'title' | 'description' | 'goalId' | 'startDate' | 'dueDate' | 'status'>;
+export type ProjectPayload = Pick<Project, 'title' | 'description' | 'goalId' | 'startDate' | 'dueDate' | 'status' | 'manualMode'>;
 
 export function ProjectFormDialog({
   open,
@@ -219,6 +265,7 @@ export function ProjectFormDialog({
   projects,
   defaultGoalId,
   hasTasks,
+  autoPercent = null,
   onClose,
   onSave,
 }: {
@@ -228,8 +275,10 @@ export function ProjectFormDialog({
   /** Every project, so a new or renamed one can't repeat a name. */
   projects: Project[];
   defaultGoalId?: string;
-  /** A project with tasks completes when they are all done, not by choice. */
+  /** A project with tasks completes when they are all done, not by choice (unless set by hand). */
   hasTasks: boolean;
+  /** The % its tasks would give it with "Set progress by hand" off; null with no tasks. */
+  autoPercent?: number | null;
   onClose: () => void;
   onSave: (payload: ProjectPayload) => void;
 }) {
@@ -239,19 +288,31 @@ export function ProjectFormDialog({
   const [startDate, setStartDate] = useState(editing ? editing.startDate ?? '' : todayKey());
   const [dueDate, setDueDate] = useState(editing?.dueDate ?? '');
   const [status, setStatus] = useState<ProjectStatus>(editing?.status ?? 'not_started');
+  const [manualMode, setManualMode] = useState(editing?.manualMode ?? false);
   const issues = useFormController();
-  const form = useUnsavedChanges(open, [title, description, goalId, startDate, dueDate, status] as const, {
+  const form = useUnsavedChanges(open, [title, description, goalId, startDate, dueDate, status, manualMode] as const, {
     key: `project:${editing?.id ?? 'new'}`,
-    restore: ([t, d, g, sd, dd, s]) => {
+    restore: ([t, d, g, sd, dd, s, man]) => {
       setTitle(t);
       setDescription(d);
       setGoalId(g);
       setStartDate(sd);
       setDueDate(dd);
       setStatus(s);
+      setManualMode(man);
     },
   });
-  const completedLocked = hasTasks && editing?.status !== 'completed';
+  const completedLocked = hasTasks && !manualMode && editing?.status !== 'completed';
+  // Turning the switch off on a project with tasks: say what its tasks will do to it.
+  const offOutcome = editing?.manualMode && !manualMode ? projectSwitchOffOutcome(autoPercent, status) : null;
+  const offLine =
+    offOutcome === 'complete'
+      ? 'All its tasks are done, so it will be marked Completed.'
+      : offOutcome === 'reopen'
+        ? "Some of its tasks aren't done, so it will go back to In progress."
+        : offOutcome === 'none' && autoPercent !== null
+          ? 'Its progress will come from its tasks again.'
+          : undefined;
   const earliestDue = earliestTargetDate(editing?.dueDate);
   const { min, max } = dateBounds();
   // The project's own start date stays pickable once it is older than the lower bound.
@@ -267,6 +328,7 @@ export function ProjectFormDialog({
         startDate: sanitizeDate(startDate, editing?.startDate),
         dueDate: sanitizeDate(dueDate, editing?.dueDate),
         status,
+        manualMode,
       });
       onClose();
     } catch (err) {
@@ -323,6 +385,12 @@ export function ProjectFormDialog({
             </option>
           ))}
         </Select>
+        <ManualModeRow
+          checked={manualMode}
+          onChange={() => setManualMode(!manualMode)}
+          helper="Linked tasks won't move this project or finish it. You update it yourself."
+          offLine={offLine}
+        />
         <FieldRow>
           <Input
             id="pg-project-start-date"

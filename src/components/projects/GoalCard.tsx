@@ -28,12 +28,17 @@ export function GoalCard({
   onDelete: () => void;
 }) {
   const hasProjects = prog.linkedProjectsCount > 0;
+  const byHand = Boolean(goal.manualMode);
   const overdue = goal.status === 'active' && Boolean(goal.targetDate) && goal.targetDate! < today;
 
-  const detail = hasProjects
-    ? `${prog.completedProjectsCount} of ${prog.linkedProjectsCount} ${prog.linkedProjectsCount === 1 ? 'project' : 'projects'} done` +
-      (prog.totalTasksCount > 0 ? ` · ${prog.completedTasksCount}/${prog.totalTasksCount} tasks` : '')
-    : 'No projects yet, so you update it yourself';
+  const projectsDone = `${prog.completedProjectsCount} of ${prog.linkedProjectsCount} ${prog.linkedProjectsCount === 1 ? 'project' : 'projects'} done`;
+  const detail = byHand
+    ? hasProjects
+      ? `You set this by hand · ${projectsDone}`
+      : 'You set this by hand'
+    : hasProjects
+      ? projectsDone + (prog.totalTasksCount > 0 ? ` · ${prog.completedTasksCount}/${prog.totalTasksCount} tasks` : '')
+      : 'No projects yet, so you update it yourself';
 
   return (
     <ItemCard
@@ -60,7 +65,7 @@ export function GoalCard({
         </>
       }
       nudge={
-        !hasProjects && goal.status === 'active' ? (
+        !hasProjects && !byHand && goal.status === 'active' ? (
           <Nudge
             tone="purple"
             text="A goal without a plan is just a wish. Add a project to turn it into steps you can take."
@@ -73,16 +78,16 @@ export function GoalCard({
         percent: prog.percent,
         detail,
         tone: 'purple',
-        onUpdate: hasProjects ? undefined : onUpdateProgress,
+        onUpdate: prog.isManual ? onUpdateProgress : undefined,
         updateDisabled: goal.status === 'abandoned',
       }}
       footer={
         <>
           <StatusSelect label={`Status of "${goal.title}"`} value={goal.status} onChange={(v) => onStatusChange(v as GoalStatus)}>
             <option value="active">Active</option>
-            {/* With projects, a goal is achieved when they are all done. */}
-            <option value="achieved" disabled={hasProjects && goal.status !== 'achieved'}>
-              {hasProjects && goal.status !== 'achieved' ? 'Achieved (when projects are done)' : 'Achieved'}
+            {/* With projects, a goal is achieved when they are all done (unless set by hand). */}
+            <option value="achieved" disabled={!prog.isManual && goal.status !== 'achieved'}>
+              {!prog.isManual && goal.status !== 'achieved' ? 'Achieved (when projects are done)' : 'Achieved'}
             </option>
             <option value="abandoned">Abandoned</option>
           </StatusSelect>

@@ -16,7 +16,17 @@ import { useLocalDayKey } from '@/lib/time/useLocalDayKey';
 import { percentOf } from '@/lib/items/linkedGoalMetrics';
 import type { Goal, GoalStatus, Project, ProjectStatus, Task, TaskPriority, TaskSubtask } from '@/types';
 import { EmptyState } from '@/components/views/ProjectsGoalsEmptyState';
-import { goalStatusPatch, lockStatusOf, projectStatusPatch, sortBySequence, useHierarchy } from '@/components/projects/hierarchy';
+import {
+  goalModePatch,
+  goalStatusPatch,
+  goalSwitchOffOutcome,
+  lockStatusOf,
+  projectModePatch,
+  projectStatusPatch,
+  projectSwitchOffOutcome,
+  sortBySequence,
+  useHierarchy,
+} from '@/components/projects/hierarchy';
 import { GoalCard } from '@/components/projects/GoalCard';
 import { ProjectCard } from '@/components/projects/ProjectCard';
 import { TaskRow } from '@/components/projects/TaskRow';
@@ -407,12 +417,17 @@ export function ProjectsGoalsView({
   // --------------------------------------------------------------------------
   const nextKey = () => ++formKey.current;
 
+  // "Set progress by hand": switching on starts the hand % at the shown %; switching off saves the
+  // status its parts give it in the same write (one write of the row, not two in a row).
   const saveGoal = (payload: GoalPayload) => {
     const editing = goalForm?.editing ?? null;
     const hasProjects = editing ? (h.projectsByGoal.get(editing.id)?.length ?? 0) > 0 : false;
-    const statusFields = goalStatusPatch(editing, payload.status, hasProjects);
+    const modeFields = goalModePatch(editing, Boolean(payload.manualMode), editing ? h.getGoalProgress(editing).percent : 0);
+    const statusFields = goalStatusPatch(editing && { ...editing, ...modeFields }, payload.status, hasProjects && !payload.manualMode);
     if (editing) {
-      store.updateGoal(editing.id, { ...payload, ...statusFields });
+      const outcome = modeFields.manualMode === false ? goalSwitchOffOutcome(h.getGoalAutoPercent(editing), payload.status) : 'none';
+      const outcomeFields: Partial<Goal> = outcome === 'complete' ? { status: 'achieved' } : outcome === 'reopen' ? { status: 'active' } : {};
+      store.updateGoal(editing.id, { ...payload, ...modeFields, ...statusFields, ...outcomeFields });
       showSuccessToast('Goal saved', `"${payload.title}" is updated.`);
     } else {
       store.createGoal({ ...payload, manualProgress: statusFields.manualProgress });
@@ -423,9 +438,12 @@ export function ProjectsGoalsView({
   const saveProject = (payload: ProjectPayload) => {
     const editing = projectForm?.editing ?? null;
     const hasTasks = editing ? (h.tasksByProject.get(editing.id)?.length ?? 0) > 0 : false;
-    const statusFields = projectStatusPatch(editing, payload.status, hasTasks);
+    const modeFields = projectModePatch(editing, Boolean(payload.manualMode), editing ? h.getProjectProgress(editing).percent : 0);
+    const statusFields = projectStatusPatch(editing && { ...editing, ...modeFields }, payload.status, hasTasks && !payload.manualMode);
     if (editing) {
-      store.updateProject(editing.id, { ...payload, ...statusFields });
+      const outcome = modeFields.manualMode === false ? projectSwitchOffOutcome(h.getProjectAutoPercent(editing), payload.status) : 'none';
+      const outcomeFields: Partial<Project> = outcome === 'complete' ? { status: 'completed' } : outcome === 'reopen' ? { status: 'in_progress' } : {};
+      store.updateProject(editing.id, { ...payload, ...modeFields, ...statusFields, ...outcomeFields });
       showSuccessToast('Project saved', `"${payload.title}" is updated.`);
     } else {
       store.createProject({ ...payload, manualProgress: statusFields.manualProgress });
@@ -457,14 +475,14 @@ export function ProjectsGoalsView({
 
   const changeGoalStatus = (goal: Goal, next: GoalStatus) => {
     const hasProjects = (h.projectsByGoal.get(goal.id)?.length ?? 0) > 0;
-    store.updateGoal(goal.id, goalStatusPatch(goal, next, hasProjects));
+    store.updateGoal(goal.id, goalStatusPatch(goal, next, hasProjects && !goal.manualMode));
   };
 
   const changeProjectStatus = (project: Project, next: ProjectStatus) => {
     const lock = h.getLockStatus(project);
     if (lock.isLocked) return; // the menu is disabled while locked
     const hasTasks = (h.tasksByProject.get(project.id)?.length ?? 0) > 0;
-    store.updateProject(project.id, projectStatusPatch(project, next, hasTasks));
+    store.updateProject(project.id, projectStatusPatch(project, next, hasTasks && !project.manualMode));
   };
 
   /** A hand-updated %: reaching 100 marks it done, dropping below takes that back. */
@@ -1100,6 +1118,7 @@ export function ProjectsGoalsView({
           editing={goalForm.editing}
           goals={goals}
           hasProjects={goalForm.editing ? (h.projectsByGoal.get(goalForm.editing.id)?.length ?? 0) > 0 : false}
+          autoPercent={goalForm.editing ? h.getGoalAutoPercent(goalForm.editing) : null}
           onClose={() => setGoalForm(null)}
           onSave={saveGoal}
         />
@@ -1113,6 +1132,7 @@ export function ProjectsGoalsView({
           projects={projects}
           defaultGoalId={projectForm.goalId}
           hasTasks={projectForm.editing ? (h.tasksByProject.get(projectForm.editing.id)?.length ?? 0) > 0 : false}
+          autoPercent={projectForm.editing ? h.getProjectAutoPercent(projectForm.editing) : null}
           onClose={() => setProjectForm(null)}
           onSave={saveProject}
         />

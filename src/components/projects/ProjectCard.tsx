@@ -34,13 +34,19 @@ export function ProjectCard({
   onDelete: () => void;
 }) {
   const done = project.status === 'completed';
-  const hasTasks = prog.total > 0;
+  const hasTasks = prog.linked > 0;
+  // Set by hand (manualMode), or no tasks yet: the user updates it, so Update shows and Completed is allowed.
+  const byHand = Boolean(project.manualMode);
   const overdue = !done && Boolean(project.dueDate) && project.dueDate! < today;
   const dueToday = !done && project.dueDate === today;
 
-  const detail = hasTasks
-    ? `${prog.completed} of ${prog.total} ${prog.total === 1 ? 'task' : 'tasks'} done`
-    : 'No tasks yet, so you update it yourself';
+  const detail = byHand
+    ? hasTasks
+      ? `You set this by hand · ${prog.linked} ${prog.linked === 1 ? 'task' : 'tasks'} linked`
+      : 'You set this by hand'
+    : hasTasks
+      ? `${prog.completed} of ${prog.total} ${prog.total === 1 ? 'task' : 'tasks'} done`
+      : 'No tasks yet, so you update it yourself';
 
   return (
     <ItemCard
@@ -76,7 +82,7 @@ export function ProjectCard({
         </>
       }
       nudge={
-        !hasTasks && !done && !lock.isLocked ? (
+        !hasTasks && !byHand && !done && !lock.isLocked ? (
           <Nudge
             tone="cyan"
             text="This project has no tasks yet. Add one small step to get started."
@@ -89,7 +95,7 @@ export function ProjectCard({
         percent: prog.percent,
         detail,
         tone: 'cyan',
-        onUpdate: hasTasks ? undefined : onUpdateProgress,
+        onUpdate: prog.isManual ? onUpdateProgress : undefined,
         updateDisabled: lock.isLocked,
       }}
       footer={
@@ -103,13 +109,13 @@ export function ProjectCard({
             <option value="not_started">Not started</option>
             <option value="in_progress">In progress</option>
             <option value="on_hold">On hold</option>
-            {/* With tasks, a project completes when they are all done. */}
-            <option value="completed" disabled={hasTasks && !done}>
-              {hasTasks && !done ? 'Completed (when tasks are done)' : 'Completed'}
+            {/* With tasks, a project completes when they are all done (unless set by hand). */}
+            <option value="completed" disabled={!prog.isManual && !done}>
+              {!prog.isManual && !done ? 'Completed (when tasks are done)' : 'Completed'}
             </option>
           </StatusSelect>
           <button type="button" onClick={onOpenTasks} className="btn-secondary ml-auto px-3 py-1.5 text-xs text-cyan-hierarchy">
-            <span>{hasTasks ? `${prog.total} ${prog.total === 1 ? 'task' : 'tasks'}` : 'Tasks'}</span>
+            <span>{hasTasks ? `${prog.linked} ${prog.linked === 1 ? 'task' : 'tasks'}` : 'Tasks'}</span>
             <ArrowRight size={13} aria-hidden="true" />
           </button>
         </>
