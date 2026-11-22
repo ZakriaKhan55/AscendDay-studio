@@ -21,6 +21,7 @@ export function useProjectActions(setState: StoreSetState, get: () => AppState, 
       status?: GoalStatus;
       manualProgress?: number;
       sequentialMode?: boolean;
+      manualMode?: boolean;
     }) => {
       const newGoal: Goal = {
         id: uid(),
@@ -31,6 +32,7 @@ export function useProjectActions(setState: StoreSetState, get: () => AppState, 
         status: data.status || 'active',
         manualProgress: data.manualProgress !== undefined ? data.manualProgress : 0,
         sequentialMode: Boolean(data.sequentialMode),
+        ...(data.manualMode ? { manualMode: true } : {}),
         createdAt: trustedNow().toISOString(),
       };
       setState(
@@ -113,6 +115,7 @@ export function useProjectActions(setState: StoreSetState, get: () => AppState, 
       status?: ProjectStatus;
       manualProgress?: number;
       order?: number;
+      manualMode?: boolean;
     }) => {
       const isCompleted = data.status === 'completed';
       // A goal's new project joins the end of its sequence; a new standalone project the top.
@@ -131,6 +134,7 @@ export function useProjectActions(setState: StoreSetState, get: () => AppState, 
         completedAt: isCompleted ? trustedNow().toISOString() : undefined,
         manualProgress: data.manualProgress !== undefined ? data.manualProgress : 0,
         order: projectOrder,
+        ...(data.manualMode ? { manualMode: true } : {}),
         createdAt: trustedNow().toISOString(),
       };
       setState(

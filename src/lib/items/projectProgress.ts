@@ -4,15 +4,20 @@ import { percentOf } from './linkedGoalMetrics';
 /**
  * Bottom-up progress and automatic status for Projects & Goals, computed from the three lists:
  * subtasks → task, tasks → project, projects → goal. A project with no tasks and a goal with
- * no projects are updated by hand (manualProgress). The Projects page reads the progress through
+ * no projects are updated by hand (manualProgress), and so is any project or goal with "Set progress
+ * by hand" on (manualMode): its linked tasks or projects stay linked but never move its % or status
+ * (isManual, so autoStatusChanges skips it). The Projects page reads the progress through
  * useHierarchy; the store applies the automatic status on every change (autoStatusChanges).
  * A project or goal with parts shows 100% only when every part is done (percentOf): rounding
  * never makes it done early, so an open task or project always keeps it below 100.
  */
 
 export interface ProjectProgress {
+  /** Tasks counted in the %: the linked tasks, or 0 for a manual project (they move nothing). */
   total: number;
   completed: number;
+  /** Linked tasks, counted or not (a manual project's tasks stay linked). */
+  linked: number;
   percent: number;
   isManual: boolean;
 }
@@ -30,8 +35,8 @@ export const clampPercent = (n: number | undefined) => Math.min(100, Math.max(0,
 
 /** A project's progress from its own tasks; a task with subtasks counts the done share of them. */
 export function projectProgressOf(project: Project, linkedTasks: Task[]): ProjectProgress {
-  if (linkedTasks.length === 0) {
-    return { total: 0, completed: 0, percent: clampPercent(project.manualProgress), isManual: true };
+  if (linkedTasks.length === 0 || project.manualMode) {
+    return { total: 0, completed: 0, linked: linkedTasks.length, percent: clampPercent(project.manualProgress), isManual: true };
   }
   let sum = 0;
   let completed = 0;
@@ -40,11 +45,25 @@ export function projectProgressOf(project: Project, linkedTasks: Task[]): Projec
     const subtasks = t.subtasks || [];
     sum += subtasks.length > 0 ? subtasks.filter((st) => st.completed).length / subtasks.length : t.completed ? 1 : 0;
   }
-  return { total: linkedTasks.length, completed, percent: percentOf(sum, linkedTasks.length), isManual: false };
+  return { total: linkedTasks.length, completed, linked: linkedTasks.length, percent: percentOf(sum, linkedTasks.length), isManual: false };
 }
 
-/** A goal's progress from its own projects; a done project counts as 100%. */
+/**
+ * A goal's progress from its own projects; a done project counts as 100%. A manual goal keeps its
+ * hand % but still counts its projects (for the card), with no task tally.
+ */
 export function goalProgressOf(goal: Goal, linkedProjects: Project[], progressOf: (project: Project) => ProjectProgress): GoalProgress {
+  if (goal.manualMode && linkedProjects.length > 0) {
+    const completedProjectsCount = linkedProjects.filter((p) => p.status === 'completed' || progressOf(p).percent === 100).length;
+    return {
+      linkedProjectsCount: linkedProjects.length,
+      completedProjectsCount,
+      totalTasksCount: 0,
+      completedTasksCount: 0,
+      percent: clampPercent(goal.manualProgress),
+      isManual: true,
+    };
+  }
   if (linkedProjects.length === 0) {
     return {
       linkedProjectsCount: 0,
@@ -95,7 +114,8 @@ export const projectsByGoalId = (projects: Project[]) => groupBy(projects, (p) =
 /**
  * The statuses that must change. A project with tasks completes when they are all done; a goal
  * with projects is achieved when they are all done; both reopen when that stops being true.
- * Abandoned goals are a choice and never change on their own; manual items keep their status.
+ * Abandoned goals are a choice and never change on their own; manual items (no parts, or Set
+ * progress by hand) keep their status.
  * Goals are judged on the projects' new statuses, so applying the result once is final.
  */
 export function autoStatusChanges(
