@@ -56,6 +56,9 @@ const g = (over: Partial<Goal> = {}): Goal => ({ id: 'g', title: 'G', status: 'a
   assert(one.includes('You set this by hand · 1 of 1 project done'), 'one project: singular');
   const none = text(goalHtml(g({ manualMode: true }), { linkedProjectsCount: 0, completedProjectsCount: 0, totalTasksCount: 0, completedTasksCount: 0, percent: 0, isManual: true }));
   assert(none.includes('You set this by hand') && !none.includes('A goal without a plan'), 'manual goal, no projects: no nudge');
+  assert(none.includes('Add project'), 'active manual goal, no projects: footer offers Add project');
+  const autoNone = text(goalHtml(g(), { linkedProjectsCount: 0, completedProjectsCount: 0, totalTasksCount: 0, completedTasksCount: 0, percent: 0, isManual: true }));
+  assert(autoNone.includes('A goal without a plan') && autoNone.split('Add project').length === 2, 'active auto goal, no projects: only the nudge offers Add project');
   const auto = text(goalHtml(g(), { linkedProjectsCount: 2, completedProjectsCount: 1, totalTasksCount: 4, completedTasksCount: 1, percent: 50, isManual: false }));
   assert(auto.includes('1 of 2 projects done · 1/4 tasks') && !achievedEnabled(auto), 'auto goal unchanged');
 }

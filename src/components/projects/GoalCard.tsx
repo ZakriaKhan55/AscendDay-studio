@@ -30,6 +30,9 @@ export function GoalCard({
   const hasProjects = prog.linkedProjectsCount > 0;
   const byHand = Boolean(goal.manualMode);
   const overdue = goal.status === 'active' && Boolean(goal.targetDate) && goal.targetDate! < today;
+  // An active goal without projects offers "+ Add project" in the nudge; when the nudge is hidden
+  // (set by hand, or not active) the footer shows the button instead.
+  const showNudge = !hasProjects && !byHand && goal.status === 'active';
 
   const projectsDone = `${prog.completedProjectsCount} of ${prog.linkedProjectsCount} ${prog.linkedProjectsCount === 1 ? 'project' : 'projects'} done`;
   const detail = byHand
@@ -65,7 +68,7 @@ export function GoalCard({
         </>
       }
       nudge={
-        !hasProjects && !byHand && goal.status === 'active' ? (
+        showNudge ? (
           <Nudge
             tone="purple"
             text="A goal without a plan is just a wish. Add a project to turn it into steps you can take."
@@ -104,7 +107,7 @@ export function GoalCard({
                 <ArrowRight size={13} aria-hidden="true" />
               </button>
             ) : (
-              goal.status !== 'active' && (
+              !showNudge && (
                 <button type="button" onClick={onAddProject} className="btn-secondary px-3 py-1.5 text-xs">
                   <Plus size={13} aria-hidden="true" />
                   <span>Add project</span>
