@@ -5,7 +5,7 @@
 // and nothing may be uploaded; a real unsent edit must still be kept and upload with its edit time.
 // Covers a jsonb document table (habits: rename + tick), relational tables (tasks, goals, also a
 // goal set by hand, since rowHash leaves manual_mode false out) and time tracker days (merge branch).
-// Also covers storeTabSyncedHashesOver (F2): it stores only over this tab's own stored versions.
+// Also covers storeTabSyncedHashesOver (F2): it stores only over this tab's own stored versions (same content and written by this tab).
 // Incident: knowledge/mode-a-stale-copy-rollback-2026-11-22.md.
 import { DEFAULT_STATE, type AppState } from '@/types';
 
@@ -265,6 +265,21 @@ console.log('  ok  S1/S2 stale boot versions (habits rename + tick, tasks, goals
   store.delete(`ascend_sync_tab_synced_${UID}`);
   storeTabSyncedHashesOver(UID, heldNow);
   assert(!store.has(`ascend_sync_tab_synced_${UID}`), 'F2: nothing stored when nothing was stored by this tab');
+
+  // Tab B stored versions V (with its cache) that equal this tab's (A's) versions; A's save then
+  // moves A's to V': B's V stays (A did not write the cache those versions belong to).
+  const V = { habits: { h1: 'same' } };
+  setTabSyncedHashes(UID, V);
+  storeTabSyncedHashes(UID);
+  store.set(`ascend_sync_tab_synced_${UID}`, JSON.stringify(V));
+  store.set(`ascend_sync_tab_synced_writer_${UID}`, 'tab-B');
+  setTabSyncedHashes(UID, { habits: { h1: 'moved' } });
+  storeTabSyncedHashesOver(UID, V);
+  assert(store.get(`ascend_sync_tab_synced_${UID}`) === JSON.stringify(V), "F2: another tab's equal stored versions are not overwritten");
+
+  // Sign-out clears the writer with the versions.
+  clearTabSyncedHashes(UID);
+  assert(!store.has(`ascend_sync_tab_synced_writer_${UID}`) && !store.has(`ascend_sync_tab_synced_${UID}`), 'F2: clear removes the writer too');
 }
 console.log('  ok  F2 storeTabSyncedHashesOver');
 console.log('staleBootVersions: OK');

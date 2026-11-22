@@ -8,6 +8,18 @@ export type Baseline = Record<string, Record<string, string>>;
 
 /** This tab's row versions as they stood when its state was last written to the device cache. */
 const tabSyncedKey = (userId: string) => `ascend_sync_tab_synced_${userId}`;
+/** Which tab wrote the stored versions (a separate key: the versions' stored format is unchanged). */
+const tabSyncedWriterKey = (userId: string) => `ascend_sync_tab_synced_writer_${userId}`;
+
+/** This tab's id, new on each page load (random, not time-based). */
+const TAB_ID: string = (() => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  } catch {
+    /* fall through */
+  }
+  return `tab-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+})();
 
 function readStoredRaw(userId: string): string | null {
   try {
@@ -50,6 +62,7 @@ export function setTabSyncedHashes(userId: string, hashes: Baseline): void {
 export function storeTabSyncedHashes(userId: string): void {
   try {
     localStorage.setItem(tabSyncedKey(userId), JSON.stringify(tabSyncedHashes(userId)));
+    localStorage.setItem(tabSyncedWriterKey(userId), TAB_ID);
   } catch {
     /* ignore quota errors: without it a cold boot falls back to the baseline alone */
   }
@@ -58,15 +71,22 @@ export function storeTabSyncedHashes(userId: string): void {
 /**
  * Stores this tab's versions after its save's diff moved them, so a tab closed right after the save
  * cold-boots with the versions its cached state holds. Only while the stored versions are still the
- * ones this tab held (`held`, stored with its own cache write): another tab of the browser may have
- * written the shared cache and versions since, and this tab's versions do not fit that state.
+ * ones this tab held (`held`) and this tab wrote them (with its own cache write): another tab of the
+ * browser may have written the shared cache and versions since, and this tab's versions do not fit
+ * that state, even when both tabs' versions were the same.
  */
 export function storeTabSyncedHashesOver(userId: string, held: Baseline): void {
+  try {
+    if (localStorage.getItem(tabSyncedWriterKey(userId)) !== TAB_ID) return;
+  } catch {
+    return;
+  }
   if (readStoredRaw(userId) !== JSON.stringify(held)) return;
   storeTabSyncedHashes(userId);
 }
 
 export function clearTabSyncedHashes(userId: string): void {
   localStorage.removeItem(tabSyncedKey(userId));
+  localStorage.removeItem(tabSyncedWriterKey(userId));
   if (tabSynced?.userId === userId) tabSynced = null;
 }
