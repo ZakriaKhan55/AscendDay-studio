@@ -801,7 +801,9 @@ export interface Project {
   dueDate?: string; // YYYY-MM-DD
   status: ProjectStatus;
   completedAt?: string; // ISO string timestamp when status became 'completed'
-  manualProgress?: number; // 0-100 when project has 0 tasks
+  manualProgress?: number; // 0-100 hand-set %: used when the project has 0 tasks or manualMode is on
+  /** "Set progress by hand": linked tasks never move this project's % or status (missing = false). */
+  manualMode?: boolean;
   order?: number; // Sequence index when linked to a sequential Goal
   createdAt: string;
 }
@@ -813,8 +815,10 @@ export interface Goal {
   category?: string;
   targetDate?: string; // YYYY-MM-DD
   status: GoalStatus;
-  manualProgress?: number; // 0-100 when goal has 0 linked projects
+  manualProgress?: number; // 0-100 hand-set %: used when the goal has 0 linked projects or manualMode is on
   sequentialMode?: boolean; // When true, linked projects must be completed in order
+  /** "Set progress by hand": linked projects never move this goal's % or status (missing = false). */
+  manualMode?: boolean;
   createdAt: string;
 }
 

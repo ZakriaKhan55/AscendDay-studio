@@ -299,6 +299,7 @@ const goals: SyncedCollection<'goals'> = {
     status: g.status,
     manual_progress: g.manualProgress ?? null,
     sequential_mode: g.sequentialMode ?? null,
+    manual_mode: g.manualMode === true,
     created_at: g.createdAt,
   }),
   fromRow: (r) => ({
@@ -310,6 +311,7 @@ const goals: SyncedCollection<'goals'> = {
     status: String(r.status) as Goal['status'],
     ...optional('manualProgress', r.manual_progress, Number),
     ...optional('sequentialMode', r.sequential_mode, Boolean),
+    ...(r.manual_mode === true ? { manualMode: true } : {}),
     createdAt: isoTime(r.created_at),
   }),
   ownTimestamp: (g) => g.createdAt,
@@ -330,6 +332,7 @@ const projects: SyncedCollection<'projects'> = {
     completed_at: p.completedAt || null,
     manual_progress: p.manualProgress ?? null,
     sort_order: p.order ?? null,
+    manual_mode: p.manualMode === true,
     created_at: p.createdAt,
   }),
   fromRow: (r) => ({
@@ -343,6 +346,7 @@ const projects: SyncedCollection<'projects'> = {
     ...optional('completedAt', r.completed_at, isoTime),
     ...optional('manualProgress', r.manual_progress, Number),
     ...optional('order', r.sort_order, Number),
+    ...(r.manual_mode === true ? { manualMode: true } : {}),
     createdAt: isoTime(r.created_at),
   }),
   ownTimestamp: (p) => p.createdAt,
