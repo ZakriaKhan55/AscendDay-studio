@@ -50,6 +50,8 @@ const SITE_COPY_UPDATED = '2026-11-07'; // 2026-11-07: footer Contact link, Abou
 /** A feature page whose own text changed after SITE_COPY_UPDATED. */
 const FEATURE_UPDATED: Partial<Record<FeatureSlug, string>> = {
   leagues: '2026-11-18', // equal points: active days, penalty points, reached first; names never decide
+  recovery: '2026-11-17', // daily check-in, crisis lines, Slipped/reset wording, re-shot screens
+  habits: '2026-11-17', // Reading habit: pages or chapters
 };
 
 const featureRoutes: MarketingRoute[] = FEATURE_SLUGS.map((slug) => {
