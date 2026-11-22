@@ -230,7 +230,7 @@ export const recovery: FeatureContent = {
   ],
   faq: [
     {
-      q: 'Why use AscendDay for a sobriety streak instead of a separate sobriety app?',
+      q: 'Why use AscendDay for a sober streak instead of a separate sobriety app?',
       a: `Because the clean streak sits next to what you are building in its place: habits, workouts, reading and a journal, in one app. Each daily check-in earns ${pts(perDay)} toward your rank and the leagues, while the tracker and your cravings stay private and others only ever see a points total. It is a self-help tool; if you need treatment or a recovery programme, that comes first.`,
     },
     {
