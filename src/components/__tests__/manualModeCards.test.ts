@@ -61,3 +61,5 @@ const g = (over: Partial<Goal> = {}): Goal => ({ id: 'g', title: 'G', status: 'a
 }
 
 console.log('manualModeCards: all assertions passed');
+// The card modules start app timers on import (like the other component tests): end the process.
+(globalThis as unknown as { process: { exit: (code: number) => never } }).process.exit(0);
