@@ -8,6 +8,8 @@
 //   3 a partnership ended on the server: gone, and the `partnership` scalar is the live one
 //   4 the challenge/partnership fetch failed (hydrated holds the cache): cached pacts still shown
 //   5 a pact with a write of ours on its way keeps the copy on screen
+//   6 a pact created after the read started (a write of ours, not in the read) stays shown while
+//     its partnership is in the read; without a write of ours it does not come back (as 2)
 // Mutation proof: without withHydratedPartnerData (cache as before) 1, 2, 3, 3b and the second check of
 // 5 fail; 4 passes on both.
 import { DEFAULT_STATE, type AppState, type Partnership, type SharedChallenge } from '@/types';
@@ -105,6 +107,21 @@ const ghost = pact({ id: 'c2', title: 'Deleted on server', user1Target: 'Swim' }
   const c3 = out.sharedChallenges.find((c) => c.id === 'c3');
   assert(JSON.stringify(c1?.user1DoneDates) === JSON.stringify([today]), `5: in-flight tick kept (got ${JSON.stringify(c1?.user1DoneDates)})`);
   assert(JSON.stringify(c3?.user2DoneDates) === JSON.stringify([today]), '5: a pact with no write in flight takes the server copy');
+}
+
+// 6. Background load whose read predates a pact I just created: the new pact (write of ours) stays.
+{
+  const created6 = pact({ id: 'c4', title: 'New pact' });
+  const hydrated = state([serverPact], [live], live);
+  const cache = state([created6, cachedPact], [live], live);
+  const kept = dirtyLoad(cache, hydrated, new Set(['c4']));
+  assert(kept.sharedChallenges.some((c) => c.id === 'c4'), '6: pact created after the read is kept');
+  assert(kept.sharedChallenges.find((c) => c.id === 'c1')?.user1Target === 'Walk', '6: other pacts still from the read');
+  const ghostOnly = dirtyLoad(cache, hydrated);
+  assert(!ghostOnly.sharedChallenges.some((c) => c.id === 'c4'), '6: without a write of ours a cache-only pact never comes back');
+  const endedPact = pact({ id: 'c5', partnershipId: 'p0' });
+  const noPartnership = dirtyLoad(state([endedPact], [live], live), hydrated, new Set(['c5']));
+  assert(!noPartnership.sharedChallenges.some((c) => c.id === 'c5'), '6: a kept pact of a partnership not in the read stays out');
 }
 
 console.log('bootPactCache: OK');

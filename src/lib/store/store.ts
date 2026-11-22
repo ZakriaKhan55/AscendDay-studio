@@ -1799,6 +1799,17 @@ export function useAppState() {
           if (write.inFlight > 0) write.skipped = true;
           else refreshAfterHoldBack = true;
         }
+        // A pact we wrote to (created) while these reads ran but that they lack stays on screen too.
+        const notReadChallengeIds = new Set<string>();
+        if (challenges) {
+          const readIds = new Set(challenges.map((c) => c?.id));
+          for (const [id, write] of pledgeWrites.current) {
+            if (readIds.has(id) || (write.inFlight === 0 && write.lastSeq <= seqAtStart)) continue;
+            notReadChallengeIds.add(id);
+            if (write.inFlight > 0) write.skipped = true;
+            else refreshAfterHoldBack = true;
+          }
+        }
 
         setState((prev) => {
           const currentTombstones = new Set(prev.deletedEntityIds || []);
@@ -1863,7 +1874,14 @@ export function useAppState() {
               const merged = existing ? mergeSharedChallenge(existing, c) : c;
               challengeMap.set(c.id, reconcileSharedChallengeLifecycle(merged));
             }
-            finalSharedChallenges = Array.from(challengeMap.values());
+            const notRead = (prev.sharedChallenges || []).filter(
+              (c) =>
+                notReadChallengeIds.has(c.id) &&
+                finalActivePartnershipIds.has(c.partnershipId) &&
+                !currentTombstones.has(c.id) &&
+                !currentTombstones.has(c.partnershipId)
+            );
+            finalSharedChallenges = [...notRead, ...Array.from(challengeMap.values())];
           }
 
           const next = {

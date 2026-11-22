@@ -8,6 +8,7 @@ import type {
   Goal,
   JournalEntry,
   Project,
+  SharedChallenge,
   Task,
   TimeTrackerActivity,
   TimeTrackerBlock,
@@ -728,13 +729,21 @@ export function cacheWithHydratedCollections(cache: AppState, hydrated: AppState
  * since deleted or ended. Merged as incoming they won over the rows until the partner refresh.
  * Hydration falls back to the cache when these fetches fail, so an offline load still shows them.
  * `keepPactIds`: pacts with a write of ours on its way keep `base`'s copy (the read may predate it).
+ * One the read lacks (created after the read started) is kept too, first, while its partnership is
+ * in the read; a pact only the cache holds (no write of ours) never comes back.
  */
 export function withHydratedPartnerData(base: AppState, hydrated: AppState, keepPactIds: ReadonlySet<string> = new Set()): AppState {
   const held = new Map((base.sharedChallenges || []).map((c) => [c.id, c]));
+  const read = hydrated.sharedChallenges || [];
+  const readIds = new Set(read.map((c) => c.id));
+  const partnershipIds = new Set((hydrated.partnerships || []).map((p) => p.id));
+  const notRead = [...keepPactIds]
+    .map((id) => (readIds.has(id) ? undefined : held.get(id)))
+    .filter((c): c is SharedChallenge => Boolean(c && partnershipIds.has(c.partnershipId)));
   return {
     ...base,
     partnerships: hydrated.partnerships,
     partnership: hydrated.partnership,
-    sharedChallenges: (hydrated.sharedChallenges || []).map((c) => (keepPactIds.has(c.id) && held.get(c.id)) || c),
+    sharedChallenges: [...notRead, ...read.map((c) => (keepPactIds.has(c.id) && held.get(c.id)) || c)],
   };
 }

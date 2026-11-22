@@ -11,12 +11,15 @@
 //      on screen is kept; the rest of the partner data comes from the server.
 //   B4 background load whose read ran before my pact tick, with the tick saved (settled) before the
 //      load applies: the tick on screen is kept and the partner data is fetched again once.
+//   B6 live partner refresh whose pact read ran before I created a pact (the answer predates it):
+//      the new pact never leaves the screen (it is kept and the partner data fetched again).
 // Mutation proof: without withHydratedPartnerData in store.ts, B1 fails (old goal, ghost pact, p0);
 // with it but no in-flight hold-back (empty writingPactIds), B3 fails (the tick vanishes); holding
 // back only writes still in flight (no lastSeq > hydrationSeq check), B4 fails (tick reverts); without
-// the afterCommit partner refresh, B4 fails (no refetch).
+// the afterCommit partner refresh, B4 fails (no refetch). Without the not-read pact rule in
+// fetchPartnerDataLive, B6 fails (the new pact vanishes until the next refresh).
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { bootHook, story, until, eq, assert, pass, server, fake, UID } from './harness/bootHook';
+import { bootHook, story, until, eq, assert, pass, server, fake, UID, quiet } from './harness/bootHook';
 
 const blobAt = 'Sun 2026-11-01 5:00 AM PKT (UTC+05:00)';
 const PARTNER = '22222222-2222-4222-8222-222222222222';
@@ -29,11 +32,22 @@ const GHOST = '66666666-6666-4666-8666-666666666666';
 const tbl = (t: string) => server.g(t) as any[];
 let partnershipsDown = false;
 let partnershipReads = 0;
+// While set, a shared_challenges read is answered as the server held it when the read arrived, but
+// only once the gate opens (a read that ran before a change and lands after it).
+let pactReadGate: Promise<void> | null = null;
+let pactReadHits = 0;
 const base = globalThis.fetch;
 const answer = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 (globalThis as any).fetch = async (input: any, init?: any) => {
   const req = input instanceof Request ? input : new Request(input, init);
   const url = new URL(req.url);
+  if (req.method === 'GET' && url.pathname === '/rest/v1/shared_challenges' && pactReadGate) {
+    const gate = pactReadGate;
+    pactReadHits++;
+    const res = await base(req);
+    await gate;
+    return res;
+  }
   if (req.method === 'GET' && url.searchParams.has('or')) {
     if (url.pathname === '/rest/v1/partnerships') {
       partnershipReads++;
@@ -83,7 +97,9 @@ await story('bootPactCache.hook (dirty boot shows server pacts first)', async ()
   // The first render that carries server data (isServerDataApplied turns true), before any refresh.
   let first: any = null;
   let wasApplied = false;
+  let watch: ((store: any) => void) | null = null;
   const record = (store: any) => {
+    watch?.(store);
     const applied = Boolean(store.isServerDataApplied && store.state.currentUser?.id === UID);
     if (applied && !wasApplied && !first) {
       first = {
@@ -200,4 +216,39 @@ await story('bootPactCache.hook (dirty boot shows server pacts first)', async ()
   afterRead.release();
   await refreshing;
   pass('B4 background load with a pact write settled after its read keeps the tick and refreshes once');
+
+  // B6: a live partner refresh reads the pacts, I create a pact, then that read's answer lands.
+  await until(() => h.s().isServerDataApplied && (fake.inFlight.get('shared_challenges') ?? 0) === 0, 'B6: loaded, no pact read running');
+  let seen6 = false;
+  let vanished6 = false;
+  watch = (store: any) => {
+    const has = (store.state.sharedChallenges || []).some((c: any) => c.title === 'Mid-read pact');
+    if (has) seen6 = true;
+    else if (seen6 && store.state.currentUser?.id === UID) vanished6 = true;
+  };
+  let openGate!: () => void;
+  pactReadGate = new Promise<void>((resolve) => (openGate = resolve));
+  pactReadHits = 0;
+  const refresh6 = h.s().refreshPartners();
+  await until(() => pactReadHits > 0, 'B6: partner refresh read the pacts (answer held)');
+  await h.s().createSharedChallenge('Mid-read pact', 7, 'habit', 'Walk', 'habit', 'Run', PS1);
+  await until(() => tbl('shared_challenges').some((r) => r.title === 'Mid-read pact'), 'B6: pact created on the server');
+  await until(() => (fake.inFlight.get('rpc/save_shared_challenge_atomic') ?? 0) === 0, 'B6: create settled');
+  await until(() => seen6, 'B6: new pact on screen');
+  const reads6 = partnershipReads;
+  // The held answer lands; any partner read after it is held in turn, so the screen it leaves shows.
+  let openGate2!: () => void;
+  pactReadGate = new Promise<void>((resolve) => (openGate2 = resolve));
+  openGate();
+  await quiet(500);
+  assert(!vanished6 && h.s().state.sharedChallenges.some((c: any) => c.title === 'Mid-read pact'), 'B6: the new pact stays after the older answer lands');
+  pactReadGate = null;
+  openGate2();
+  await refresh6;
+  await until(() => partnershipReads > reads6, 'B6: partner data fetched again after the held-back pact', 5000);
+  await until(() => (fake.inFlight.get('shared_challenges') ?? 0) === 0, 'B6: reads settled', 5000);
+  await quiet(500);
+  watch = null;
+  assert(!vanished6 && h.s().state.sharedChallenges.some((c: any) => c.title === 'Mid-read pact'), 'B6: the new pact is shown');
+  pass('B6 live refresh whose read predates a new pact keeps it on screen');
 }, 60_000);
