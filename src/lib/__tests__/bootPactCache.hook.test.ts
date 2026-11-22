@@ -11,13 +11,17 @@
 //      on screen is kept; the rest of the partner data comes from the server.
 //   B4 background load whose read ran before my pact tick, with the tick saved (settled) before the
 //      load applies: the tick on screen is kept and the partner data is fetched again once.
+//   B5 background load whose read ran before my partner's tick, with the live partner sync applying
+//      that tick while the load waits to apply: the tick (newer read) stays on screen.
 //   B6 live partner refresh whose pact read ran before I created a pact (the answer predates it):
 //      the new pact never leaves the screen (it is kept and the partner data fetched again).
 // Mutation proof: without withHydratedPartnerData in store.ts, B1 fails (old goal, ghost pact, p0);
 // with it but no in-flight hold-back (empty writingPactIds), B3 fails (the tick vanishes); holding
 // back only writes still in flight (no lastSeq > hydrationSeq check), B4 fails (tick reverts); without
-// the afterCommit partner refresh, B4 fails (no refetch). Without the not-read pact rule in
-// fetchPartnerDataLive, B6 fails (the new pact vanishes until the next refresh).
+// the afterCommit partner refresh, B4 fails (no refetch). Without the partner-read counter in
+// loadAccount, B5 fails (the load's older read puts the pact back without the partner's tick).
+// Without the not-read pact rule in fetchPartnerDataLive, B6 fails (the new pact vanishes until the
+// next refresh).
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { bootHook, story, until, eq, assert, pass, server, fake, UID, quiet } from './harness/bootHook';
 
@@ -216,6 +220,41 @@ await story('bootPactCache.hook (dirty boot shows server pacts first)', async ()
   afterRead.release();
   await refreshing;
   pass('B4 background load with a pact write settled after its read keeps the tick and refreshes once');
+
+  // B5: as B4 (opened from the copy, then pull-to-refresh), but the change comes from my partner: it
+  // lands after the load's read, the live partner sync shows it, then the load applies.
+  await until(() => (fake.inFlight.get('user_data') ?? 0) === 0, 'B5: saves settled');
+  await h.supabase.auth.signOut();
+  await until(() => h.s().state.currentUser === null, 'B5: signed out');
+  const row5 = () => tbl('shared_challenges').find((r) => r.id === PACT);
+  Object.assign(row5(), { user2_done_dates: [start], user2_done_date: null });
+  h.storage.setItem(cacheKey, JSON.stringify(cache));
+  h.storage.setItem(dirtyKey, 'seed-5');
+  const own5 = profiles.splice(profiles.findIndex((p) => p.id === UID), 1);
+  fake.fail('profiles', 500, ['POST']);
+  await h.signIn();
+  await until(() => h.s().state.currentUser?.id === UID && !h.s().isSessionLoading, 'B5: opened from the device copy');
+  assert(!h.s().isServerDataApplied, 'B5: copy, not server data');
+  profiles.push(...own5);
+  fake.unfail('profiles');
+  const afterRead5 = fake.hold((r) => r.table === 'rpc/ascend_season_config');
+  first = null;
+  wasApplied = false;
+  const refreshing5 = h.s().refreshNow();
+  await until(() => afterRead5.hits > 0, 'B5: load read done, waiting to apply');
+  assert(!h.s().isServerDataApplied, 'B5: the load has not applied yet');
+  Object.assign(row5(), { user2_done_dates: [start, today] });
+  const partner5 = () => h.s().state.sharedChallenges.find((c) => c.id === PACT)?.user2DoneDates || [];
+  void h.s().refreshPartners();
+  await until(() => partner5().includes(today), 'B5: partner tick on screen from the live partner read');
+  afterRead5.release();
+  await until(() => first, 'B5: first render with server data', 10_000);
+  const kept5 = first.pacts.find((p: any) => p.id === PACT);
+  assert(kept5?.partner.includes(today), `B5: the newer partner tick survives the load (got ${JSON.stringify(kept5?.partner)})`);
+  await refreshing5;
+  await quiet(500);
+  assert(partner5().includes(today), 'B5: still on screen after the load');
+  pass('B5 background load keeps a partner change a newer live read applied while it waited');
 
   // B6: a live partner refresh reads the pacts, I create a pact, then that read's answer lands.
   await until(() => h.s().isServerDataApplied && (fake.inFlight.get('shared_challenges') ?? 0) === 0, 'B6: loaded, no pact read running');

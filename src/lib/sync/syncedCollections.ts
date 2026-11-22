@@ -747,3 +747,17 @@ export function withHydratedPartnerData(base: AppState, hydrated: AppState, keep
     sharedChallenges: [...notRead, ...read.map((c) => (keepPactIds.has(c.id) && held.get(c.id)) || c)],
   };
 }
+
+/**
+ * An account load whose partner read is older than one the live partner sync applied meanwhile:
+ * partnerships, pacts and invites stay as on screen (`screen`, server data from the newer read).
+ */
+export function withLivePartnerData(loaded: AppState, screen: AppState): AppState {
+  return {
+    ...loaded,
+    partnerships: screen.partnerships,
+    partnership: screen.partnership,
+    sharedChallenges: screen.sharedChallenges,
+    partnerInvites: screen.partnerInvites,
+  };
+}

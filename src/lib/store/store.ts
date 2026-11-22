@@ -77,7 +77,7 @@ import { noteEditTimes } from '../sync/editTimes';
 import { clearDirtyAfterSave, dirtyMark, markDirty } from '../sync/dirtyFlag';
 import { isStaleOwnEcho } from '../sync/ownWrites';
 import { adoptTabState, applyRemoteChanges, isOlderRowEvent, prepareRemoteRows, pullSyncedRows, takePeerVersions, type RemoteChange } from '../sync/pull';
-import { SYNCED_COLLECTIONS, cacheWithHydratedCollections, itemsOf, rowIdOf, syncKeyOf, withHydratedPartnerData } from '../sync/syncedCollections';
+import { SYNCED_COLLECTIONS, cacheWithHydratedCollections, itemsOf, rowIdOf, syncKeyOf, withHydratedPartnerData, withLivePartnerData } from '../sync/syncedCollections';
 import { mergeAppState, mergeAppStateWithGuardResult, signInMergeBase } from './stateMerger';
 import { toUserMessage } from '../app/userMessage';
 import { disablePush } from '../app/push';
@@ -219,6 +219,12 @@ export function useAppState() {
   // way (or before it) would put the old done-dates back on screen, so it is held back for that
   // pact and one refresh runs once the writes settle. A sequence counter, not a clock.
   const pledgeWriteSeq = useRef(0);
+  // Partner reads, numbered when each starts (a counter, not a clock): the newest full read applied
+  // (partnerships, pacts and invites all answered) and the newest realtime partner change applied.
+  // An account load whose own partner read started earlier keeps what they put on screen.
+  const partnerReadSeq = useRef(0);
+  const partnerReadApplied = useRef(0);
+  const partnerEventApplied = useRef(0);
   const pledgeWrites = useRef(new Map<string, { inFlight: number; lastSeq: number; skipped: boolean }>());
   const trackPledgeWrite = useCallback(<T>(challengeId: string, write: Promise<T>): Promise<T> => {
     const entry = pledgeWrites.current.get(challengeId) ?? { inFlight: 0, lastSeq: 0, skipped: false };
@@ -1288,7 +1294,7 @@ export function useAppState() {
           // `hydration` adopts a load that is still running, so a slow answer is not thrown away).
           const loadAccount = async (
             myGeneration: number,
-            background?: { hydration?: ReturnType<typeof hydrateUserSession>; hydrationSeq?: number }
+            background?: { hydration?: ReturnType<typeof hydrateUserSession>; hydrationSeq?: number; partnerSeq?: number }
           ): Promise<void> => {
             retryFirstLoadRef.current = null;
             recoverLoadRef.current = null;
@@ -1301,6 +1307,8 @@ export function useAppState() {
             // Pact writes counted when the read starts (a reused read keeps its own start; 0 when
             // unknown keeps every written pact): a write after it is newer than what the read returns.
             const hydrationSeq = background?.hydration ? (background.hydrationSeq ?? 0) : pledgeWriteSeq.current;
+            // Partner reads started when this read starts (same rule; 0 when unknown).
+            const partnerSeq = background?.hydration ? (background.partnerSeq ?? 0) : partnerReadSeq.current;
             const hydration = background?.hydration ?? hydrateUserSession(userId, email, session.user, signupDefaults);
 
             try {
@@ -1388,10 +1396,19 @@ export function useAppState() {
 
                 lastKnownGoodStateRef.current = reconciledMergedState;
 
-                setState(reconciledMergedState);
+                // The live partner sync runs while this load waits (account on screen already): a full
+                // partner read it started after this load's read and applied meanwhile is newer, so its
+                // partnerships, pacts and invites stay. A realtime change alone is not a full read:
+                // the partner data is fetched again once this state is applied.
+                setState((prev) =>
+                  partnerReadApplied.current > partnerSeq && prev.currentUser?.id === userId
+                    ? withLivePartnerData(reconciledMergedState, prev)
+                    : reconciledMergedState
+                );
                 // Same batch as the state: the first render that sees the flag sees the server data.
                 setIsServerDataApplied(tablesRead && !guardResult.hasSuspiciousDrop);
-                if (refreshAfterHoldBack) afterCommit(() => void partnersRefreshRef.current?.());
+                const partnerEventMissed = () => partnerEventApplied.current > partnerSeq && partnerReadApplied.current <= partnerSeq;
+                if (refreshAfterHoldBack || partnerEventMissed()) afterCommit(() => void partnersRefreshRef.current?.());
 
                 if (guardResult.hasSuspiciousDrop) {
                   const isZeroOut = guardResult.mergedCount === 0;
@@ -1465,7 +1482,7 @@ export function useAppState() {
                   if (e === timeoutError) {
                     afterCommit(() => {
                       if (myGeneration !== authGenerationRef.current || isHydrated.current) return;
-                      void runRecovery(() => loadAccount(myGeneration, { hydration, hydrationSeq }));
+                      void runRecovery(() => loadAccount(myGeneration, { hydration, hydrationSeq, partnerSeq }));
                     });
                   }
                 } else if (stateRef.current.currentUser?.id !== userId) {
@@ -1761,6 +1778,7 @@ export function useAppState() {
       }
       try {
         const seqAtStart = pledgeWriteSeq.current;
+        const readSeq = ++partnerReadSeq.current;
         // Each fetch gives null when it failed: that part keeps what is on screen (N1).
         const fetchedInvites = await fetchPartnerInvitesSupabase(userId, username);
         const activePartnerships = await fetchPartnershipsSupabase(userId);
@@ -1812,6 +1830,9 @@ export function useAppState() {
         }
 
         setState((prev) => {
+          if (fetchedInvites && activePartnerships && challenges) {
+            partnerReadApplied.current = Math.max(partnerReadApplied.current, readSeq);
+          }
           const currentTombstones = new Set(prev.deletedEntityIds || []);
 
           // 1. Notifications
@@ -1940,6 +1961,7 @@ export function useAppState() {
           if (payload.eventType === 'DELETE') {
             const deletedId = (payload.old as any)?.id;
             if (deletedId) {
+              partnerEventApplied.current = ++partnerReadSeq.current;
               setState((prev) => ({
                 ...prev,
                 partnerInvites: (prev.partnerInvites || []).filter((i) => i.id !== deletedId),
@@ -1953,6 +1975,7 @@ export function useAppState() {
           if (payload.eventType === 'DELETE') {
             const deletedId = (payload.old as any)?.id;
             if (deletedId) {
+              partnerEventApplied.current = ++partnerReadSeq.current;
               setState((prev) => {
                 const remainingPartnerships = (prev.partnerships || []).filter((p) => p.id !== deletedId);
                 const remainingChallenges = (prev.sharedChallenges || []).filter((c) => c.partnershipId !== deletedId);
@@ -1983,6 +2006,7 @@ export function useAppState() {
               (stateRef.current?.sharedChallenges || []).find((c) => c.id === deletedId)?.partnershipId
             );
             if (deletedId) {
+              partnerEventApplied.current = ++partnerReadSeq.current;
               setState((prev) => ({
                 ...prev,
                 sharedChallenges: (prev.sharedChallenges || []).filter((c) => c.id !== deletedId),
@@ -2029,6 +2053,7 @@ export function useAppState() {
                 return;
               }
 
+              partnerEventApplied.current = ++partnerReadSeq.current;
               setState((prev) => {
                 if (
                   (prev.deletedEntityIds || []).includes(incomingChallenge.id) ||
