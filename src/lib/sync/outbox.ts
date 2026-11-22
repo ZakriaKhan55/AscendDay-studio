@@ -3,7 +3,7 @@ import type { AppState } from '../../types';
 import { supabase } from '../auth/supabase';
 import { SYNCED_COLLECTIONS, itemsOf, rowIdOf, syncKeyOf } from './syncedCollections';
 import { trustedNow } from '../time/clock';
-import { clearTabSyncedHashes, setTabSyncedHashes, tabSyncedHashes, type Baseline } from './tabVersions';
+import { clearTabSyncedHashes, setTabSyncedHashes, storeTabSyncedHashesOver, tabSyncedHashes, type Baseline } from './tabVersions';
 import { hashRow } from './rowHash';
 import { clearEditTimes, editTimeOf, pruneEditTimes, readEditTimes, type EditTimes } from './editTimes';
 import { reportError } from '../app/errorReporting';
@@ -300,6 +300,11 @@ export function recordSyncedChanges(state: AppState, versionsAtStart?: Baseline)
   const versionsMoved = JSON.stringify(nextVersions) !== JSON.stringify(current);
   setTabSyncedHashes(userId, nextVersions);
   if (versionsMoved) {
+    // Stored too, not only in memory: the device cache was written (with the versions from before
+    // this diff) when the state changed, so a tab closed now would cold-boot with versions one save
+    // behind and take its synced rows for unsent edits. The cache holds this tab's latest state, so
+    // a newer unsaved copy in it still reads as an edit, as it should.
+    storeTabSyncedHashesOver(userId, current);
     window.dispatchEvent(new CustomEvent(SYNC_VERSIONS_EVENT, { detail: { userId, hashes: nextVersions } }));
   }
   if (result.behind > 0) window.dispatchEvent(new CustomEvent(SYNC_BEHIND_EVENT, { detail: { userId } }));
