@@ -194,6 +194,25 @@ export function goalSwitchOffOutcome(fromProjects: number | null, status: GoalSt
   return 'none';
 }
 
+/**
+ * The status a saved edit of a project adds so it lands where its tasks put it, in the same write
+ * as the edit: whenever the project ends up automatic (switched off now, or already automatic), a
+ * Completed its open tasks don't allow is reopened and all-done tasks complete it. Set by hand:
+ * nothing. Without this the store's auto-status effect would fix it in a second quick write.
+ */
+export function projectSaveOutcomeFields(fromTasks: number | null, nextManual: boolean, status: ProjectStatus): Partial<Project> {
+  if (nextManual) return {};
+  const outcome = projectSwitchOffOutcome(fromTasks, status);
+  return outcome === 'complete' ? { status: 'completed' } : outcome === 'reopen' ? { status: 'in_progress' } : {};
+}
+
+/** Same for a goal and its projects (Achieved / Active; abandoned never changes on its own). */
+export function goalSaveOutcomeFields(fromProjects: number | null, nextManual: boolean, status: GoalStatus): Partial<Goal> {
+  if (nextManual) return {};
+  const outcome = goalSwitchOffOutcome(fromProjects, status);
+  return outcome === 'complete' ? { status: 'achieved' } : outcome === 'reopen' ? { status: 'active' } : {};
+}
+
 export const GOAL_STATUS_LABEL: Record<GoalStatus, string> = {
   active: 'Active',
   achieved: 'Achieved',

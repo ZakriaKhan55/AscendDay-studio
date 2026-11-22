@@ -7,7 +7,11 @@
 //   T27  a goal created with manualMode and an auto project with one task: ticking the task
 //        completes the project but the goal stays active (row manual_mode = true); an old-client
 //        write keeps the flag; turning the switch off achieves the goal (outcome in the same write).
-import { bootHook, story, until, quiet, rows, assert, pass, server, UID } from './harness/bootHook';
+//   T28  an automatic project with an open task saved as Completed (form: on → Completed → off, so
+//        no mode change) and an automatic goal with an open project saved as Achieved: the save
+//        lands as In progress / Active in ONE write of the row, never uploading Completed/Achieved.
+import { bootHook, story, until, quiet, rows, assert, pass, server, UID, fake } from './harness/bootHook';
+import { goalModePatch, goalSaveOutcomeFields, goalStatusPatch, projectModePatch, projectSaveOutcomeFields, projectStatusPatch } from '@/components/projects/hierarchy';
 
 const blobAt = '2026-11-01T00:00:00.000Z';
 const row = (table: string, id: string) => rows(table).find((r) => r.id === id);
@@ -79,4 +83,42 @@ await story('manualMode.hook (Set progress by hand on projects and goals)', asyn
   await until(() => goal()?.status === 'achieved', 'T27: switch off → achieved (state)');
   await until(() => row('goals', g.id)?.status === 'achieved' && row('goals', g.id)?.manual_mode === false, 'T27: achieved, manual_mode false (row)', 5000);
   pass('T27 goal by hand: project completion moves nothing, old-client write keeps the flag, switch off achieves');
+
+  // T28: saves built like ProjectsGoalsView.saveProject / saveGoal (no mode change in either).
+  const writesOf = (table: string, id: string) =>
+    fake.requests({ table }).filter((r) => r.method !== 'GET' && JSON.stringify(r.body ?? '').includes(id));
+  const ap = h.s().createProject({ title: 'AutoProject' });
+  h.s().createTask({ title: 'AutoOpen', projectId: ap.id });
+  h.s().createTask({ title: 'AutoDone', projectId: ap.id });
+  const autoDone = () => h.s().state.tasks.find((t) => t.title === 'AutoDone');
+  await until(() => autoDone() && row('tasks', autoDone()!.id), 'T28: tasks reached tasks', 5000);
+  h.s().toggleTaskCompleted(autoDone()!.id);
+  await until(() => row('tasks', autoDone()!.id)?.completed === true, 'T28: one of two tasks done (row)', 5000);
+  await quiet(1500);
+  const apNow = h.s().state.projects.find((x) => x.id === ap.id)!;
+  const pPayload = { title: 'AutoProject renamed', status: 'completed' as const, manualMode: false };
+  const pMode = projectModePatch(apNow, false, 50);
+  fake.resetCounts();
+  h.s().updateProject(ap.id, { ...pPayload, ...pMode, ...projectStatusPatch({ ...apNow, ...pMode }, 'completed', true), ...projectSaveOutcomeFields(50, false, 'completed') });
+  await until(() => row('projects', ap.id)?.status === 'in_progress', 'T28: project saved In progress (row)', 5000);
+  await quiet(1500);
+  const pWrites = writesOf('projects', ap.id);
+  assert(pWrites.length === 1, `T28: one write of the project row (got ${pWrites.length})`);
+  assert(!JSON.stringify(pWrites).includes('"completed"'), 'T28: Completed never uploaded');
+  assert(h.s().state.projects.find((x) => x.id === ap.id)?.status === 'in_progress', 'T28: project In progress (state)');
+
+  const ag = h.s().createGoal({ title: 'AutoGoal' });
+  h.s().updateProject(ap.id, { goalId: ag.id });
+  await until(() => row('projects', ap.id)?.goal_id === ag.id, 'T28: project linked to the goal (row)', 5000);
+  await quiet(1500);
+  const agNow = h.s().state.goals.find((x) => x.id === ag.id)!;
+  const gMode = goalModePatch(agNow, false, 50);
+  fake.resetCounts();
+  h.s().updateGoal(ag.id, { title: 'AutoGoal renamed', status: 'achieved', manualMode: false, ...gMode, ...goalStatusPatch({ ...agNow, ...gMode }, 'achieved', true), ...goalSaveOutcomeFields(50, false, 'achieved') });
+  await until(() => row('goals', ag.id)?.title === 'AutoGoal renamed', 'T28: goal edit reached goals', 5000);
+  await quiet(1500);
+  const gWrites = writesOf('goals', ag.id);
+  assert(row('goals', ag.id)?.status === 'active' && h.s().state.goals.find((x) => x.id === ag.id)?.status === 'active', 'T28: goal stays Active (row + state)');
+  assert(gWrites.length === 1 && !JSON.stringify(gWrites).includes('"achieved"'), `T28: one write of the goal row, Achieved never uploaded (got ${gWrites.length})`);
+  pass('T28 automatic project/goal saved Completed/Achieved with open parts: one write, In progress / Active');
 });

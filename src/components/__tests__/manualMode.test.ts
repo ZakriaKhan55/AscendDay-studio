@@ -2,8 +2,17 @@
 // switch-off outcome line, and the status patches on a manual goal or project (callers pass
 // hasParts && !manualMode, so a manual item moves its % with the status).
 import type { Goal, Project } from '../../types';
-const { projectModePatch, goalModePatch, projectSwitchOffOutcome, goalSwitchOffOutcome, projectStatusPatch, goalStatusPatch, REOPENED_PERCENT } =
-  await import('../projects/hierarchy');
+const {
+  projectModePatch,
+  goalModePatch,
+  projectSwitchOffOutcome,
+  goalSwitchOffOutcome,
+  projectStatusPatch,
+  goalStatusPatch,
+  projectSaveOutcomeFields,
+  goalSaveOutcomeFields,
+  REOPENED_PERCENT,
+} = await import('../projects/hierarchy');
 
 function assert(condition: boolean, msg: string) {
   if (!condition) throw new Error(`Assertion failed: ${msg}`);
@@ -62,5 +71,15 @@ assert(
   const status = projectStatusPatch({ ...editing, ...mode }, 'in_progress', false);
   assert(same({ ...mode, ...status }, { manualMode: true, manualProgress: REOPENED_PERCENT, status: 'in_progress' }), 'on + reopen in one save: 95');
 }
+
+// Save outcome: runs whenever the saved item ends up automatic, also when it already was (on →
+// Completed → off in the form leaves status 'completed' with manualMode false and no mode change).
+assert(same(projectSaveOutcomeFields(50, false, 'completed'), { status: 'in_progress' }), 'auto project, open task, saved Completed: In progress');
+assert(same(projectSaveOutcomeFields(100, false, 'on_hold'), { status: 'completed' }), 'auto project, all done, saved On hold: Completed');
+assert(same(projectSaveOutcomeFields(50, true, 'completed'), {}), 'project set by hand: status as picked');
+assert(same(projectSaveOutcomeFields(null, false, 'completed'), {}), 'project without tasks: status as picked');
+assert(same(goalSaveOutcomeFields(50, false, 'achieved'), { status: 'active' }), 'auto goal, open project, saved Achieved: Active');
+assert(same(goalSaveOutcomeFields(100, false, 'active'), { status: 'achieved' }), 'auto goal, all done, saved Active: Achieved');
+assert(same(goalSaveOutcomeFields(50, true, 'achieved'), {}) && same(goalSaveOutcomeFields(50, false, 'abandoned'), {}), 'goal by hand / abandoned: as picked');
 
 console.log('manualMode helpers: all assertions passed');
