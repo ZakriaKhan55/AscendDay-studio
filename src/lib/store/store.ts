@@ -13,6 +13,7 @@ import { dispatchToastError } from './storeShared';
 import { generateNumericUID, todayKey, getNextDateKey, formatWeekdayDate } from '../time/dates';
 import { singleFlight } from './singleFlight';
 import { reconcileSharedChallengeLifecycle, mergeSharedChallenge, pactTickRefused, type LinkedPactTick } from '../partners/pactLifecycle';
+import { PartnerEventLog, applyPartnerEvent, sharedChallengeFromRow, upsertedPactId, type PartnerEvent } from '../partners/partnerEvents';
 import { pauseStoredSessionsForSignOut } from '../focus/focusSession';
 import {
   leagueNow,
@@ -219,11 +220,14 @@ export function useAppState() {
   // pact and one refresh runs once the writes settle. A sequence counter, not a clock.
   const pledgeWriteSeq = useRef(0);
   // Partner reads, numbered when each starts (a counter, not a clock): the newest full read applied
-  // (partnerships, pacts and invites all answered) and the newest realtime partner change applied.
-  // An account load whose own partner read started earlier keeps what they put on screen.
+  // (partnerships, pacts and invites all answered). Realtime partner changes take a number from the
+  // same counter: the ones applied from the event are logged (partnerEvents), the newest that only
+  // asks for a refetch is partnerRefetchEvent. An account load whose own partner read started earlier
+  // keeps what they put on screen (replay, or a refetch where nothing can be replayed).
   const partnerReadSeq = useRef(0);
   const partnerReadApplied = useRef(0);
-  const partnerEventApplied = useRef(0);
+  const partnerEvents = useRef(new PartnerEventLog());
+  const partnerRefetchEvent = useRef(0);
   const pledgeWrites = useRef(new Map<string, { inFlight: number; lastSeq: number; skipped: boolean }>());
   const trackPledgeWrite = useCallback(<T>(challengeId: string, write: Promise<T>): Promise<T> => {
     const entry = pledgeWrites.current.get(challengeId) ?? { inFlight: 0, lastSeq: 0, skipped: false };
@@ -1184,6 +1188,7 @@ export function useAppState() {
       }
       pendingImmediateResolvers.current = [];
       pledgeWrites.current.clear();
+      partnerEvents.current.clear();
       pactDiverged.current.clear();
       pactRepairedOn.current.clear();
       pactRetry.current.clear();
@@ -1269,7 +1274,11 @@ export function useAppState() {
 
           const myGeneration = ++authGenerationRef.current;
           if (event === 'SIGNED_IN') setIsSessionLoading(true);
-          if (currentUserRef.current?.id !== session.user.id) setIsServerDataApplied(false);
+          if (currentUserRef.current?.id !== session.user.id) {
+            setIsServerDataApplied(false);
+            // Realtime partner changes of the account that was on screen are not this account's.
+            partnerEvents.current.clear();
+          }
           // A member signed in after boot (or a different one) gets the standings their session can see.
           void refreshLeagueStandings({ full: leagueRefresher.fetchedUserId() !== session.user.id });
 
@@ -1333,6 +1342,8 @@ export function useAppState() {
                 // on screen comes in below only when it holds unsaved changes).
                 let baseCurrentState = background ? sanitizedState : signInMergeBase(stateRef.current, sanitizedState, userId);
                 let refreshAfterHoldBack = false;
+                // Pacts that keep the copy on screen (below): it holds every realtime change already.
+                const writingPactIds = new Set<string>();
                 if (typeof window !== 'undefined' && userId) {
                   try {
                     const isDirty = Boolean(localStorage.getItem(`ascend_dirty_${userId}`));
@@ -1355,7 +1366,6 @@ export function useAppState() {
                           // failed); a pact written since the read started keeps the copy on screen
                           // (as the partner refresh does): a write still on its way refreshes once it
                           // settles, a settled one refreshes after this state is applied.
-                          const writingPactIds = new Set<string>();
                           if (background) {
                             for (const [id, write] of pledgeWrites.current) {
                               if (write.inFlight === 0 && write.lastSeq <= hydrationSeq) continue;
@@ -1397,17 +1407,32 @@ export function useAppState() {
 
                 // The live partner sync runs while this load waits (account on screen already): a full
                 // partner read it started after this load's read and applied meanwhile is newer, so its
-                // partnerships, pacts and invites stay. A realtime change alone is not a full read:
-                // the partner data is fetched again once this state is applied.
-                setState((prev) =>
-                  partnerReadApplied.current > partnerSeq && prev.currentUser?.id === userId
-                    ? withLivePartnerData(reconciledMergedState, prev)
-                    : reconciledMergedState
-                );
+                // partnerships, pacts and invites stay. Otherwise the realtime partner changes applied
+                // on screen since this load's read started are replayed onto its partner data, in
+                // order (PartnerEventLog says why that ends at the latest state), so the read's older
+                // copy is never shown. Taken now: a change arriving after this call is applied by its
+                // own update, queued after this one. Pacts keeping the copy on screen already hold them.
+                const replay = partnerEvents.current.since(userId, partnerSeq);
+                setState((prev) => {
+                  if (prev.currentUser?.id !== userId) return reconciledMergedState;
+                  if (partnerReadApplied.current > partnerSeq) return withLivePartnerData(reconciledMergedState, prev);
+                  let next = reconciledMergedState;
+                  for (const { event } of replay ?? []) {
+                    const pactId = upsertedPactId(event);
+                    if (pactId && writingPactIds.has(pactId)) continue;
+                    next = applyPartnerEvent(next, event);
+                  }
+                  return next;
+                });
                 // Same batch as the state: the first render that sees the flag sees the server data.
                 setIsServerDataApplied(tablesRead && !guardResult.hasSuspiciousDrop);
-                const partnerEventMissed = () => partnerEventApplied.current > partnerSeq && partnerReadApplied.current <= partnerSeq;
-                if (refreshAfterHoldBack || partnerEventMissed()) afterCommit(() => void partnersRefreshRef.current?.());
+                // The partner data is fetched again once this state is applied only where the replay
+                // cannot stand in for it: a change that only asks for a refetch (an invite or a
+                // partnership added or changed, a pact of a partnership not shown yet) or a log gap.
+                const partnerChangeMissed = () =>
+                  partnerReadApplied.current <= partnerSeq && (replay === null || partnerRefetchEvent.current > partnerSeq);
+                if (refreshAfterHoldBack || partnerChangeMissed()) afterCommit(() => void partnersRefreshRef.current?.());
+                partnerEvents.current.prune(partnerSeq);
 
                 if (guardResult.hasSuspiciousDrop) {
                   const isZeroOut = guardResult.mergedCount === 0;
@@ -1833,6 +1858,7 @@ export function useAppState() {
           if (disposed || prev.currentUser?.id !== userId) return prev;
           if (fetchedInvites && activePartnerships && challenges) {
             partnerReadApplied.current = Math.max(partnerReadApplied.current, readSeq);
+            partnerEvents.current.prune(readSeq);
           }
           const currentTombstones = new Set(prev.deletedEntityIds || []);
 
@@ -1952,6 +1978,13 @@ export function useAppState() {
       }
     };
 
+    /** A realtime partner change applied from the event: numbered, logged for a load that waits, shown. */
+    const applyPartnerEventLive = (event: PartnerEvent) => {
+      const seq = ++partnerReadSeq.current;
+      partnerEvents.current.record(userId, seq, event);
+      setState((prev) => applyPartnerEvent(prev, event));
+    };
+
     let isSubscribed = false;
     let channel: any = null;
     if (isSupabaseConfigured) {
@@ -1959,38 +1992,15 @@ export function useAppState() {
       channel = supabase
         .channel(`social_realtime_${userId}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'partner_invites' }, (payload) => {
-          if (payload.eventType === 'DELETE') {
-            const deletedId = (payload.old as any)?.id;
-            if (deletedId) {
-              partnerEventApplied.current = ++partnerReadSeq.current;
-              setState((prev) => ({
-                ...prev,
-                partnerInvites: (prev.partnerInvites || []).filter((i) => i.id !== deletedId),
-                deletedEntityIds: [...(prev.deletedEntityIds || []), deletedId].slice(-500),
-              }));
-            }
-          }
+          const deletedId = payload.eventType === 'DELETE' ? (payload.old as any)?.id : undefined;
+          if (deletedId) applyPartnerEventLive({ kind: 'inviteDeleted', id: deletedId });
+          else partnerRefetchEvent.current = ++partnerReadSeq.current;
           syncPartnerDataLive();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'partnerships' }, (payload) => {
-          if (payload.eventType === 'DELETE') {
-            const deletedId = (payload.old as any)?.id;
-            if (deletedId) {
-              partnerEventApplied.current = ++partnerReadSeq.current;
-              setState((prev) => {
-                const remainingPartnerships = (prev.partnerships || []).filter((p) => p.id !== deletedId);
-                const remainingChallenges = (prev.sharedChallenges || []).filter((c) => c.partnershipId !== deletedId);
-                const updatedDeletedEntityIds = [...(prev.deletedEntityIds || []), deletedId].slice(-500);
-                return {
-                  ...prev,
-                  partnerships: remainingPartnerships,
-                  partnership: remainingPartnerships[0] || null,
-                  sharedChallenges: remainingChallenges,
-                  deletedEntityIds: updatedDeletedEntityIds,
-                };
-              });
-            }
-          }
+          const deletedId = payload.eventType === 'DELETE' ? (payload.old as any)?.id : undefined;
+          if (deletedId) applyPartnerEventLive({ kind: 'partnershipDeleted', id: deletedId });
+          else partnerRefetchEvent.current = ++partnerReadSeq.current;
           syncPartnerDataLive();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'shared_challenges' }, (payload) => {
@@ -2006,45 +2016,12 @@ export function useAppState() {
             needsRefetch = !knownPartnership(
               (stateRef.current?.sharedChallenges || []).find((c) => c.id === deletedId)?.partnershipId
             );
-            if (deletedId) {
-              partnerEventApplied.current = ++partnerReadSeq.current;
-              setState((prev) => ({
-                ...prev,
-                sharedChallenges: (prev.sharedChallenges || []).filter((c) => c.id !== deletedId),
-                deletedEntityIds: [...(prev.deletedEntityIds || []), deletedId].slice(-500),
-              }));
-            }
+            if (deletedId) applyPartnerEventLive({ kind: 'pactDeleted', id: deletedId });
           } else if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
             const row = payload.new as any;
             needsRefetch = !knownPartnership(row?.partnership_id);
             if (row && row.id) {
-              const u1DoneDates = Array.isArray(row.user1_done_dates) && row.user1_done_dates.length
-                ? row.user1_done_dates
-                : (row.user1_done_date ? [row.user1_done_date] : []);
-              const u2DoneDates = Array.isArray(row.user2_done_dates) && row.user2_done_dates.length
-                ? row.user2_done_dates
-                : (row.user2_done_date ? [row.user2_done_date] : []);
-
-              const incomingChallenge: SharedChallenge = reconcileSharedChallengeLifecycle({
-                id: row.id,
-                partnershipId: row.partnership_id,
-                title: row.title,
-                targetHabitName: row.target_habit_name,
-                durationDays: row.duration_days,
-                jointStreak: row.joint_streak,
-                totalJointDaysCompleted: row.total_joint_days_completed ?? 0,
-                user1Category: row.user1_category || 'habit',
-                user1Target: row.user1_target || row.target_habit_name,
-                user2Category: row.user2_category || 'habit',
-                user2Target: row.user2_target || row.target_habit_name,
-                user1DoneDate: row.user1_done_date || undefined,
-                user2DoneDate: row.user2_done_date || undefined,
-                user1DoneDates: u1DoneDates,
-                user2DoneDates: u2DoneDates,
-                status: row.status as 'active' | 'completed' | 'expired',
-                createdAt: row.created_at,
-                ...(typeof row.start_date === 'string' && row.start_date ? { startDate: row.start_date } : {}),
-              });
+              const incomingChallenge = sharedChallengeFromRow(row);
 
               // Our own write to this pact is still on its way: keep the tick on screen; the
               // refresh after it settles brings this change in.
@@ -2054,25 +2031,13 @@ export function useAppState() {
                 return;
               }
 
-              partnerEventApplied.current = ++partnerReadSeq.current;
-              setState((prev) => {
-                if (
-                  (prev.deletedEntityIds || []).includes(incomingChallenge.id) ||
-                  (prev.deletedEntityIds || []).includes(incomingChallenge.partnershipId)
-                ) {
-                  return prev;
-                }
-                const exists = (prev.sharedChallenges || []).some((c) => c.id === incomingChallenge.id);
-                return {
-                  ...prev,
-                  sharedChallenges: exists
-                    ? prev.sharedChallenges.map((c) => (c.id === incomingChallenge.id ? mergeSharedChallenge(c, incomingChallenge) : c))
-                    : [incomingChallenge, ...(prev.sharedChallenges || [])],
-                };
-              });
+              applyPartnerEventLive({ kind: 'pactUpserted', challenge: incomingChallenge });
             }
           }
-          if (needsRefetch) syncPartnerDataLive();
+          if (needsRefetch) {
+            partnerRefetchEvent.current = ++partnerReadSeq.current;
+            syncPartnerDataLive();
+          }
         })
         // Only this account's notices; they need only the inbox refetch, not the partner queries.
         .on(
