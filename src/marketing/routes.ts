@@ -49,9 +49,17 @@ const SITE_COPY_UPDATED = '2026-11-07'; // 2026-11-07: footer Contact link, Abou
 
 /** A feature page whose own text changed after SITE_COPY_UPDATED. */
 const FEATURE_UPDATED: Partial<Record<FeatureSlug, string>> = {
+  'projects-goals': '2026-11-22', // set a goal or project's progress by hand
+  recovery: '2026-11-22', // FAQ: sober streak (11-17: daily check-in, crisis lines, Slipped/reset wording, re-shot screens)
   leagues: '2026-11-18', // equal points: active days, penalty points, reached first; names never decide
-  recovery: '2026-11-17', // daily check-in, crisis lines, Slipped/reset wording, re-shot screens
   habits: '2026-11-17', // Reading habit: pages or chapters
+  reading: '2026-11-17', // pages or chapters
+  'time-blocking': '2026-11-17', // ticking a block doesn't log the reading
+  'weekly-goals': '2026-11-17', // pages or chapters (11-14: last week's reflection stays open until Monday ends)
+  'bad-habits': '2026-11-13', // a slip or a day not logged costs the resist points
+  ranks: '2026-11-13', // finished-book bonus 20 (11-09: recovery check-ins)
+  journal: '2026-11-10', // earlier entries' mood and notes can be edited
+  'brain-lessons': '2026-11-09', // focus: 1 pt per 12 min
 };
 
 const featureRoutes: MarketingRoute[] = FEATURE_SLUGS.map((slug) => {
