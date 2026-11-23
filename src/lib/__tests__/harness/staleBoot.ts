@@ -56,6 +56,7 @@ export async function runStaleBoot(name: string, strict: boolean) {
       beforeRender: async () => {
         const { SYNCED_COLLECTIONS } = await import('../../sync/syncedCollections');
         const { hashRow } = await import('../../sync/rowHash');
+        const { cacheFingerprint } = await import('../../sync/tabVersions');
         const col = (table: string) => SYNCED_COLLECTIONS.find((c) => c.table === table)!;
         const hash = (table: string, item: unknown) => hashRow(col(table).toRow(item as never));
         const serverRow = (table: string, item: any, updatedAt: string) => ({ ...col(table).toRow(item as never), user_id: UID, updated_at: updatedAt });
@@ -65,17 +66,15 @@ export async function runStaleBoot(name: string, strict: boolean) {
         server.upsert('goals', [serverRow('goals', goalSynced, t1)], 'other-device');
 
         const ls = win.localStorage as Storage;
-        ls.setItem(
-          `ascend_user_cache_${UID}`,
-          JSON.stringify({
-            currentUser: { id: UID, username: 'hooktester', email: 'hook@test.local', avatar: '🧑', createdAt: '2026-10-01T00:00:00.000Z' },
-            username: 'hooktester',
-            lastSeenRelease: 100,
-            habits: [v.h1[1], v.h2[1]],
-            tasks: [v.t1[1]],
-            goals: [goalEdited],
-          })
-        );
+        const cacheJson = JSON.stringify({
+          currentUser: { id: UID, username: 'hooktester', email: 'hook@test.local', avatar: '🧑', createdAt: '2026-10-01T00:00:00.000Z' },
+          username: 'hooktester',
+          lastSeenRelease: 100,
+          habits: [v.h1[1], v.h2[1]],
+          tasks: [v.t1[1]],
+          goals: [goalEdited],
+        });
+        ls.setItem(`ascend_user_cache_${UID}`, cacheJson);
         ls.setItem(
           `ascend_sync_baseline_${UID}`,
           JSON.stringify({
@@ -84,12 +83,17 @@ export async function runStaleBoot(name: string, strict: boolean) {
             goals: { g1: hash('goals', goalSynced) },
           })
         );
+        // The versions stored with that cache (v2 record, paired by the cache string's fingerprint).
         ls.setItem(
           `ascend_sync_tab_synced_${UID}`,
           JSON.stringify({
-            habits: { h1: hash('habits', v.h1[0]), h2: hash('habits', v.h2[0]) },
-            tasks: { t1: hash('tasks', v.t1[0]) },
-            goals: { g1: hash('goals', goalSynced) },
+            v: 2,
+            cache: cacheFingerprint(cacheJson),
+            hashes: {
+              habits: { h1: hash('habits', v.h1[0]), h2: hash('habits', v.h2[0]) },
+              tasks: { t1: hash('tasks', v.t1[0]) },
+              goals: { g1: hash('goals', goalSynced) },
+            },
           })
         );
         // eslint-disable-next-line no-restricted-syntax -- the device's last full pull, an hour ago

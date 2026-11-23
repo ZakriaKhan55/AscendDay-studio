@@ -5,6 +5,7 @@ import { reconcileSharedChallengeLifecycle } from '../partners/pactLifecycle';
 import { cachedSyncedCollections } from '../sync/syncedCollections';
 import { cachedDeviceLocalState } from '../store/deviceLocalState';
 import { applyRemoteChanges, pullSyncedRows, type PullResult } from '../sync/pull';
+import { adoptSnapshotTabSyncedHashes, readDeviceCacheSnapshot } from '../sync/tabVersions';
 import { applyPresetHabitRemovalMigration } from '../store/loadedState';
 import {
   fetchUserDataWithStatusFromSupabase,
@@ -259,6 +260,12 @@ export async function hydrateUserSession(
   authUser?: User | null,
   signupDefaults?: SignUpDefaults
 ): Promise<{ user: UserProfile; state: AppState; tablesRead: boolean }> {
+  // The device cache and its row versions, read once, before the table pull uses the versions: the
+  // cached state below and this tab's versions then come from the same cache write (a later read
+  // could see another tab's newer cache). A tab already running keeps its own versions.
+  const deviceCache = readDeviceCacheSnapshot(userId);
+  adoptSnapshotTabSyncedHashes(userId, deviceCache.versions);
+
   // Fetch profile and saved user_data in parallel
   const [profileRes, userDataRes, tablePull] = await Promise.all([
     fetchProfileForUser(userId),
@@ -276,16 +283,8 @@ export async function hydrateUserSession(
   let savedState = userDataRes.state;
   if ((userDataRes.error || profileRes.error) && !savedState) {
     console.warn('Network error fetching user_data, attempting to restore from local cache:', userDataRes.error || profileRes.error);
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = localStorage.getItem(`ascend_user_cache_${userId}`);
-        if (cached) {
-          savedState = JSON.parse(cached);
-        }
-      } catch (e) {
-        console.error('Failed reading user cache from localStorage:', e);
-      }
-    }
+    // The cache read with this tab's versions at the start (deviceCache).
+    if (typeof window !== 'undefined' && deviceCache.cache) savedState = deviceCache.cache as AppState;
   }
 
   // If there is still no savedState AND either fetch had a network error on an existing account,
@@ -324,10 +323,10 @@ export async function hydrateUserSession(
     state = {
       ...DEFAULT_STATE,
       // Collections that live in their own tables are not in the blob (DB normalization S4).
-      ...cachedSyncedCollections(userId),
+      ...cachedSyncedCollections(userId, deviceCache.cache),
       ...savedState,
       // Tombstones and pending ids stay on this device (batch H); the blob no longer has them.
-      ...cachedDeviceLocalState(userId),
+      ...cachedDeviceLocalState(userId, deviceCache.cache),
       currentUser: user,
       username: user.username,
     };
@@ -342,8 +341,8 @@ export async function hydrateUserSession(
     // so a lost user_data row never hides saved activity.
     state = {
       ...DEFAULT_STATE,
-      ...cachedSyncedCollections(userId),
-      ...cachedDeviceLocalState(userId),
+      ...cachedSyncedCollections(userId, deviceCache.cache),
+      ...cachedDeviceLocalState(userId, deviceCache.cache),
       currentUser: user,
       username: user.username,
     };

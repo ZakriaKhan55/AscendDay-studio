@@ -681,12 +681,13 @@ export function withoutSyncedCollections(state: AppState): AppState {
 /**
  * Table-backed keys from this device's last saved state. The blob no longer
  * carries them, so a boot starts from these instead of empty values until the
- * table reads land; those reads then reconcile them.
+ * table reads land; those reads then reconcile them. parsedCache: that cache already read (a boot
+ * takes it with its row versions, sync/tabVersions readDeviceCacheSnapshot); read here when absent.
  */
-export function cachedSyncedCollections(userId: string): Partial<AppState> {
+export function cachedSyncedCollections(userId: string, parsedCache?: Partial<AppState> | null): Partial<AppState> {
   try {
-    const raw = localStorage.getItem(`ascend_user_cache_${userId}`);
-    const cached = raw ? (JSON.parse(raw) as Partial<AppState>) : null;
+    const raw = parsedCache === undefined ? localStorage.getItem(`ascend_user_cache_${userId}`) : null;
+    const cached = parsedCache !== undefined ? parsedCache : raw ? (JSON.parse(raw) as Partial<AppState>) : null;
     if (!cached || typeof cached !== 'object') return {};
     const picked: Partial<AppState> = {};
     for (const key of TABLE_BACKED_KEYS) {

@@ -72,7 +72,7 @@ import {
 } from '../auth/supabase';
 import { GuardBlockedError, SessionLostError } from './errors';
 import { SYNC_BEHIND_EVENT, SYNC_VERSIONS_EVENT, flushOutbox, hasPendingSyncOps, readBaseline, recordSyncedChanges } from '../sync/outbox';
-import { setTabSyncedHashes, storeTabSyncedHashes, tabSyncedHashes, type Baseline } from '../sync/tabVersions';
+import { setTabSyncedHashes, tabSyncedHashes, writeDeviceCache, type Baseline } from '../sync/tabVersions';
 import { noteEditTimes } from '../sync/editTimes';
 import { clearDirtyAfterSave, dirtyMark, markDirty } from '../sync/dirtyFlag';
 import { isStaleOwnEcho } from '../sync/ownWrites';
@@ -141,8 +141,7 @@ const GUEST_STORAGE_KEY = 'ascend_guest_state_v2';
  * state keeps the versions it was built on (sync/tabVersions). Throws what localStorage throws.
  */
 function writeUserDeviceCache(userId: string, cached: AppState): void {
-  localStorage.setItem(`ascend_user_cache_${userId}`, JSON.stringify(cached));
-  storeTabSyncedHashes(userId);
+  writeDeviceCache(userId, JSON.stringify(cached));
 }
 /** Waits between re-reads of the synced tables after a table read failed (the last one repeats). */
 const TABLE_REREAD_DELAYS_MS = [5_000, 15_000, 30_000, 60_000];

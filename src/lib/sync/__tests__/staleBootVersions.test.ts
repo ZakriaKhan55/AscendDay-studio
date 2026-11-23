@@ -5,7 +5,7 @@
 // and nothing may be uploaded; a real unsent edit must still be kept and upload with its edit time.
 // Covers a jsonb document table (habits: rename + tick), relational tables (tasks, goals, also a
 // goal set by hand, since rowHash leaves manual_mode false out) and time tracker days (merge branch).
-// Also covers storeTabSyncedHashesOver (F2): it stores only over this tab's own stored versions (same content and written by this tab).
+// Also covers storeTabSyncedHashesOver (F2): it stores only over this tab's own stored versions (same content, paired with the cache this tab wrote).
 // Incident: knowledge/mode-a-stale-copy-rollback-2026-11-22.md.
 import { DEFAULT_STATE, type AppState } from '@/types';
 
@@ -20,7 +20,7 @@ const store = new Map<string, string>();
 const { diffSyncedCollections, hashRow, readBaseline } = await import('../outbox');
 const { applyRemoteChanges, prepareRemoteRows } = await import('../pull');
 const { SYNCED_COLLECTIONS, itemsOf, rowIdOf, syncKeyOf } = await import('../syncedCollections');
-const { clearTabSyncedHashes, setTabSyncedHashes, storeTabSyncedHashes, storeTabSyncedHashesOver, tabSyncedHashes } =
+const { cacheFingerprint, clearTabSyncedHashes, readDeviceCacheSnapshot, setTabSyncedHashes, storeTabSyncedHashesOver, tabSyncedHashes, writeDeviceCache } =
   await import('../tabVersions');
 
 function assert(condition: boolean, msg: string) {
@@ -49,12 +49,23 @@ function reset() {
   clearTabSyncedHashes(UID);
 }
 
-/** The device as it cold-boots: baseline = V1 (what the last save sent), stored tab version = V0. */
-function seedDevice(table: string, id: string, v0: unknown, v1: unknown) {
+/** A stored versions record (v2), paired with the cache string it was written with. */
+const versionsRecord = (cacheJson: string, hashes: unknown) => JSON.stringify({ v: 2, cache: cacheFingerprint(cacheJson), hashes });
+
+/**
+ * The device as it cold-boots from its cache (`cached`): baseline = V1 (what the last save sent),
+ * stored tab version = V0. Returns the cached state as the boot reads it.
+ */
+function seedDevice(table: string, id: string, v0: unknown, v1: unknown, cached: AppState): AppState {
   const key = keyOf(table);
   store.set(`ascend_sync_baseline_${UID}`, JSON.stringify({ [key]: { [id]: hashOf(table, v1) } }));
   clearTabSyncedHashes(UID);
-  store.set(`ascend_sync_tab_synced_${UID}`, JSON.stringify({ [key]: { [id]: hashOf(table, v0) } }));
+  const cacheJson = JSON.stringify(cached);
+  store.set(`ascend_user_cache_${UID}`, cacheJson);
+  store.set(`ascend_sync_tab_synced_${UID}`, versionsRecord(cacheJson, { [key]: { [id]: hashOf(table, v0) } }));
+  const snapshot = readDeviceCacheSnapshot(UID);
+  assert(snapshot.versions?.[key]?.[id] === hashOf(table, v0), 'seed: the stored versions pair with the cache');
+  return snapshot.cache as AppState;
 }
 
 /** The boot's full pull of the server row (another device's newer V2), applied to the cached state. */
@@ -192,8 +203,8 @@ for (const c of cases) {
   // S1: the cached copy equals the baseline (synced); the stored tab version lags (V0).
   {
     reset();
-    seedDevice(c.table, c.id, c.v(0), c.v(1));
-    const after = bootPull(base(c.state(c.v(1))), c.table, c.serverItem());
+    const cached = seedDevice(c.table, c.id, c.v(0), c.v(1), base(c.state(c.v(1))));
+    const after = bootPull(cached, c.table, c.serverItem());
     const shown = itemOf(after, c.table, c.id);
     assert(hashOf(c.table, shown) === hashOf(c.table, c.serverItem()), `${c.name}: S1 the boot shows the server's newer row`);
     assert(opsAfter(after, c.table).length === 0, `${c.name}: S1 nothing is uploaded after the boot`);
@@ -207,9 +218,9 @@ for (const c of cases) {
   // edit time (checked where editTimes carry it; a merged time tracker day carries its own).
   {
     reset();
-    seedDevice(c.table, c.id, c.v(0), c.v(1));
     const edited = c.edit();
-    const after = bootPull(base(c.state(edited)), c.table, c.serverItem());
+    const cached = seedDevice(c.table, c.id, c.v(0), c.v(1), base(c.state(edited)));
+    const after = bootPull(cached, c.table, c.serverItem());
     const shown = itemOf(after, c.table, c.id);
     if (c.table === 'time_tracker_days') {
       // A merging table merges the two: the local block edit is newer and kept.
@@ -232,8 +243,8 @@ for (const c of cases) {
   // takes the server row and uploads nothing.
   {
     reset();
-    seedDevice(c.table, c.id, c.v(0), c.v(1));
-    const after = bootPull(base(c.state(c.v(0))), c.table, c.serverItem());
+    const cached = seedDevice(c.table, c.id, c.v(0), c.v(1), base(c.state(c.v(0))));
+    const after = bootPull(cached, c.table, c.serverItem());
     assert(
       hashOf(c.table, itemOf(after, c.table, c.id)) === hashOf(c.table, c.serverItem()),
       `${c.name}: a copy at the tab's own version takes the server row`
@@ -243,43 +254,51 @@ for (const c of cases) {
 }
 console.log('  ok  S1/S2 stale boot versions (habits rename + tick, tasks, goals, manual goal, time tracker days)');
 
-// F2 helper: stores this tab's versions only over the stored versions this tab held.
+// F2 helper: stores this tab's versions only over the stored versions this tab held, paired with
+// the cache this tab wrote.
 {
   reset();
+  const VERSIONS = `ascend_sync_tab_synced_${UID}`;
+  const CACHE = `ascend_user_cache_${UID}`;
+  const cacheA = JSON.stringify({ habits: [{ id: 'h1', name: 'A' }] });
   const held = { habits: { h1: 'v0' } };
   setTabSyncedHashes(UID, held);
-  storeTabSyncedHashes(UID);
+  writeDeviceCache(UID, cacheA);
   setTabSyncedHashes(UID, { habits: { h1: 'v1' } });
   storeTabSyncedHashesOver(UID, held);
-  assert(store.get(`ascend_sync_tab_synced_${UID}`) === JSON.stringify({ habits: { h1: 'v1' } }), 'F2: stored over its own versions');
+  assert(store.get(VERSIONS) === versionsRecord(cacheA, { habits: { h1: 'v1' } }), 'F2: stored over its own versions');
 
   // Another tab wrote the shared cache and its versions meanwhile: left alone.
-  const other = JSON.stringify({ habits: { h1: 'other-tab' } });
-  store.set(`ascend_sync_tab_synced_${UID}`, other);
+  const cacheB = JSON.stringify({ habits: [{ id: 'h1', name: 'B' }] });
+  const other = versionsRecord(cacheB, { habits: { h1: 'other-tab' } });
+  store.set(CACHE, cacheB);
+  store.set(VERSIONS, other);
   const heldNow = tabSyncedHashes(UID);
   setTabSyncedHashes(UID, { habits: { h1: 'v2' } });
   storeTabSyncedHashesOver(UID, heldNow);
-  assert(store.get(`ascend_sync_tab_synced_${UID}`) === other, "F2: another tab's stored versions are not overwritten");
+  assert(store.get(VERSIONS) === other, "F2: another tab's stored versions are not overwritten");
 
-  // Nothing stored yet (first save on the device): left alone, as before.
-  store.delete(`ascend_sync_tab_synced_${UID}`);
+  // Nothing stored (versions removed): left alone, as before.
+  store.set(CACHE, cacheA);
+  store.delete(VERSIONS);
   storeTabSyncedHashesOver(UID, heldNow);
-  assert(!store.has(`ascend_sync_tab_synced_${UID}`), 'F2: nothing stored when nothing was stored by this tab');
+  assert(!store.has(VERSIONS), 'F2: nothing stored when nothing was stored by this tab');
 
   // Tab B stored versions V (with its cache) that equal this tab's (A's) versions; A's save then
   // moves A's to V': B's V stays (A did not write the cache those versions belong to).
   const V = { habits: { h1: 'same' } };
   setTabSyncedHashes(UID, V);
-  storeTabSyncedHashes(UID);
-  store.set(`ascend_sync_tab_synced_${UID}`, JSON.stringify(V));
-  store.set(`ascend_sync_tab_synced_writer_${UID}`, 'tab-B');
+  writeDeviceCache(UID, cacheA);
+  store.set(CACHE, cacheB);
+  store.set(VERSIONS, versionsRecord(cacheB, V));
   setTabSyncedHashes(UID, { habits: { h1: 'moved' } });
   storeTabSyncedHashesOver(UID, V);
-  assert(store.get(`ascend_sync_tab_synced_${UID}`) === JSON.stringify(V), "F2: another tab's equal stored versions are not overwritten");
+  assert(store.get(VERSIONS) === versionsRecord(cacheB, V), "F2: another tab's equal stored versions are not overwritten");
 
-  // Sign-out clears the writer with the versions.
+  // Sign-out clears the versions, and a writer key left by an older app version.
+  store.set(`ascend_sync_tab_synced_writer_${UID}`, 'tab-B');
   clearTabSyncedHashes(UID);
-  assert(!store.has(`ascend_sync_tab_synced_writer_${UID}`) && !store.has(`ascend_sync_tab_synced_${UID}`), 'F2: clear removes the writer too');
+  assert(!store.has(`ascend_sync_tab_synced_writer_${UID}`) && !store.has(VERSIONS), 'F2: clear removes the legacy writer key too');
 }
 console.log('  ok  F2 storeTabSyncedHashesOver');
 console.log('staleBootVersions: OK');

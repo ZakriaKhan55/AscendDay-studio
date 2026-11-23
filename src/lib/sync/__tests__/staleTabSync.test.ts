@@ -17,7 +17,7 @@ const store = new Map<string, string>();
 const { DELETED, diffSyncedCollections, hashRow, readBaseline } = await import('../outbox');
 const { adoptTabState, applyRemoteChanges, prepareRemoteRows } = await import('../pull');
 const { SYNCED_COLLECTIONS, itemsOf, rowIdOf, syncKeyOf } = await import('../syncedCollections');
-const { setTabSyncedHashes, storeTabSyncedHashes, tabSyncedHashes, clearTabSyncedHashes } = await import(
+const { setTabSyncedHashes, writeDeviceCache, tabSyncedHashes, clearTabSyncedHashes } = await import(
   '../tabVersions'
 );
 type Baseline = Record<string, Record<string, string>>;
@@ -259,10 +259,12 @@ for (const c of cases) {
     const { a, b } = twoTabs(base(c.state('old')));
     phoneWrites(c.table, c.phoneItem);
     pull(a, c.table, [c.id]);
-    asTab(b, () => storeTabSyncedHashes(UID)); // B wrote its (old) state to the device cache
-    clearTabSyncedHashes(UID);
-    store.set(`ascend_sync_tab_synced_${UID}`, JSON.stringify(b.hashes));
-    const booted: Tab = { state: b.state, hashes: tabSyncedHashes(UID) };
+    asTab(b, () => writeDeviceCache(UID, JSON.stringify(b.state))); // B wrote its (old) state to the device cache
+    const stored = store.get(`ascend_sync_tab_synced_${UID}`)!;
+    clearTabSyncedHashes(UID); // a new tab: no versions in memory
+    store.set(`ascend_sync_tab_synced_${UID}`, stored);
+    const booted: Tab = { state: JSON.parse(store.get(`ascend_user_cache_${UID}`)!), hashes: tabSyncedHashes(UID) };
+    assert(JSON.stringify(booted.hashes) === JSON.stringify(b.hashes), `${c.name}: cold boot reads the versions stored with the cache`);
     pull(booted, c.table, [c.id], true);
     assert(hashOf(c.table, itemOf(booted, c.table, c.id)) === hashOf(c.table, c.phoneItem), `${c.name}: cold boot takes the newer row`);
     save(booted);

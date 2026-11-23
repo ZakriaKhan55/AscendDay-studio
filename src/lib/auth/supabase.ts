@@ -14,7 +14,7 @@ import {
 } from '../time/deviceTimezone';
 import { computeStateDataWeight, savedItemCount, type UserDataWeight } from '../store/dataWeight';
 import { withoutSyncedCollections } from '../sync/syncedCollections';
-import { storeTabSyncedHashes } from '../sync/tabVersions';
+import { writeDeviceCache } from '../sync/tabVersions';
 import { withoutRetiredKeys, withoutUnsavedBlobKeys } from '../store/retiredStateKeys';
 import { withoutDeviceLocalKeys } from '../store/deviceLocalState';
 import { trustedNow, trustedNowMs } from '../time/clock';
@@ -486,8 +486,7 @@ export async function saveUserDataToSupabase(
   // Always mirror authenticated user state to local cache for resilient cold boot and offline recovery
   if (typeof window !== 'undefined') {
     try {
-      localStorage.setItem(`ascend_user_cache_${userId}`, JSON.stringify(finalState));
-      storeTabSyncedHashes(userId);
+      writeDeviceCache(userId, JSON.stringify(finalState));
     } catch {
       /* ignore */
     }
