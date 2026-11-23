@@ -102,10 +102,26 @@ export interface LoggedPartnerEvent {
 }
 
 /**
+ * `state` with the logged `events` replayed in order (PartnerEventLog.since), as a partner read that
+ * started before them applies: an account load and the live partner refresh. A pact in `keepPactIds`
+ * keeps the copy on screen (our own pact write since the read started), which already holds its
+ * events, so they are not replayed over it.
+ */
+export function replayPartnerEvents(state: AppState, events: readonly LoggedPartnerEvent[], keepPactIds: ReadonlySet<string>): AppState {
+  let next = state;
+  for (const { event } of events) {
+    const pactId = upsertedPactId(event);
+    if (pactId && keepPactIds.has(pactId)) continue;
+    next = applyPartnerEvent(next, event);
+  }
+  return next;
+}
+
+/**
  * The realtime partner events applied on screen, for one account, numbered by the partner read
- * counter (`partnerReadSeq` in the store: a counter, not a clock). An account load whose partner read
- * started at seq S replays every event with seq > S, in seq order, onto its own partner data, so the
- * screen never goes back to the read's older copy.
+ * counter (`partnerReadSeq` in the store: a counter, not a clock). An account load or a live partner
+ * refresh whose partner read started at seq S replays every event with seq > S, in seq order, onto its
+ * own partner data, so the screen never goes back to the read's older copy.
  *
  * Why the replay ends at the latest state (no updated_at/version on the partner tables, so ordering
  * is all we have): realtime delivers one channel's changes in commit order, and each event is

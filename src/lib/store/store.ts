@@ -13,7 +13,7 @@ import { dispatchToastError } from './storeShared';
 import { generateNumericUID, todayKey, getNextDateKey, formatWeekdayDate } from '../time/dates';
 import { singleFlight } from './singleFlight';
 import { reconcileSharedChallengeLifecycle, mergeSharedChallenge, pactTickRefused, type LinkedPactTick } from '../partners/pactLifecycle';
-import { PartnerEventLog, applyPartnerEvent, sharedChallengeFromRow, upsertedPactId, type PartnerEvent } from '../partners/partnerEvents';
+import { PartnerEventLog, applyPartnerEvent, replayPartnerEvents, sharedChallengeFromRow, type PartnerEvent } from '../partners/partnerEvents';
 import { pauseStoredSessionsForSignOut } from '../focus/focusSession';
 import {
   leagueNow,
@@ -1416,13 +1416,7 @@ export function useAppState() {
                 setState((prev) => {
                   if (prev.currentUser?.id !== userId) return reconciledMergedState;
                   if (partnerReadApplied.current > partnerSeq) return withLivePartnerData(reconciledMergedState, prev);
-                  let next = reconciledMergedState;
-                  for (const { event } of replay ?? []) {
-                    const pactId = upsertedPactId(event);
-                    if (pactId && writingPactIds.has(pactId)) continue;
-                    next = applyPartnerEvent(next, event);
-                  }
-                  return next;
+                  return replayPartnerEvents(reconciledMergedState, replay ?? [], writingPactIds);
                 });
                 // Same batch as the state: the first render that sees the flag sees the server data.
                 setIsServerDataApplied(tablesRead && !guardResult.hasSuspiciousDrop);
@@ -1852,6 +1846,13 @@ export function useAppState() {
             else refreshAfterHoldBack = true;
           }
         }
+        // The realtime partner changes applied on screen since these reads started (their reads may
+        // predate them) are replayed onto the read data below, in order, as an account load does
+        // (PartnerEventLog says why that ends at the latest state), so the older copy never shows.
+        // Taken now: a change arriving after the update below is applied by its own update, queued
+        // after it. Pacts keeping the copy on screen already hold them.
+        const replay = partnerEvents.current.since(userId, readSeq);
+        const keepPactIds = new Set([...heldBackChallengeIds, ...notReadChallengeIds]);
 
         setState((prev) => {
           // A read of an account no longer on screen (signed out, switched) changes nothing.
@@ -1932,11 +1933,23 @@ export function useAppState() {
             finalSharedChallenges = [...notRead, ...Array.from(challengeMap.values())];
           }
 
+          // The events' own tombstones are on screen already (prev): only the partner data is taken.
+          const replayed = replayPartnerEvents(
+            {
+              ...prev,
+              partnerInvites: validInvites,
+              partnerships: finalPartnerships,
+              partnership: finalPartnerships[0] || null,
+              sharedChallenges: finalSharedChallenges,
+            },
+            replay ?? [],
+            keepPactIds
+          );
           const next = {
-            partnerInvites: validInvites,
-            partnerships: finalPartnerships,
-            partnership: finalPartnerships[0] || null,
-            sharedChallenges: finalSharedChallenges,
+            partnerInvites: replayed.partnerInvites,
+            partnerships: replayed.partnerships,
+            partnership: replayed.partnership,
+            sharedChallenges: replayed.sharedChallenges,
             notifications: mergedNotifs,
           };
           // The fallback poll runs every 10 s: when the server has nothing new, keep the same
@@ -1947,7 +1960,9 @@ export function useAppState() {
           if (unchanged) return prev;
           return { ...prev, ...next };
         });
-        if (refreshAfterHoldBack) void syncPartnerDataLive();
+        // A gap in the bounded log (changes that cannot be replayed): the partner data is read again.
+        // A change that only asks for a refetch already asked for one run more when it arrived.
+        if (refreshAfterHoldBack || replay === null) void syncPartnerDataLive();
       } catch (e) {
         // Background sync error: what is on screen stays; the Partners page offers Retry.
         setPartnersStatus('failed');

@@ -2,10 +2,11 @@
 // account load replays them from (knowledge: partner flash during an account load, deferred finding).
 // Mutation proof: applyPartnerEvent without the tombstone guard fails "upsert of a tombstoned pact";
 // a log whose since() ignores seq fails "since skips older events"; record() keeping another
-// account's entries fails "account switch"; since() without the gap check fails "bounded log".
+// account's entries fails "account switch"; since() without the gap check fails "bounded log";
+// replayPartnerEvents without the keep check fails "replay keeps a held-back pact".
 import type { AppState, Partnership, PartnerInvite, SharedChallenge } from '@/types';
 import { DEFAULT_STATE } from '@/types';
-import { PartnerEventLog, applyPartnerEvent, sharedChallengeFromRow, type PartnerEvent } from '../partners/partnerEvents';
+import { PartnerEventLog, applyPartnerEvent, replayPartnerEvents, sharedChallengeFromRow, type PartnerEvent } from '../partners/partnerEvents';
 import { addDays, todayKey } from '../time/dates';
 
 function assert(condition: unknown, msg: string): asserts condition {
@@ -126,8 +127,25 @@ function log() {
   console.log('log passed');
 }
 
+function replay() {
+  const s = state();
+  const events = [
+    { seq: 3, event: { kind: 'pactUpserted', challenge: pact('c1', 'p1', { title: 'First' }) } },
+    { seq: 4, event: { kind: 'pactUpserted', challenge: pact('c1', 'p1', { title: 'Second' }) } },
+    { seq: 5, event: { kind: 'pactUpserted', challenge: pact('c2', 'p2', { title: 'Held' }) } },
+    { seq: 6, event: { kind: 'inviteDeleted', id: 'i1' } },
+  ] as { seq: number; event: PartnerEvent }[];
+  const r = replayPartnerEvents(s, events, new Set(['c2']));
+  eq(r.sharedChallenges.find((c) => c.id === 'c1')?.title, 'Second', 'replay applies in order: the newest wins');
+  eq(r.sharedChallenges.find((c) => c.id === 'c2')?.title, 'Pact', 'replay keeps a held-back pact');
+  eq(r.partnerInvites.map((i) => i.id), ['i2'], 'replay applies deletes');
+  assert(replayPartnerEvents(s, [], new Set()) === s, 'nothing to replay: the same state');
+  console.log('replay passed');
+}
+
 deletes();
 upserts();
 rowMapping();
 log();
+replay();
 console.log('partnerEvents tests passed');
