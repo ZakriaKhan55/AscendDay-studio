@@ -29,6 +29,10 @@ export function GoalCard({
 }) {
   const hasProjects = prog.linkedProjectsCount > 0;
   const byHand = Boolean(goal.manualMode);
+  // Automatic: all projects done means Achieved (Active would be set back); Achieved waits for them.
+  // An abandoned goal never changes on its own, so it may be marked Achieved once they are all done.
+  const allProjectsDone = !prog.isManual && prog.percent === 100;
+  const achievedWaits = !prog.isManual && prog.percent < 100 && goal.status !== 'achieved';
   const overdue = goal.status === 'active' && Boolean(goal.targetDate) && goal.targetDate! < today;
   // An active goal without projects offers "+ Add project" in the nudge; when the nudge is hidden
   // (set by hand, or not active) the footer shows the button instead.
@@ -87,10 +91,13 @@ export function GoalCard({
       footer={
         <>
           <StatusSelect label={`Status of "${goal.title}"`} value={goal.status} onChange={(v) => onStatusChange(v as GoalStatus)}>
-            <option value="active">Active</option>
-            {/* With projects, a goal is achieved when they are all done (unless set by hand). */}
-            <option value="achieved" disabled={!prog.isManual && goal.status !== 'achieved'}>
-              {!prog.isManual && goal.status !== 'achieved' ? 'Achieved (when projects are done)' : 'Achieved'}
+            {/* With projects, a goal is achieved when they are all done and reopens when one is open
+                (unless set by hand): a status the store would change straight back is not offered. */}
+            <option value="active" disabled={allProjectsDone}>
+              {allProjectsDone ? 'Active (reopen a project first)' : 'Active'}
+            </option>
+            <option value="achieved" disabled={achievedWaits}>
+              {achievedWaits ? 'Achieved (when projects are done)' : 'Achieved'}
             </option>
             <option value="abandoned">Abandoned</option>
           </StatusSelect>

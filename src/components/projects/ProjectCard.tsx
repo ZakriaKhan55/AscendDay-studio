@@ -37,6 +37,8 @@ export function ProjectCard({
   const hasTasks = prog.linked > 0;
   // Set by hand (manualMode), or no tasks yet: the user updates it, so Update shows and Completed is allowed.
   const byHand = Boolean(project.manualMode);
+  // Automatic and every task done: the project completes on its own, so only Completed holds.
+  const allTasksDone = !prog.isManual && prog.percent === 100;
   const overdue = !done && Boolean(project.dueDate) && project.dueDate! < today;
   const dueToday = !done && project.dueDate === today;
 
@@ -106,10 +108,17 @@ export function ProjectCard({
             disabled={lock.isLocked}
             onChange={(v) => onStatusChange(v as ProjectStatus)}
           >
-            <option value="not_started">Not started</option>
-            <option value="in_progress">In progress</option>
-            <option value="on_hold">On hold</option>
-            {/* With tasks, a project completes when they are all done (unless set by hand). */}
+            {/* With tasks, a project completes when they are all done and reopens when one is open
+                (unless set by hand): a status the store would change straight back is not offered. */}
+            <option value="not_started" disabled={allTasksDone}>
+              {allTasksDone ? 'Not started (reopen a task first)' : 'Not started'}
+            </option>
+            <option value="in_progress" disabled={allTasksDone}>
+              {allTasksDone ? 'In progress (reopen a task first)' : 'In progress'}
+            </option>
+            <option value="on_hold" disabled={allTasksDone}>
+              {allTasksDone ? 'On hold (reopen a task first)' : 'On hold'}
+            </option>
             <option value="completed" disabled={!prog.isManual && !done}>
               {!prog.isManual && !done ? 'Completed (when tasks are done)' : 'Completed'}
             </option>

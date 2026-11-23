@@ -63,6 +63,36 @@ const g = (over: Partial<Goal> = {}): Goal => ({ id: 'g', title: 'G', status: 'a
   assert(auto.includes('1 of 2 projects done · 1/4 tasks') && !achievedEnabled(auto), 'auto goal unchanged');
 }
 
+
+// Status menu of an automatic item whose parts are all done: a status the store's auto-status
+// effect would change straight back (a second quick write of the same row) is not offered.
+{
+  // The selected option carries selected="", so only the disabled attribute decides.
+  const optionEnabled = (html: string, value: string) => {
+    const tag = html.match(new RegExp(`<option value="${value}"[^>]*>`));
+    return Boolean(tag) && !/disabled/.test(tag![0]);
+  };
+  const done = text(projectHtml(p({ status: 'completed' }), { total: 2, completed: 2, linked: 2, percent: 100, isManual: false }));
+  assert(optionEnabled(done, 'completed'), 'auto project, all tasks done: Completed offered');
+  for (const v of ['not_started', 'in_progress', 'on_hold']) assert(!optionEnabled(done, v), `auto project, all tasks done: ${v} not offered`);
+  assert(done.includes('In progress (reopen a task first)'), 'auto project, all tasks done: says why');
+  const open = text(projectHtml(p(), { total: 2, completed: 1, linked: 2, percent: 50, isManual: false }));
+  for (const v of ['not_started', 'in_progress', 'on_hold']) assert(optionEnabled(open, v), `auto project, open task: ${v} offered`);
+  const byHand = text(projectHtml(p({ manualMode: true, status: 'completed', manualProgress: 100 }), { total: 0, completed: 0, linked: 2, percent: 100, isManual: true }));
+  for (const v of ['not_started', 'in_progress', 'on_hold']) assert(optionEnabled(byHand, v), `project set by hand at 100: ${v} offered`);
+
+  const gp = { linkedProjectsCount: 2, completedProjectsCount: 2, totalTasksCount: 0, completedTasksCount: 0, percent: 100, isManual: false };
+  const achieved = text(goalHtml(g({ status: 'achieved' }), gp));
+  assert(!optionEnabled(achieved, 'active') && optionEnabled(achieved, 'achieved') && optionEnabled(achieved, 'abandoned'), 'auto goal, all projects done: Active not offered');
+  assert(achieved.includes('Active (reopen a project first)'), 'auto goal, all projects done: says why');
+  const abandoned = text(goalHtml(g({ status: 'abandoned' }), gp));
+  assert(!optionEnabled(abandoned, 'active') && optionEnabled(abandoned, 'achieved'), 'abandoned auto goal, all projects done: Achieved offered, Active not');
+  const openGoal = text(goalHtml(g(), { ...gp, completedProjectsCount: 1, percent: 50 }));
+  assert(optionEnabled(openGoal, 'active') && !optionEnabled(openGoal, 'achieved'), 'auto goal, open project: Active offered, Achieved waits');
+  const goalByHand = text(goalHtml(g({ manualMode: true, status: 'achieved', manualProgress: 100 }), { ...gp, isManual: true }));
+  assert(optionEnabled(goalByHand, 'active'), 'goal set by hand at 100: Active offered');
+}
+
 console.log('manualModeCards: all assertions passed');
 // The card modules start app timers on import (like the other component tests): end the process.
 (globalThis as unknown as { process: { exit: (code: number) => never } }).process.exit(0);
