@@ -14,9 +14,10 @@
 //      data is fetched again after the load.
 // Account switch / sign-out clearing the log is covered in partnerEvents.test.ts (a later load of
 // any account starts its read after every event of the session before, so it is not observable here).
-// Mutation proof: on the old code (no replay) R1 and R2 fail (the load renders the older pact, the
-// deleted invite/partnership/pact come back until the refetch). Replay ignoring the seq (since(…, 0))
-// fails R3. Replay over the newer live read with the full-read prune removed fails R4. Without the
+// Mutation proof: on the old code (no replay) R1 fails (the load renders the older pact) and R2a/R2b
+// fail (the deleted pact and the deleted partnership's pact come back until the refetch; the invite
+// and partnership themselves were already kept out by their tombstones). Replaying only pact upserts
+// fails R2. Replay ignoring the seq (since(…, 0)) fails R3. Replay over the newer live read with the full-read prune removed fails R4. Without the
 // partnerRefetchEvent check R5 fails (no refetch).
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { bootHook, story, until, eq, assert, pass, server, fake, UID, quiet } from './harness/bootHook';
