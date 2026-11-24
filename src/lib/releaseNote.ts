@@ -48,8 +48,12 @@ export function releaseNoteGroups(note: ReleaseNote): { key: ReleaseNoteGroupKey
 }
 
 export const RELEASE_NOTE: ReleaseNote | null = {
-  id: 6,
-  releasedAt: '2026-11-24T10:50:00+05:00',
-  title: "What's new in 1.7.0",
-  new: ['When a league week, month or season ends, you now see your results: your place, the top three and your change.'],
+  id: 7,
+  releasedAt: '2026-11-24T11:50:00+05:00',
+  title: "What's new in 1.8.0",
+  changed: [
+    'At Beginner, missed habits, slips and unlogged bad-habit days no longer cost points.',
+    'From Starter to Trainer they cost half, rounded up. From Achiever up, nothing changes.',
+    'Points already lost stay as they are.',
+  ],
 };
