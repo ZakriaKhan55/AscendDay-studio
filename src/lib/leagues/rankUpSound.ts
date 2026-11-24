@@ -5,9 +5,9 @@
  * notes, an octave, a low boom and a longer tail (about 1.6 s up to 2.6 s).
  */
 
-const NOTE = (semitones: number) => 261.63 * 2 ** (semitones / 12); // from C4
+export const NOTE = (semitones: number) => 261.63 * 2 ** (semitones / 12); // from C4
 
-interface Voice {
+export interface Voice {
   wave: OscillatorType;
   freq: number;
   start: number;
@@ -23,7 +23,7 @@ interface Voice {
   glideTo?: number;
 }
 
-function playVoice(ctx: AudioContext, out: AudioNode, v: Voice): void {
+export function playVoice(ctx: AudioContext, out: AudioNode, v: Voice): void {
   const gain = ctx.createGain();
   const end = v.start + v.attack + v.hold + v.release;
   gain.gain.setValueAtTime(0.0001, v.start);
@@ -52,7 +52,7 @@ function playVoice(ctx: AudioContext, out: AudioNode, v: Voice): void {
   osc.stop(end + 0.05);
 }
 
-function sparkle(ctx: AudioContext, out: AudioNode, start: number, length: number, level: number): void {
+export function sparkle(ctx: AudioContext, out: AudioNode, start: number, length: number, level: number): void {
   const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * length), ctx.sampleRate);
   const data = buffer.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
