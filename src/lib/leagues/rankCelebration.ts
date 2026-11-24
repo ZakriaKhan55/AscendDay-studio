@@ -48,9 +48,9 @@ export function decideRankUp(stored: RankCelebrated | null | undefined, season: 
 }
 
 /**
- * The rank-up's extra line when the climb leaves Beginner, the free band (missPenalty.ts): from now
- * on misses cost points, half until Achiever. Null for any other climb (and for a jump straight to
- * Achiever or above, the line drops the "half" part).
+ * The rank-up's extra line when the climb leaves Beginner, the flat 1-point band (missPenalty.ts):
+ * from now on misses cost more, half their points until Achiever. Null for any other climb (a jump
+ * straight to Achiever or above says misses now cost their full points).
  */
 export function rankUpPenaltyNote(from: number, to: number): string | null {
   const before = TIERS[from];
@@ -58,6 +58,6 @@ export function rankUpPenaltyNote(from: number, to: number): string | null {
   if (!before || !after) return null;
   if (before.minPoints >= PENALTY_TIERS.half.minPoints || after.minPoints < PENALTY_TIERS.half.minPoints) return null;
   return after.minPoints < PENALTY_TIERS.full.minPoints
-    ? `Misses now cost points (half until ${PENALTY_TIERS.full.name}).`
-    : 'Misses now cost points.';
+    ? `Misses now cost more (half until ${PENALTY_TIERS.full.name}).`
+    : 'Misses now cost their full points.';
 }

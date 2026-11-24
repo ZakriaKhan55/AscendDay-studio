@@ -16,6 +16,10 @@ eq(t('habit_missed', 'Missed habit (1x penalty): Wake up early', { habitName: 'W
 eq(t('habit_missed', 'Missed habit (2x penalty): Meditation', { habitName: 'Meditation', multiplier: 2 }), 'Missed habit: Meditation · 2x', 'missed 2x');
 eq(t('bad_habit_no_report', 'No-report bad habit penalty (1.5x penalty): AI chatbot', { badHabitName: 'AI chatbot', multiplier: 1.5 }), 'Not logged: AI chatbot · 1.5x', 'no report');
 eq(t('bad_habit_occurred', 'Bad habit occurred (1.5x penalty): Staying up late', { status: 'occurred' }), 'Slipped: Staying up late · 1.5x', 'slipped, name + multiplier from reason');
+// 1.8.0 rank bands: Beginner stores 1 / base (0.33, 0.5, 1) and the half band 0.5 / 0.75; at or below 1x no label.
+eq(t('habit_missed', 'Missed habit (0.33x penalty): Meditate', { habitName: 'Meditate', multiplier: 0.33 }), 'Missed habit: Meditate', 'Beginner 0.33x: no label');
+eq(t('bad_habit_occurred', 'Bad habit occurred (0.5x penalty): Doomscrolling', { status: 'occurred' }), 'Slipped: Doomscrolling', 'Beginner/half 0.5x from reason: no label');
+eq(t('bad_habit_no_report', 'No-report bad habit penalty (0.75x penalty): Porn', { badHabitName: 'Porn', multiplier: 0.75 }), 'Not logged: Porn', 'half band 0.75x: no label');
 eq(t('bad_habit_occurred', 'Bad habit occurred (1x penalty): Junk food', { status: 'occurred' }), 'Slipped: Junk food', 'slipped 1x');
 eq(t('bad_habit_resisted', 'Bad habit resisted: Doomscrolling', { status: 'resisted' }), 'Resisted: Doomscrolling', 'resisted');
 eq(t('exercise', 'Workouts logged (2)', { workouts: 2 }), 'Exercise: 2 workouts', 'exercise');

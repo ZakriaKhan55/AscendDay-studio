@@ -14,7 +14,7 @@ export const TIERS: Tier[] = [
     minPoints: 0,
     color: '#94a3b8',
     icon: 'Compass',
-    description: 'Where everyone starts each season. Misses cost no points yet.',
+    description: 'Where everyone starts each season. Each miss costs just 1 point.',
   },
   {
     name: 'Starter',
@@ -74,17 +74,17 @@ export const TIERS: Tier[] = [
   },
 ];
 
-/** The rank where a miss starts to cost a share of its points, by season points (missPenalty.ts). */
+/** The rank that starts at a penalty band's line, by season points (missPenalty.ts). */
 const tierStartingAt = (points: number): Tier => TIERS.find((t) => t.minPoints === points) ?? getCurrentTier(points);
 
 /**
  * The ranks of the miss penalty bands (lib/points/missPenalty.ts MISS_PENALTY_RANKS, SQL
- * ascend_miss_penalty): below `half` a miss costs nothing, from `half` half its points (rounded
- * up), from `full` its full points, from `escalate` misses in a row grow faster.
+ * ascend_miss_penalty): below `half` (at `flat`, Beginner) a miss costs a flat 1 point, from `half`
+ * half its points (rounded up), from `full` its full points, from `escalate` misses in a row grow faster.
  */
 export const PENALTY_TIERS = {
-  free: TIERS[0],
-  half: tierStartingAt(MISS_PENALTY_RANKS.freeBelow),
+  flat: TIERS[0],
+  half: tierStartingAt(MISS_PENALTY_RANKS.flatBelow),
   full: tierStartingAt(MISS_PENALTY_RANKS.fullFrom),
   escalate: tierStartingAt(MISS_PENALTY_RANKS.escalateFrom),
 };

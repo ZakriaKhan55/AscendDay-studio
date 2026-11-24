@@ -31,7 +31,7 @@ export function badHabitResistPoints(habit: Pick<BadHabit, 'isPreset' | 'name'>)
 /**
  * What a slip (or a day not logged) costs at the nth bad day in a row: getMissPenalty (SQL
  * ascend_miss_penalty) of the habit's resist points (library 1 to 3, custom 1), by the season
- * rank (0 at Beginner, half rounded up to Trainer), then negated by the caller.
+ * rank (a flat 1 at Beginner, half rounded up to Trainer), then negated by the caller.
  */
 export function badHabitPenalty(habit: Pick<BadHabit, 'isPreset' | 'name'>, badDayInARow: number, seasonPoints: number): number {
   return getMissPenalty(badHabitResistPoints(habit), badDayInARow, seasonPoints);
@@ -158,7 +158,7 @@ export function computeBadHabitAwards(
       existing: undefined,
       penalty: badHabitPenalty(habitsById.get(log.badHabitId)!, occurrences, seasonNow()),
       // The effective multiplier, as the server writes it (ascend_miss_effective_multiplier).
-      multiplier: getEffectiveMissMultiplier(occurrences, seasonNow()),
+      multiplier: getEffectiveMissMultiplier(badHabitResistPoints(habitsById.get(log.badHabitId)!), occurrences, seasonNow()),
     };
   });
   slips.sort((a, b) => b.penalty - a.penalty || byTimeThenId(a.log, b.log));

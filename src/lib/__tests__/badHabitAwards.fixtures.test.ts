@@ -166,19 +166,27 @@ const before = (days: number) => {
   assert(entries.every((e) => e.metadata?.date === DAY), 'only today is recomputed; yesterday stays frozen');
 }
 
-// 9. Rank bands (ascend_miss_penalty): Beginner 0 and no row; Starter to Trainer half rounded up, the
-//    effective multiplier in the reason.
+// 9. Rank bands (ascend_miss_penalty): Beginner a flat 1 (v2), never more in a row; Starter to Trainer
+//    half rounded up, the effective multiplier in the reason.
 {
   const porn = { name: 'Porn', isPreset: true };
   const junk = { name: 'Junk food', isPreset: true };
-  assert(badHabitPenalty(porn, 1, 0) === 0 && badHabitPenalty(porn, 3, 199) === 0, 'Beginner: 0');
+  assert(badHabitPenalty(porn, 1, 0) === 1 && badHabitPenalty(porn, 3, 199) === 1 && badHabitPenalty(junk, 5, 0) === 1, 'Beginner: a flat 1');
+  assert(badHabitPenalty({ name: 'Doomscrolling', isPreset: true }, 2, 199) === 1 && badHabitPenalty({ name: 'Nail biting' }, 3, 0) === 1, 'Beginner: 2-point and custom, in a row: 1');
   assert(badHabitPenalty(porn, 1, HALF) === 2 && badHabitPenalty(porn, 2, HALF) === 3 && badHabitPenalty(porn, 3, 1399) === 3, 'Starter-Trainer Porn 2 (1.5), 3 (2.25), 3');
   assert(badHabitPenalty(junk, 1, HALF) === 1 && badHabitPenalty(junk, 2, HALF) === 1, 'Starter Junk food 1 (0.5), 1 (0.75): never 0');
   const habits = [bh('p', 'Porn', 30, true), bh('j', 'Junk food', 30, true)];
   const logs = [log('op', 'p', 1, 'occurred'), log('oj', 'j', 2, 'occurred')];
   const beginner = computeBadHabitAwards(habits, logs, [], DAY, START, NOW, 0);
-  assert(beginner.entries.length === 0, 'Beginner slips: no rows');
-  assert(beginner.logPoints.get('op') === 0 && beginner.logPoints.get('oj') === 0, 'Beginner slips: logs carry 0');
+  const b = slipsOf(beginner.entries);
+  assert(b.p === -1 && b.j === -1, 'Beginner slips: Porn -1, Junk food -1');
+  assert(beginner.logPoints.get('op') === -1 && beginner.logPoints.get('oj') === -1, 'Beginner slips: logs carry -1');
+  // The stored multiplier: 1 / resist points, 2 decimals, so never an "x" label above 1.
+  const bReason = (id: string) => beginner.entries.find((e) => e.metadata?.badHabitId === id)?.reason ?? '';
+  assert(bReason('p').startsWith('Bad habit occurred (0.33x penalty)') && bReason('j').startsWith('Bad habit occurred (1x penalty)'), `Beginner reasons: ${bReason('p')} | ${bReason('j')}`);
+  // A 3rd bad day in a row is still -1 at Beginner (199).
+  const days = [dayLog('y2p', 'p', before(2), 'occurred'), dayLog('y1p', 'p', before(1), 'occurred'), log('op3', 'p', 3, 'occurred')];
+  assert(slipsOf(computeBadHabitAwards([bh('p', 'Porn', 30, true)], days, [], DAY, START, NOW, 199).entries).p === -1, 'Beginner 3rd bad day in a row: -1');
   const starter = computeBadHabitAwards(habits, logs, [], DAY, START, NOW, HALF);
   const s = slipsOf(starter.entries);
   assert(s.p === -2 && s.j === -1, 'Starter first slips: Porn -2, Junk food -1');
