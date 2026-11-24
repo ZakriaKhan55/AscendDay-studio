@@ -9,10 +9,11 @@ const blobAt = 'Sun 2026-11-01 5:00 AM PKT (UTC+05:00)';
 
 // Object.keys(useAppState()) at ef21c97 (the 175 members, in order), plus refreshNow (pull-to-refresh),
 // firstLoadFailed / retryFirstLoad (the failed-first-load gate), isLeagueStandingsStale (Leagues'
-// "couldn't refresh" line) and linkSharedChallengeSide (link my side of a running pact later).
+// "couldn't refresh" line), linkSharedChallengeSide (link my side of a running pact later)
+// and setLeagueResultsSeen (league results overlay).
 const MEMBERS = [
   'state', 'isAuthChecking', 'isSessionLoading', 'isServerDataApplied', 'firstLoadFailed', 'retryFirstLoad', 'setRankCelebrated',
-  'setLastSeenRelease', 'storedSessionWait', 'logout', 'deleteAccount', 'logoutGuest', 'addPresetHabit',
+  'setLastSeenRelease', 'setLeagueResultsSeen', 'storedSessionWait', 'logout', 'deleteAccount', 'logoutGuest', 'addPresetHabit',
   'addCustomHabit', 'renameHabit', 'deleteHabit', 'toggleHabit', 'toggleReadingHabit', 'isHabitDone',
   'saveJournalEntry', 'deleteJournalEntry', 'editJournalEntry', 'getTodayJournalEntry', 'markLessonRead',
   'setUsername', 'updateProfileUsername', 'updateProfileAvatar', 'resolvedTheme', 'setThemePreference',
