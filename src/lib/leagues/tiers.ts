@@ -1,3 +1,5 @@
+import { MISS_PENALTY_RANKS } from '../points/missPenalty';
+
 export interface Tier {
   name: string;
   minPoints: number;
@@ -12,35 +14,35 @@ export const TIERS: Tier[] = [
     minPoints: 0,
     color: '#94a3b8',
     icon: 'Compass',
-    description: 'Where everyone starts each season.',
+    description: 'Where everyone starts each season. Misses cost no points yet.',
   },
   {
     name: 'Starter',
     minPoints: 200,
     color: '#38bdf8',
     icon: 'Rocket',
-    description: 'You have made a start on your daily habits.',
+    description: 'You have made a start on your daily habits. Misses now cost half their points.',
   },
   {
     name: 'Learner',
     minPoints: 500,
     color: '#34d399',
     icon: 'BookOpen',
-    description: 'Your daily routine is starting to stick.',
+    description: 'Your daily routine is starting to stick. Misses still cost half their points.',
   },
   {
     name: 'Trainer',
     minPoints: 900,
     color: '#fb923c',
     icon: 'Dumbbell',
-    description: 'You put in the work on most days.',
+    description: 'You put in the work on most days. Misses still cost half their points.',
   },
   {
     name: 'Achiever',
     minPoints: 1400,
     color: '#a3e635',
     icon: 'Trophy',
-    description: 'Your steady work is paying off.',
+    description: 'Your steady work is paying off. Misses cost their full points.',
   },
   {
     name: 'Performer',
@@ -71,6 +73,21 @@ export const TIERS: Tier[] = [
     description: 'The top rank of the season.',
   },
 ];
+
+/** The rank where a miss starts to cost a share of its points, by season points (missPenalty.ts). */
+const tierStartingAt = (points: number): Tier => TIERS.find((t) => t.minPoints === points) ?? getCurrentTier(points);
+
+/**
+ * The ranks of the miss penalty bands (lib/points/missPenalty.ts MISS_PENALTY_RANKS, SQL
+ * ascend_miss_penalty): below `half` a miss costs nothing, from `half` half its points (rounded
+ * up), from `full` its full points, from `escalate` misses in a row grow faster.
+ */
+export const PENALTY_TIERS = {
+  free: TIERS[0],
+  half: tierStartingAt(MISS_PENALTY_RANKS.freeBelow),
+  full: tierStartingAt(MISS_PENALTY_RANKS.fullFrom),
+  escalate: tierStartingAt(MISS_PENALTY_RANKS.escalateFrom),
+};
 
 export function getCurrentTier(totalPoints: number): Tier {
   let current = TIERS[0];

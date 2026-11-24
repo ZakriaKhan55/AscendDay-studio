@@ -5,12 +5,13 @@ import { todayKey, periodKey, previousPeriodKey, addDays, addWeeks } from '../ti
 /**
  * Penalties are issued only by the server (ascend_process_penalties, hourly cron). This file keeps the
  * pieces the app shows before the server's rows arrive, and must change together with the SQL:
- * getMissPenaltyMultiplier = ascend_miss_multiplier, getHabitConsecutiveMissesUpToPeriod = the preset
+ * getMissPenaltyMultiplier = ascend_miss_multiplier, getMissPenalty = ascend_miss_penalty,
+ * getEffectiveMissMultiplier = ascend_miss_effective_multiplier, getHabitConsecutiveMissesUpToPeriod = the preset
  * miss walk, getBadHabitBadDaysBefore = ascend_bad_habit_bad_days_before (no-report and occurred).
  */
 export const MAX_RETROACTIVE_PENALTY_DAYS = 90;
 
-export { getMissPenaltyMultiplier } from './missPenalty';
+export { getEffectiveMissMultiplier, getMissPenalty, getMissPenaltyMultiplier } from './missPenalty';
 
 /**
  * Checks if a habit was completed for a given period key.

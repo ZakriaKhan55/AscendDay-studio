@@ -1,7 +1,7 @@
 import type { BadHabit, BadHabitLog, PointsEntry } from '@/types';
 import { BAD_HABIT_POINTS } from './pointsConfig';
 import { PRESET_BAD_HABITS } from '../content/presets';
-import { badHabitCreatedDay, getBadHabitBadDaysBefore, getMissPenaltyMultiplier } from './habitPenalties';
+import { badHabitCreatedDay, getBadHabitBadDaysBefore, getEffectiveMissMultiplier, getMissPenalty } from './habitPenalties';
 import { timeMsOr } from '../time/dates';
 
 /**
@@ -29,11 +29,12 @@ export function badHabitResistPoints(habit: Pick<BadHabit, 'isPreset' | 'name'>)
 }
 
 /**
- * What a slip (or a day not logged) costs at the nth bad day in a row: the habit's resist points
- * (library 1 to 3, custom 1) x the miss multiplier, rounded, then negated by the caller.
+ * What a slip (or a day not logged) costs at the nth bad day in a row: getMissPenalty (SQL
+ * ascend_miss_penalty) of the habit's resist points (library 1 to 3, custom 1), by the season
+ * rank (0 at Beginner, half rounded up to Trainer), then negated by the caller.
  */
 export function badHabitPenalty(habit: Pick<BadHabit, 'isPreset' | 'name'>, badDayInARow: number, seasonPoints: number): number {
-  return Math.round(badHabitResistPoints(habit) * getMissPenaltyMultiplier(badDayInARow, seasonPoints));
+  return getMissPenalty(badHabitResistPoints(habit), badDayInARow, seasonPoints);
 }
 
 const APP_WRITTEN_DAY_SOURCES = new Set(['bad_habit_resisted', 'bad_habit_occurred', 'bad_habit_undo']);
@@ -156,7 +157,8 @@ export function computeBadHabitAwards(
       log,
       existing: undefined,
       penalty: badHabitPenalty(habitsById.get(log.badHabitId)!, occurrences, seasonNow()),
-      multiplier: getMissPenaltyMultiplier(occurrences, seasonNow()),
+      // The effective multiplier, as the server writes it (ascend_miss_effective_multiplier).
+      multiplier: getEffectiveMissMultiplier(occurrences, seasonNow()),
     };
   });
   slips.sort((a, b) => b.penalty - a.penalty || byTimeThenId(a.log, b.log));
