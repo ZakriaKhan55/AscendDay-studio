@@ -48,5 +48,6 @@ export const badHabitsGuide: HowItWorksGuide = {
       Each bad day in a row costs more: <Fig>×{missRule.again}</Fig>; from {missRule.rank} rank <Fig>×{missRule.second}</Fig> for the 2nd and{' '}
       <Fig>×{missRule.third}</Fig> from the 3rd (rounded). Resisting resets the count.
     </>,
+    `By rank: at ${missRule.free} slips and days not logged cost nothing. From ${missRule.half} they cost half (rounded up), from ${missRule.full} the full amount.`,
   ],
 };

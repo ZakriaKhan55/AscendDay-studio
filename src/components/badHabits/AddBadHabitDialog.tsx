@@ -4,6 +4,7 @@ import type { BadHabit } from '@/types';
 import { PRESET_BAD_HABITS, type PresetBadHabit } from '@/lib/content/presets';
 import { BAD_HABIT_POINTS } from '@/lib/points/pointsConfig';
 import { ptsText } from '@/lib/leagues/leagues';
+import { PENALTY_TIERS } from '@/lib/leagues/tiers';
 import { useUnsavedChanges } from '@/lib/ui/unsavedChanges';
 import { nameTaken, sameName } from '@/lib/items/uniqueNames';
 import { Dialog, Form, Input, StaticTabPanel, Tabs } from '@/components/ui/primitives';
@@ -87,7 +88,8 @@ export function AddBadHabitDialog({ open, onClose, habits, onAddPreset, onAddCus
               <p className="text-xs text-content-muted">
                 Each day you resist one earns its points, up to{' '}
                 <span className="figure">{ptsText(BAD_HABIT_POINTS.dailyCap)}</span> a day for all of them together. The ones
-                you log first count first. A slip, or a day you don&apos;t log, costs the Slipped points.
+                you log first count first. A slip, or a day you don&apos;t log, costs the Slipped points: none at{' '}
+                {PENALTY_TIERS.free.name}, half (rounded up) until {PENALTY_TIERS.full.name}.
               </p>
               <ul className="divide-y divide-overlay-subtle rounded-xl border border-overlay-subtle">
                 {PRESET_BAD_HABITS.map((preset) => {
@@ -152,7 +154,7 @@ export function AddBadHabitDialog({ open, onClose, habits, onAddPreset, onAddCus
               <p className="text-xs text-content-muted">
                 A custom bad habit earns <span className="figure">{ptsText(BAD_HABIT_POINTS.customResist, true)}</span> each day
                 you resist it. A slip, or a day you don&apos;t log, costs{' '}
-                <span className="figure">{ptsText(-BAD_HABIT_POINTS.customResist)}</span>.
+                <span className="figure">{ptsText(-BAD_HABIT_POINTS.customResist)}</span>, none at {PENALTY_TIERS.free.name}.
               </p>
             </Form>
           )}

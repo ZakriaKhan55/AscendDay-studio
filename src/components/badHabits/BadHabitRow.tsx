@@ -2,6 +2,7 @@ import { AlertTriangle, Check, Flame, Pencil, Trash2, Undo2, X } from 'lucide-re
 import type { BadHabit, BadHabitLog } from '@/types';
 import { todayKey, parseDate, calculateStreak, calculateBestStreak } from '@/lib/time/dates';
 import { badHabitCreatedDay, getBadHabitBadDaysBefore } from '@/lib/points/habitPenalties';
+import { PENALTY_TIERS } from '@/lib/leagues/tiers';
 import { ptsText } from '@/lib/leagues/leagues';
 import { badHabitPenalty, badHabitResistPoints } from '@/lib/points/badHabitAwards';
 import { lastDayKeys } from '@/lib/time/weeklyActivity';
@@ -63,7 +64,7 @@ export function badHabitPointsInfo(
 }
 
 /**
- * "N bad days in a row. Slipping today costs −X." Shown only while today is not logged and the
+ * "N bad days in a row. Slipping today costs −X." (at Beginner: no points lost yet). Shown only while today is not logged and the
  * habit has bad days before today (the row's warning; the partner card shows the same one).
  */
 export function BadHabitSlipWarning({
@@ -84,12 +85,20 @@ export function BadHabitSlipWarning({
 }) {
   const slips = logged ? 0 : slipsInARow(habit, logs, today);
   if (slips <= 0) return null;
+  // 0 at Beginner (getMissPenalty): say so instead of "costs −0".
+  const cost = badHabitPenalty(habit, slips + 1, seasonPoints);
   return (
     <p className={cx('flex items-start gap-1 text-xs font-medium text-rose-theme', className)}>
       <AlertTriangle size={13} aria-hidden="true" className="mt-px shrink-0" />
       <span>
-        {slips} bad {slips === 1 ? 'day' : 'days'} in a row. Slipping today costs{' '}
-        <span className="figure">{ptsText(-badHabitPenalty(habit, slips + 1, seasonPoints))}</span>.
+        {slips} bad {slips === 1 ? 'day' : 'days'} in a row.{' '}
+        {cost > 0 ? (
+          <>
+            Slipping today costs <span className="figure">{ptsText(-cost)}</span>.
+          </>
+        ) : (
+          `No points lost yet: slips cost points from ${PENALTY_TIERS.half.name}.`
+        )}
       </span>
     </p>
   );

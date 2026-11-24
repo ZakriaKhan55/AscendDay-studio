@@ -1,7 +1,8 @@
 import { AlertTriangle, Check, Flame, Pencil, Trash2, Undo2 } from 'lucide-react';
 import type { Habit } from '@/types';
 import { calculateBestStreak, calculateStreak, periodKey, previousPeriodKey } from '@/lib/time/dates';
-import { getHabitConsecutiveMisses, getMissPenaltyMultiplier } from '@/lib/points/habitPenalties';
+import { getHabitConsecutiveMisses, getMissPenalty } from '@/lib/points/habitPenalties';
+import { PENALTY_TIERS } from '@/lib/leagues/tiers';
 import { isDailyHabit } from '@/lib/points/habitAwards';
 import { ptsText } from '@/lib/leagues/leagues';
 import { SwipeRow } from '@/components/ui/SwipeRow';
@@ -83,8 +84,8 @@ export function HabitRow({ habit, done, seasonPoints, popClass, onToggle, onDele
   // Exactly the server's penalty filter: preset habits that earn points (never the Reading habit).
   const penalised = habit.isPreset && habit.points > 0 && !linked;
   const misses = penalised && !done ? getHabitConsecutiveMisses(habit) : 0;
-  // Same formula and rounding as the server's penalty for the next missed period.
-  const missCost = misses > 0 ? Math.round(habit.points * getMissPenaltyMultiplier(misses + 1, seasonPoints)) : 0;
+  // The server's penalty for the next missed period (getMissPenalty = ascend_miss_penalty); 0 at Beginner.
+  const missCost = misses > 0 ? getMissPenalty(habit.points, misses + 1, seasonPoints) : 0;
 
   const pointsLabel = linked
     ? habit.points > 0
@@ -145,9 +146,14 @@ export function HabitRow({ habit, done, seasonPoints, popClass, onToggle, onDele
               <p className="mt-1.5 flex items-start gap-1 text-xs font-medium text-rose-theme">
                 <AlertTriangle size={13} aria-hidden="true" className="mt-px shrink-0" />
                 <span>
-                  {misses === 1 ? `Missed ${weekly ? 'last week' : 'yesterday'}.` : `Missed ${misses} ${unit}s in a row.`} Missing{' '}
-                  {weekly ? 'this week' : 'today'} costs{' '}
-                  <span className="figure">{ptsText(-missCost)}</span>.
+                  {misses === 1 ? `Missed ${weekly ? 'last week' : 'yesterday'}.` : `Missed ${misses} ${unit}s in a row.`}{' '}
+                  {missCost > 0 ? (
+                    <>
+                      Missing {weekly ? 'this week' : 'today'} costs <span className="figure">{ptsText(-missCost)}</span>.
+                    </>
+                  ) : (
+                    `No points lost yet: misses cost points from ${PENALTY_TIERS.half.name}.`
+                  )}
                 </span>
               </p>
             )}

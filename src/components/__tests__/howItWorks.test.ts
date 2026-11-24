@@ -123,6 +123,8 @@ const guides: [string, HowItWorksGuide, (string | number)[]][] = [
       `×${getMissPenaltyMultiplier(2, 0)}`,
       `×${getMissPenaltyMultiplier(3, 2000)}`,
       'Weekly custom habits earn no points',
+      // Penalties by rank (1.8.0, missPenalty.ts).
+      'By rank: at Beginner a miss costs nothing. From Starter it costs half (rounded up), from Achiever the full amount.',
     ],
   ],
   [
@@ -135,6 +137,7 @@ const guides: [string, HowItWorksGuide, (string | number)[]][] = [
       // A slip costs the same as a resist: library −1 to −3, custom −1 (singular unit).
       `library −${Math.min(...PRESET_BAD_HABITS.map((h) => h.points))} to −${Math.max(...PRESET_BAD_HABITS.map((h) => h.points))} pts`,
       `−${BAD_HABIT_POINTS.customResist} pt`,
+      'By rank: at Beginner slips and days not logged cost nothing. From Starter they cost half (rounded up), from Achiever the full amount.',
     ],
   ],
   ['partners', partnersGuide, [`Up to ${MAX_PARTNERS} partners`, ...CHALLENGE_LENGTH_OPTIONS.map(String), 'Challenges don’t give points', 'Slipped']],

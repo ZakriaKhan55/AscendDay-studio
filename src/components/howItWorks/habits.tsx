@@ -5,7 +5,7 @@ import { missRule } from './penalties';
 
 /**
  * Habits. Rules from lib/pointsConfig.ts PRESET_HABIT_POINTS + recomputeTodayPresetPoints (first ticked
- * first), lib/habitAwards.ts CUSTOM_HABIT_POINTS, lib/missPenalty.ts (miss multipliers), HabitRow
+ * first), lib/habitAwards.ts CUSTOM_HABIT_POINTS, lib/missPenalty.ts (rank bands + miss multipliers), HabitRow
  * (swipe: right Done/Undo, left Delete; the Reading habit can't be ticked by hand), pact habit link.
  */
 export const habitsGuide: HowItWorksGuide = {
@@ -37,6 +37,7 @@ export const habitsGuide: HowItWorksGuide = {
       <Fig>×{missRule.again}</Fig>; from {missRule.rank} rank, <Fig>×{missRule.second}</Fig> for the 2nd and <Fig>×{missRule.third}</Fig> from
       the 3rd (rounded). Ticking it resets the count.
     </>,
+    `By rank: at ${missRule.free} a miss costs nothing. From ${missRule.half} it costs half (rounded up), from ${missRule.full} the full amount.`,
     'Custom habits have no penalty. The Reading habit earns no points and has no penalty.',
   ],
 };
