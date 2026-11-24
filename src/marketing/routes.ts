@@ -49,8 +49,8 @@ const SITE_COPY_UPDATED = '2026-11-07'; // 2026-11-07: footer Contact link, Abou
 
 /** A feature page whose own text changed after SITE_COPY_UPDATED. */
 const FEATURE_UPDATED: Partial<Record<FeatureSlug, string>> = {
-  habits: '2026-11-24', // misses by rank: nothing at Beginner, half to Trainer (11-17: Reading habit: pages or chapters)
-  'bad-habits': '2026-11-24', // slips by rank: nothing at Beginner, half to Trainer (11-13: a slip or a day not logged costs the resist points)
+  habits: '2026-11-24', // misses by rank: 1 point at Beginner, half to Trainer (11-17: Reading habit: pages or chapters)
+  'bad-habits': '2026-11-24', // slips by rank: 1 point at Beginner, half to Trainer (11-13: a slip or a day not logged costs the resist points)
   ranks: '2026-11-24', // misses by rank, new FAQ (11-13: finished-book bonus 20; 11-09: recovery check-ins)
   'projects-goals': '2026-11-22', // set a goal or project's progress by hand
   recovery: '2026-11-22', // FAQ: sober streak (11-17: daily check-in, crisis lines, Slipped/reset wording, re-shot screens)
@@ -91,7 +91,7 @@ export const MARKETING_ROUTES: MarketingRoute[] = [
     ogImage: 'home',
     ogAlt: 'AscendDay – Gamified Self-Improvement. Step up every day.',
     index: true,
-    updated: '2026-11-24', // misses cost points from Starter (half until Achiever); else SITE_COPY_UPDATED
+    updated: '2026-11-24', // misses by rank (1 point at Beginner, half until Achiever); else SITE_COPY_UPDATED
   },
   {
     path: '/features',

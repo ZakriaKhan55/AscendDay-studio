@@ -27,6 +27,7 @@ const times = (m: number) => `×${m}`;
 /** A real two-point library habit for the worked example. */
 const example = library.find((h) => h.points === 2) ?? library[0];
 const { seasonIn } = penaltyBand;
+const exampleFlat = missRun(example.points, seasonIn.flat);
 const exampleHalf = missRun(example.points, seasonIn.half);
 const exampleFull = missRun(example.points, seasonIn.full);
 const exampleAbove = missRun(example.points, seasonIn.escalate);
@@ -40,8 +41,8 @@ export const habits: FeatureContent = {
         move your rank and your place in the leagues.
       </p>
       <p>
-        It also works the other way: once you reach {penaltyBand.half.name} rank, a habit you chose from the library and then
-        skip costs points. That small cost is what makes a streak feel worth protecting.
+        It also works the other way: a habit you chose from the library and then skip costs points. That small cost is
+        what makes a streak feel worth protecting.
       </p>
     </>
   ),
@@ -146,7 +147,12 @@ export const habits: FeatureContent = {
           caption="Missing a library habit"
           rows={[
             { what: 'First missed day', amount: times(below(1)), tone: 'loss', note: 'The habit’s own points (the full amount; see By rank), counted from the day you add it.' },
-            { what: 'Each further missed day in a row', amount: times(below(2)), tone: 'loss', note: 'Rounded to whole points.' },
+            {
+              what: 'Each further missed day in a row',
+              amount: times(below(2)),
+              tone: 'loss',
+              note: `Rounded to whole points. At ${penaltyBand.flat.name} a miss stays ${pts(exampleFlat[2])} (see By rank).`,
+            },
             {
               what: `From ${performer.name} rank (${fmt(performer.minPoints)} season points)`,
               amount: `${times(above(2))}, then ${times(above(3))}`,
@@ -158,7 +164,7 @@ export const habits: FeatureContent = {
         />
         <Rules caption="By rank" rows={penaltyBandRows('a miss')} />
         <Note title={`Example with “${example.name}” (${pts(example.points)}).`}>
-          At {penaltyBand.free.name} missing it costs nothing. At {penaltyBand.half.name} three days in a row cost{' '}
+          At {penaltyBand.flat.name} three days in a row cost {negList(exampleFlat)}, at {penaltyBand.half.name}{' '}
           {negList(exampleHalf)}, at {penaltyBand.full.name} {negList(exampleFull)}, and at {performer.name} rank or higher{' '}
           {negList(exampleAbove)}. Custom habits and the Reading habit never cost anything.
         </Note>
@@ -213,7 +219,7 @@ export const habits: FeatureContent = {
     ['Library', `${library.length} daily habits in ${PRESET_CATEGORIES.length} groups, ${libraryPoints} points each`],
     ['Custom habits', `Daily (${pts(CUSTOM_HABIT_POINTS)}) or weekly (streak only)`],
     ['Daily cap', `${cap} points from habits`],
-    ['Missed library habit', `Its points, ${times(below(2))} for more misses in a row`],
+    ['Missed library habit', `Its points (by rank), ${times(below(2))} for more misses in a row from ${penaltyBand.half.name}`],
     ['Misses by rank', `${bandSentence}`],
     ['Streaks', 'Current and best streak per habit'],
     ['Price', 'Free while in beta'],
@@ -244,7 +250,7 @@ export const habits: FeatureContent = {
     },
     {
       q: 'What happens if I miss a habit?',
-      a: `If it is a library habit, it costs its own points after the day ends, and more if you keep missing it (${times(below(2))} each further day in a row, more from ${performer.name} rank). ${byRankSentence} Ticking it again resets the count. Custom habits never cost points.`,
+      a: `If it is a library habit, it costs points after the day ends. ${byRankSentence} From ${penaltyBand.half.name} it costs more if you keep missing it (${times(below(2))} each further day in a row, more from ${performer.name} rank). Ticking it again resets the count. Custom habits never cost points.`,
     },
     {
       q: 'Can I track weekly habits?',

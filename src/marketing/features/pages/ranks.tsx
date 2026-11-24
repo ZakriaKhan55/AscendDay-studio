@@ -125,11 +125,13 @@ export const ranks: FeatureContent = {
           ]}
         />
         <Note title="Misses cost more as you climb.">
-          At {first.name} a miss costs nothing. From {penaltyBand.half.name} ({fmt(penaltyBand.half.minPoints)} season points) it
-          costs half its points, rounded up, so a two-point habit missed three days in a row costs{' '}
-          {negList(missRun(2, penaltyBand.seasonIn.half))}. From {penaltyBand.full.name} ({fmt(penaltyBand.full.minPoints)}) it costs
-          the full amount, {negList(missRun(2, penaltyBand.seasonIn.full))}. Below {fmt(performer.minPoints)} season points a repeated
-          miss costs {times(getMissPenaltyMultiplier(2))} the normal amount. From {performer.name}, rank {performerIndex}, a second miss in a row costs{' '}
+          At {first.name} every miss costs just {pts(missRun(3, penaltyBand.seasonIn.flat)[0])}, even many in a row, so a
+          three-point habit missed three days in a row costs {negList(missRun(3, penaltyBand.seasonIn.flat))}. From{' '}
+          {penaltyBand.half.name} ({fmt(penaltyBand.half.minPoints)} season points) it costs half its points, rounded up:{' '}
+          {negList(missRun(3, penaltyBand.seasonIn.half))}. From {penaltyBand.full.name} ({fmt(penaltyBand.full.minPoints)}) the full
+          amount: {negList(missRun(3, penaltyBand.seasonIn.full))}. Above {first.name} and below {fmt(performer.minPoints)} season
+          points a repeated miss costs {times(getMissPenaltyMultiplier(2))} a first one (before rounding). From {performer.name}, rank{' '}
+          {performerIndex}, a second miss in a row costs{' '}
           {times(getMissPenaltyMultiplier(2, performer.minPoints))} and a third{' '}
           {times(getMissPenaltyMultiplier(3, performer.minPoints))}, so the higher ranks are harder to hold. The
           details are on the{' '}
@@ -214,7 +216,7 @@ export const ranks: FeatureContent = {
     ['Top rank', `${fmt(top.minPoints)} season points`],
     ['Season', `${seasonDays} days, then back to ${first.name}`],
     ['Lowest score', '0; it never goes negative'],
-    ['Misses cost', `Nothing at ${first.name}, half to ${penaltyBand.lastHalf.name}, full from ${penaltyBand.full.name}`],
+    ['Misses cost', `${pts(missRun(3, penaltyBand.seasonIn.flat)[0])} at ${first.name}, half to ${penaltyBand.lastHalf.name}, full from ${penaltyBand.full.name}`],
     ['Harder from', `${performer.name}, ${fmt(performer.minPoints)} points`],
     ['Streaks', 'Alive while you log today or yesterday'],
     ['Price', 'Free while in beta'],
@@ -247,7 +249,7 @@ export const ranks: FeatureContent = {
     },
     {
       q: 'Do misses cost points at every rank?',
-      a: `No. ${byRankSentence} A ${first.name} can learn the app without losing points; from ${penaltyBand.half.name} on, a missed library habit, a bad-habit slip or a day not logged takes points away. Your rank follows your season points, so this changes as you climb or drop.`,
+      a: `Yes, but less at the start. ${byRankSentence} A ${first.name} can learn the app while losing only ${pts(missRun(3, penaltyBand.seasonIn.flat)[0])} for each missed library habit, bad-habit slip or day not logged; from ${penaltyBand.half.name} on, each costs more. Your rank follows your season points, so this changes as you climb or drop.`,
     },
     {
       q: 'What happens to my points when the season ends?',

@@ -155,21 +155,25 @@ assert(featureTexts.length === FEATURE_SLUGS.length, 'every feature page is chec
 const ranksPage = renderMarketingPage(MARKETING_ROUTES.find((r) => r.slug === 'ranks')!, assets);
 TIERS.forEach((tier, i) => assert(ranksPage.includes(`${i + 1}. ${tier.name}`) && ranksPage.includes(pts(fmt(tier.minPoints))), `ranks page lists ${tier.name} at ${tier.minPoints}`));
 // Penalties by rank (1.8.0): the habits, bad-habits and ranks pages and the home page say a miss costs
-// nothing at Beginner and half to Trainer, with worked numbers from getMissPenalty; never "−0".
+// a flat 1 point at Beginner (v2) and half to Trainer, with worked numbers from getMissPenalty; never "−0",
+// and nowhere that a Beginner loses nothing.
 {
   const squash = (html: string) => textOf(html).replace(/\s+/g, ' ').replace(/ ([.,;)])/g, '$1');
   const plain = (slug: string) => squash(renderMarketingPage(MARKETING_ROUTES.find((r) => r.slug === slug)!, assets));
   const habitsText = plain('habits');
   assert(habitsText.includes('By rank') && habitsText.includes('Beginner (under 200 season points)') && habitsText.includes('Starter to Trainer (200–1,399)'), 'habits page: By rank table');
-  assert(habitsText.includes('At Starter three days in a row cost −1, −2, −2, at Achiever −2, −3, −3'), 'habits page: worked example by rank');
+  assert(habitsText.includes('At Beginner three days in a row cost −1, −1, −1, at Starter −1, −2, −2, at Achiever −2, −3, −3'), 'habits page: worked example by rank');
   const badText = plain('bad-habits');
-  assert(badText.includes('By rank') && badText.includes('cost −2, −3, −3; from Starter to Trainer −1, −2, −2; at Beginner nothing'), 'bad-habits page: rank example');
+  assert(badText.includes('By rank') && badText.includes('cost −2, −3, −3; from Starter to Trainer −1, −2, −2; at Beginner −1, −1, −1'), 'bad-habits page: rank example');
   const ranksText = plain('ranks');
   assert(ranksText.includes('Do misses cost points at every rank?') && ranksText.includes('half its points, rounded up'), 'ranks page: rank bands');
+  assert(ranksText.includes('three-point habit missed three days in a row costs −1, −1, −1') && ranksText.includes('rounded up: −2, −3, −3') && ranksText.includes('the full amount: −3, −5, −5'), 'ranks page: 3-point worked example');
   const homeText = squash(renderMarketingPage(MARKETING_ROUTES.find((r) => r.path === '/')!, assets));
-  assert(homeText.includes('Past Beginner, doing nothing is never neutral'), 'home: honest score line by rank');
+  assert(homeText.includes('skipping a habit you chose costs points. Doing nothing is never neutral'), 'home: honest score line');
+  assert(homeText.includes('1 point at Beginner, half until Achiever'), 'home: costs by rank');
   for (const [name, text] of [['habits', habitsText], ['bad-habits', badText], ['ranks', ranksText], ['home', homeText]] as const) {
     assert(!/−0\b/.test(text), `${name}: never "−0"`);
+    assert(!/nothing at Beginner|at Beginner nothing|costs no points yet|Past Beginner|without losing points/i.test(text), `${name}: no "Beginners lose nothing" wording`);
   }
 }
 

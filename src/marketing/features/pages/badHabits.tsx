@@ -18,6 +18,7 @@ const performer = TIERS.find((t) => t.name === 'Performer') ?? TIERS[0];
 const times = (m: number) => `×${m}`;
 // A slip and a day not logged cost the same: the habit's resist value (x the miss multiplier).
 const example = PRESET_BAD_HABITS.find((h) => h.name === 'Doomscrolling') ?? PRESET_BAD_HABITS[0];
+const badRunFlat = missRun(example.points, penaltyBand.seasonIn.flat);
 const badRunHalf = missRun(example.points, penaltyBand.seasonIn.half);
 const badRunFull = missRun(example.points, penaltyBand.seasonIn.full);
 const limit = P.dailyPenaltyLimit;
@@ -28,7 +29,7 @@ export const badHabits: FeatureContent = {
       <p>
         AscendDay’s bad habit tracker is a free daily check-in for the things you are trying to stop, like doomscrolling or
         junk food. Each day you log one word per habit, Resisted or Slipped. Resisting earns points and builds a clean
-        streak; from {penaltyBand.half.name} rank on, slipping, or not logging at all, costs points.
+        streak; slipping, or not logging at all, costs points.
       </p>
       <p>
         It works on trust: AscendDay can’t see what you did, only what you log. The points help you break bad habits by
@@ -133,7 +134,7 @@ export const badHabits: FeatureContent = {
               what: 'Each further bad day in a row (slipped or not logged)',
               amount: times(getMissPenaltyMultiplier(2)),
               tone: 'loss',
-              note: 'Rounded to whole points. A resisted day resets the count.',
+              note: `Rounded to whole points. At ${penaltyBand.flat.name} it stays ${pts(badRunFlat[2])} (see By rank). A resisted day resets the count.`,
             },
             {
               what: `From ${performer.name} rank (${fmt(performer.minPoints)} season points)`,
@@ -159,7 +160,7 @@ export const badHabits: FeatureContent = {
         />
         <Note title="Being straight about the numbers.">
           From {penaltyBand.full.name}, three slips in a row on {example.name} cost {negList(badRunFull)}; from{' '}
-          {penaltyBand.half.name} to {penaltyBand.lastHalf.name} {negList(badRunHalf)}; at {penaltyBand.free.name} nothing. Three days
+          {penaltyBand.half.name} to {penaltyBand.lastHalf.name} {negList(badRunHalf)}; at {penaltyBand.flat.name} {negList(badRunFlat)}. Three days
           left blank cost the same: a blank day costs
           the same as a slip and still counts as a bad day in a row, so staying silent never saves points, and a resisted
           day is the only thing that resets the count.
@@ -200,7 +201,7 @@ export const badHabits: FeatureContent = {
     ['Library', `${PRESET_BAD_HABITS.length} bad habits, ${resistRange} points per resisted day`],
     ['Custom bad habits', `${pts(P.customResist)} per resisted day`],
     ['Daily cap', `${P.dailyCap} resist points`],
-    ['Slipped', `−${resistRange} (the same as its resist value), more for bad days in a row`],
+    ['Slipped', `−${resistRange} (the same as its resist value), more for bad days in a row from ${penaltyBand.half.name}`],
     ['By rank', bandSentence],
     ['Not logged', 'The same as a slip'],
     ['Can lose points', `Every bad habit, at most ${limit} a day`],
@@ -231,7 +232,7 @@ export const badHabits: FeatureContent = {
     },
     {
       q: 'What if I forget to log a day?',
-      a: `A day with no log costs the same as a slip, the habit’s resist value, charged after midnight and more if it keeps happening. It counts toward the ${limit} bad habits a day that can lose points.`,
+      a: `A day with no log costs the same as a slip, charged after midnight: the habit’s resist value, more if it keeps happening, or a flat ${pts(badRunFlat[0])} at ${penaltyBand.flat.name}. It counts toward the ${limit} bad habits a day that can lose points.`,
     },
     {
       q: 'Is there a limit on what bad habits can cost in a day?',
