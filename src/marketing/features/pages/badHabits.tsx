@@ -6,21 +6,21 @@ import { LINK_CLASS } from '../../components/MarketingLayout';
 import { featurePath } from '../catalog';
 import { Block, Cards, Note, Rules, Steps, type FeatureContent } from '../blocks';
 import { fmt, pts, range } from '../format';
+import { bandSentence, byRankSentence, missRun, negList, penaltyBand, penaltyBandRows } from '../penaltyBands';
 
 /* /features/bad-habits. Sources: lib/presets.ts PRESET_BAD_HABITS, lib/pointsConfig.ts
-   BAD_HABIT_POINTS, lib/missPenalty.ts, lib/tiers.ts, and the Bad habits page's own How it
+   BAD_HABIT_POINTS, lib/missPenalty.ts (via ../penaltyBands.ts), lib/tiers.ts, and the Bad habits page's own How it
    works (components/howItWorks/badHabits.tsx). */
 
 const P = BAD_HABIT_POINTS;
 const resistRange = range(PRESET_BAD_HABITS.map((h) => h.points));
 const performer = TIERS.find((t) => t.name === 'Performer') ?? TIERS[0];
-const cost = (base: number, nth: number, season = 0) => Math.round(base * getMissPenaltyMultiplier(nth, season));
 const times = (m: number) => `×${m}`;
 // A slip and a day not logged cost the same: the habit's resist value (x the miss multiplier).
 const example = PRESET_BAD_HABITS.find((h) => h.name === 'Doomscrolling') ?? PRESET_BAD_HABITS[0];
-const badRun = [1, 2, 3].map((n) => cost(example.points, n));
+const badRunHalf = missRun(example.points, penaltyBand.seasonIn.half);
+const badRunFull = missRun(example.points, penaltyBand.seasonIn.full);
 const limit = P.dailyPenaltyLimit;
-const neg = (list: number[]) => list.map((n) => `−${n}`).join(', ');
 
 export const badHabits: FeatureContent = {
   intro: (
@@ -28,7 +28,7 @@ export const badHabits: FeatureContent = {
       <p>
         AscendDay’s bad habit tracker is a free daily check-in for the things you are trying to stop, like doomscrolling or
         junk food. Each day you log one word per habit, Resisted or Slipped. Resisting earns points and builds a clean
-        streak; slipping, or not logging at all, costs points.
+        streak; from {penaltyBand.half.name} rank on, slipping, or not logging at all, costs points.
       </p>
       <p>
         It works on trust: AscendDay can’t see what you did, only what you log. The points help you break bad habits by
@@ -110,7 +110,7 @@ export const badHabits: FeatureContent = {
               what: 'Slipped',
               amount: `−${resistRange}`,
               tone: 'loss',
-              note: `The same as its resist value; a custom bad habit −${P.customResist}. Logged the same day.`,
+              note: `The same as its resist value (the full amount; see By rank); a custom bad habit −${P.customResist}. Logged the same day.`,
             },
             {
               what: 'Not logged at all',
@@ -143,6 +143,7 @@ export const badHabits: FeatureContent = {
             },
           ]}
         />
+        <Rules caption="By rank" rows={penaltyBandRows('a slip or a day not logged')} />
         <Cards
           cols={2}
           items={[
@@ -157,7 +158,9 @@ export const badHabits: FeatureContent = {
           ]}
         />
         <Note title="Being straight about the numbers.">
-          Three slips in a row on {example.name} cost {neg(badRun)}. Three days left blank cost the same: a blank day costs
+          From {penaltyBand.full.name}, three slips in a row on {example.name} cost {negList(badRunFull)}; from{' '}
+          {penaltyBand.half.name} to {penaltyBand.lastHalf.name} {negList(badRunHalf)}; at {penaltyBand.free.name} nothing. Three days
+          left blank cost the same: a blank day costs
           the same as a slip and still counts as a bad day in a row, so staying silent never saves points, and a resisted
           day is the only thing that resets the count.
         </Note>
@@ -198,6 +201,7 @@ export const badHabits: FeatureContent = {
     ['Custom bad habits', `${pts(P.customResist)} per resisted day`],
     ['Daily cap', `${P.dailyCap} resist points`],
     ['Slipped', `−${resistRange} (the same as its resist value), more for bad days in a row`],
+    ['By rank', bandSentence],
     ['Not logged', 'The same as a slip'],
     ['Can lose points', `Every bad habit, at most ${limit} a day`],
     ['Price', 'Free while in beta'],
@@ -219,7 +223,7 @@ export const badHabits: FeatureContent = {
     },
     {
       q: 'Why do slips and unlogged days cost points?',
-      a: `Because a tracker that only rewards good days lets you hide the bad ones. A slip costs the same as the habit’s resist value (${resistRange} points) and a day you don’t log costs the same, more when it keeps happening, so staying silent is never cheaper than an honest answer. At most ${limit} bad habits lose points on one day.`,
+      a: `Because a tracker that only rewards good days lets you hide the bad ones. A slip costs the same as the habit’s resist value (${resistRange} points) and a day you don’t log costs the same, more when it keeps happening, so staying silent is never cheaper than an honest answer. At most ${limit} bad habits lose points on one day. ${byRankSentence}`,
     },
     {
       q: 'What counts as a slip?',

@@ -25,6 +25,7 @@ import { CtaBand, FaqList, Section, SectionHeading } from '../components/Section
 import { Cards } from '../features/blocks';
 import { LANDING_FAQ, LANDING_FITS, LANDING_NOT_FOR, LANDING_WHY } from '../landingQa';
 import { fmt, pts, range } from '../features/format';
+import { penaltyBand } from '../features/penaltyBands';
 import { FEATURE_GROUPS, FEATURE_SLUGS, featurePath, featuresInGroup } from '../features/catalog';
 import { SITE_DESCRIPTOR, SITE_FORMER_NAME, SITE_HOST, SITE_MAKER, SITE_NAME, SITE_TAGLINE } from '../site';
 
@@ -180,7 +181,7 @@ function Hero() {
 
 const LOOP = [
   { title: 'Log what you do', text: 'Tick off habits, log a workout, read a few pages, write today’s entry. Each one earns points.' },
-  { title: 'Rank up', text: `Season points move you up ${TIERS.length} ranks, from ${TIERS[0].name} to ${topRank.name}. Missing a habit you chose costs points.` },
+  { title: 'Rank up', text: `Season points move you up ${TIERS.length} ranks, from ${TIERS[0].name} to ${topRank.name}. From ${penaltyBand.half.name} on, missing a habit you chose costs points.` },
   { title: 'Compete', text: 'Weekly, monthly and 90-day leagues rank everyone by the points they earned, so every week is a new race.' },
 ];
 
@@ -222,7 +223,7 @@ const REASONS = [
   },
   {
     title: 'An honest score',
-    text: 'Everything you log adds to one total, and skipping a habit you chose costs points. Doing nothing is never neutral, so your rank shows how you really did.',
+    text: `Everything you log adds to one total, and from ${penaltyBand.half.name} on, skipping a habit you chose costs points. Past ${penaltyBand.free.name}, doing nothing is never neutral, so your rank shows how you really did.`,
   },
   {
     title: 'Free, on phone and PC',
@@ -337,8 +338,9 @@ function PointsRanksLeagues() {
             ))}
           </dl>
           <p className="mt-5 rounded-xl bg-overlay-subtle p-4 text-sm leading-relaxed text-content-secondary">
-            <span className="font-semibold text-content-primary">And what costs points.</span> Missing a library habit,
-            slipping on a bad habit or not logging one takes points away, and the cost grows when it keeps happening.
+            <span className="font-semibold text-content-primary">And what costs points.</span> From {penaltyBand.half.name} on,
+            missing a library habit, slipping on a bad habit or not logging one takes points away (half until{' '}
+            {penaltyBand.full.name}), and the cost grows when it keeps happening.
             Projects, plans and partner challenges are for planning and support, so they don’t earn points.
           </p>
         </div>

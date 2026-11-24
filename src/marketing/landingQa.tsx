@@ -6,6 +6,7 @@ import { LINK_CLASS } from './components/MarketingLayout';
 import type { FaqItem } from './components/Sections';
 import { FEATURE_SLUGS, featurePath } from './features/catalog';
 import { fmt } from './features/format';
+import { byRankSentence, penaltyBand } from './features/penaltyBands';
 import { SEASON_DAYS, SITE_DEFINITION, SITE_HOST, SITE_MAKER, SITE_NAME } from './site';
 
 /*
@@ -44,7 +45,7 @@ export const LANDING_WHY: FaqItem[] = [
   },
   {
     q: 'Why can a missed habit cost points?',
-    a: `Because a streak is easier to protect when breaking it costs something. Losing points you already have tends to feel stronger than not earning new ones, the well-known idea of loss aversion, so a small cost is enough to get you to tick a habit on a tired day. Library habits can cost points, and so can any bad habit (at most ${BAD_HABIT_POINTS.dailyPenaltyLimit} bad habits a day); custom habits never do. A first miss costs the habit’s own points, each further miss in a row ×${repeatMiss} (more from ${performer.name} rank), and ticking the habit again resets the count.`,
+    a: `Because a streak is easier to protect when breaking it costs something. Losing points you already have tends to feel stronger than not earning new ones, the well-known idea of loss aversion, so a small cost is enough to get you to tick a habit on a tired day. Library habits can cost points, and so can any bad habit (at most ${BAD_HABIT_POINTS.dailyPenaltyLimit} bad habits a day); custom habits never do. A first miss costs the habit’s own points, each further miss in a row ×${repeatMiss} (more from ${performer.name} rank), and ticking the habit again resets the count. ${byRankSentence}`,
   },
   {
     q: 'Why compete in leagues against real people?',
@@ -96,7 +97,7 @@ export const LANDING_FAQ: FaqItem[] = [
     a: (
       <>
         What you log earns points, with a daily cap on most things so one long session can’t buy a rank. Missing a
-        library habit or slipping on a bad habit costs points. Your season points move you through {TIERS.length} ranks,
+        library habit or slipping on a bad habit costs points from {penaltyBand.half.name} rank on. Your season points move you through {TIERS.length} ranks,
         from {TIERS[0].name} to {topRank.name} at {fmt(topRank.minPoints)} points.{' '}
         <a href={featurePath('ranks')} className={LINK_CLASS}>
           More about ranks

@@ -18,11 +18,13 @@ import { LINK_CLASS } from '../../components/MarketingLayout';
 import { featurePath } from '../catalog';
 import { Block, Cards, Note, Rules, type FeatureContent } from '../blocks';
 import { fmt, pts } from '../format';
+import { bandSentence, byRankSentence, missRun, negList, penaltyBand } from '../penaltyBands';
 
 /* /features/ranks (ranks, season points and streaks in one page). Sources: lib/tiers.ts TIERS,
    lib/leagues.ts calculateSeasonalTotal (season points only, never below 0), lib/leagueTime.ts
    (season length), lib/rankCelebration.ts (each rank celebrated once per season, a new season
-   starts at Beginner), lib/missPenalty.ts (escalation from Performer), lib/pointsConfig.ts (caps),
+   starts at Beginner), lib/missPenalty.ts (rank bands via ../penaltyBands.ts, escalation from
+   Performer), lib/pointsConfig.ts (caps),
    components/views/TierView.tsx (progress to the next rank, season countdown, recent points) and
    lib/streakLogic.ts calculateUnifiedStreak (a streak lives while the last day is today or
    yesterday; the headline streak is the longest of habits, exercise, reading, resisted bad habits
@@ -114,12 +116,20 @@ export const ranks: FeatureContent = {
               amount: `up to ${WEEKLY_GOALS_POINTS.maxWeeklyPoints + WEEKLY_REFLECTION_POINTS.awarded} a week`,
             },
             { what: 'Recovery check-ins', amount: `up to ${RECOVERY_POINTS.seasonCap} a season` },
-            { what: 'Missed library habits, slips, unlogged bad-habit days', amount: 'lose points', tone: 'loss' },
+            {
+              what: 'Missed library habits, slips, unlogged bad-habit days',
+              amount: 'lose points',
+              tone: 'loss',
+              note: `${bandSentence}.`,
+            },
           ]}
         />
-        <Note title={`From ${performer.name} up, misses cost more.`}>
-          Below {fmt(performer.minPoints)} season points a repeated miss costs {times(getMissPenaltyMultiplier(2))} the
-          normal amount. From {performer.name}, rank {performerIndex}, a second miss in a row costs{' '}
+        <Note title="Misses cost more as you climb.">
+          At {first.name} a miss costs nothing. From {penaltyBand.half.name} ({fmt(penaltyBand.half.minPoints)} season points) it
+          costs half its points, rounded up, so a two-point habit missed three days in a row costs{' '}
+          {negList(missRun(2, penaltyBand.seasonIn.half))}. From {penaltyBand.full.name} ({fmt(penaltyBand.full.minPoints)}) it costs
+          the full amount, {negList(missRun(2, penaltyBand.seasonIn.full))}. Below {fmt(performer.minPoints)} season points a repeated
+          miss costs {times(getMissPenaltyMultiplier(2))} the normal amount. From {performer.name}, rank {performerIndex}, a second miss in a row costs{' '}
           {times(getMissPenaltyMultiplier(2, performer.minPoints))} and a third{' '}
           {times(getMissPenaltyMultiplier(3, performer.minPoints))}, so the higher ranks are harder to hold. The
           details are on the{' '}
@@ -204,6 +214,7 @@ export const ranks: FeatureContent = {
     ['Top rank', `${fmt(top.minPoints)} season points`],
     ['Season', `${seasonDays} days, then back to ${first.name}`],
     ['Lowest score', '0; it never goes negative'],
+    ['Misses cost', `Nothing at ${first.name}, half to ${penaltyBand.lastHalf.name}, full from ${penaltyBand.full.name}`],
     ['Harder from', `${performer.name}, ${fmt(performer.minPoints)} points`],
     ['Streaks', 'Alive while you log today or yesterday'],
     ['Price', 'Free while in beta'],
@@ -233,6 +244,10 @@ export const ranks: FeatureContent = {
     {
       q: 'Do I lose my rank?',
       a: `Your rank follows your season points, so points lost to misses can take you down a rank. Every new season also starts everyone at ${first.name} again.`,
+    },
+    {
+      q: 'Do misses cost points at every rank?',
+      a: `No. ${byRankSentence} A ${first.name} can learn the app without losing points; from ${penaltyBand.half.name} on, a missed library habit, a bad-habit slip or a day not logged takes points away. Your rank follows your season points, so this changes as you climb or drop.`,
     },
     {
       q: 'What happens to my points when the season ends?',

@@ -154,6 +154,25 @@ assert(featureTexts.length === FEATURE_SLUGS.length, 'every feature page is chec
 // The ranks page's ladder is the app's own (lib/tiers.ts), rank for rank.
 const ranksPage = renderMarketingPage(MARKETING_ROUTES.find((r) => r.slug === 'ranks')!, assets);
 TIERS.forEach((tier, i) => assert(ranksPage.includes(`${i + 1}. ${tier.name}`) && ranksPage.includes(pts(fmt(tier.minPoints))), `ranks page lists ${tier.name} at ${tier.minPoints}`));
+// Penalties by rank (1.8.0): the habits, bad-habits and ranks pages and the home page say a miss costs
+// nothing at Beginner and half to Trainer, with worked numbers from getMissPenalty; never "−0".
+{
+  const squash = (html: string) => textOf(html).replace(/\s+/g, ' ').replace(/ ([.,;)])/g, '$1');
+  const plain = (slug: string) => squash(renderMarketingPage(MARKETING_ROUTES.find((r) => r.slug === slug)!, assets));
+  const habitsText = plain('habits');
+  assert(habitsText.includes('By rank') && habitsText.includes('Beginner (under 200 season points)') && habitsText.includes('Starter to Trainer (200–1,399)'), 'habits page: By rank table');
+  assert(habitsText.includes('At Starter three days in a row cost −1, −2, −2, at Achiever −2, −3, −3'), 'habits page: worked example by rank');
+  const badText = plain('bad-habits');
+  assert(badText.includes('By rank') && badText.includes('cost −2, −3, −3; from Starter to Trainer −1, −2, −2; at Beginner nothing'), 'bad-habits page: rank example');
+  const ranksText = plain('ranks');
+  assert(ranksText.includes('Do misses cost points at every rank?') && ranksText.includes('half its points, rounded up'), 'ranks page: rank bands');
+  const homeText = squash(renderMarketingPage(MARKETING_ROUTES.find((r) => r.path === '/')!, assets));
+  assert(homeText.includes('Past Beginner, doing nothing is never neutral'), 'home: honest score line by rank');
+  for (const [name, text] of [['habits', habitsText], ['bad-habits', badText], ['ranks', ranksText], ['home', homeText]] as const) {
+    assert(!/−0\b/.test(text), `${name}: never "−0"`);
+  }
+}
+
 // Health-adjacent pages carry their not-medical-advice note; recovery also its check-in points and a helpline.
 const pageOf = (slug: string) => renderMarketingPage(MARKETING_ROUTES.find((r) => r.slug === slug)!, assets);
 const recoveryPage = pageOf('recovery');
