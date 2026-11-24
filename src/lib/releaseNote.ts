@@ -48,8 +48,8 @@ export function releaseNoteGroups(note: ReleaseNote): { key: ReleaseNoteGroupKey
 }
 
 export const RELEASE_NOTE: ReleaseNote | null = {
-  id: 5,
-  releasedAt: '2026-11-22T11:22:00+05:00',
-  title: "What's new in 1.6.0",
-  new: ["Goals and projects: turn on Set progress by hand, and their linked parts won't move or finish them."],
+  id: 6,
+  releasedAt: '2026-11-24T10:50:00+05:00',
+  title: "What's new in 1.7.0",
+  new: ['When a league week, month or season ends, you now see your results: your place, the top three and your change.'],
 };
