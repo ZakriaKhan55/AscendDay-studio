@@ -1,17 +1,19 @@
--- Penalties by rank (2026-11-24, release 1.8.0). Plan: knowledge/mode-a-rank-penalties-2026-11-24.md.
+-- Penalties by rank (2026-11-24, release 1.8.0, v2). Plan: knowledge/mode-a-rank-penalties-2026-11-24.md.
 -- A missed library habit, a bad-habit slip and an unlogged bad-habit day now cost by the season rank:
---   Beginner (< 200 season points)            0 (no point loss)
+--   Beginner (< 200 season points)            a flat 1 point (any base > 0; never grows for misses in a row)
 --   Starter, Learner, Trainer (200 - 1399)     half of the full penalty, rounded UP (never 0, never more)
 --   Achiever and up (>= 1400)                  unchanged: round(base x ascend_miss_multiplier)
 -- The rank lines are the tiers.ts minimums (Starter 200, Achiever 1400); every season, plain tier rule.
--- Client mirror: src/lib/points/missPenalty.ts (getMissPenalty, getEffectiveMissMultiplier,
--- getMissPenaltyRankShare); change both sides together.
+-- Client mirror: src/lib/points/missPenalty.ts (getMissPenalty, getEffectiveMissMultiplier);
+-- change both sides together.
 --
 -- New (pure, IMMUTABLE, search_path '', not SECURITY DEFINER; EXECUTE for service_role only, like
 -- ascend_miss_multiplier):
---   ascend_miss_rank_share(season)                       0 / 0.5 / 1
---   ascend_miss_effective_multiplier(misses, season)     rank share x ascend_miss_multiplier (stored
---                                                        in the rows' 'multiplier' metadata and reason)
+--   ascend_miss_effective_multiplier(base, misses, season)  the multiplier a row stores (metadata
+--       'multiplier' and the reason's "(Nx penalty)"): Beginner round(1 / base, 2), the share of the
+--       base the flat point is (1, 0.5, 0.33; never above 1 for a base >= 1, so the app's points
+--       list adds no "x" label); Starter to Trainer 0.5 x ascend_miss_multiplier (0.5, 0.75);
+--       Achiever+ ascend_miss_multiplier. Before rounding, base x it = the penalty (Beginner: to 2 decimals).
 --   ascend_miss_penalty(base, misses, season) -> int     the points one miss costs
 -- Changed (CREATE OR REPLACE of the LIVE bodies read with pg_get_functiondef on 2026-11-24, only the
 -- penalty lines changed; no signature change, so owner, ACL, SECURITY DEFINER and search_path stay):
@@ -19,41 +21,36 @@
 --   ascend_recompute_bad_habit_awards   slips
 -- ascend_miss_multiplier is unchanged and still used (by the new functions).
 --
--- Behaviour kept: a Beginner missed habit still writes a 0-point entry and a notice without
--- "points deducted" (the notice adds that only when the penalty > 0). A Beginner no-report has
--- penalty 0, so it is no candidate and writes no row (as any 0 candidate did); a Beginner slip gets
--- no row (penalty <= 0 is skipped). The bad-day walk still counts those days, so the multiplier
--- continues correctly after 200. Past rows are never touched (no backfill or refund).
+-- Beginner behaviour: a missed habit writes a -1 entry and the notice "... 1 points deducted." (the
+-- same text every 1-point penalty has had since 2026-10-15); a no-report is a 1-point candidate
+-- (row, log -1, notice) inside the day's 4-penalty limit; a slip gets a -1 row. The bad-day walk
+-- counts those days, so the multiplier continues correctly after 200. The season score never goes
+-- below 0 (ascend_season_points), so a Beginner at 0 still gets the -1 row but stays at 0.
+-- Past rows are never touched (no backfill or refund).
 --
 -- Order: BEFORE the studio test of 1.8.0. Prod-compatible: the old prod client only shows server
 -- rows; until prod gets 1.8.0 its "next miss" hints and its own short-lived slip preview show the
 -- old full amount, and the server's row replaces that preview (same id).
--- Rollback: re-run the live copies of the two functions saved before apply, then DROP the three new
+-- Rollback: re-run the live copies of the two functions saved before apply, then DROP the two new
 -- functions.
 
 BEGIN;
 
-CREATE OR REPLACE FUNCTION public.ascend_miss_rank_share(p_season_points integer)
- RETURNS numeric
- LANGUAGE sql
- IMMUTABLE
- SET search_path TO ''
-AS $function$
-  SELECT CASE
-    WHEN coalesce(p_season_points, 0) < 200  THEN 0    -- Beginner (tiers.ts Starter minPoints)
-    WHEN coalesce(p_season_points, 0) < 1400 THEN 0.5  -- Starter to Trainer (Achiever minPoints)
-    ELSE 1
-  END::numeric;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.ascend_miss_effective_multiplier(p_misses integer, p_season_points integer)
+CREATE OR REPLACE FUNCTION public.ascend_miss_effective_multiplier(p_base numeric, p_misses integer, p_season_points integer)
  RETURNS double precision
  LANGUAGE sql
  IMMUTABLE
  SET search_path TO ''
 AS $function$
-  SELECT (public.ascend_miss_rank_share(p_season_points)
-          * public.ascend_miss_multiplier(p_misses, coalesce(p_season_points, 0))::numeric)::double precision;
+  SELECT (CASE
+    -- Beginner (tiers.ts Starter minPoints): the flat point as a share of the base, 2 decimals.
+    WHEN coalesce(p_season_points, 0) < 200 THEN
+      CASE WHEN coalesce(p_base, 0) > 0 THEN round(1 / p_base, 2) ELSE 0 END
+    -- Starter to Trainer (Achiever minPoints): half.
+    WHEN coalesce(p_season_points, 0) < 1400 THEN
+      0.5 * public.ascend_miss_multiplier(p_misses, coalesce(p_season_points, 0))::numeric
+    ELSE public.ascend_miss_multiplier(p_misses, coalesce(p_season_points, 0))::numeric
+  END)::double precision;
 $function$;
 
 CREATE OR REPLACE FUNCTION public.ascend_miss_penalty(p_base numeric, p_misses integer, p_season_points integer)
@@ -62,19 +59,20 @@ CREATE OR REPLACE FUNCTION public.ascend_miss_penalty(p_base numeric, p_misses i
  IMMUTABLE
  SET search_path TO ''
 AS $function$
-  SELECT CASE public.ascend_miss_rank_share(p_season_points)
-    WHEN 0 THEN 0
-    WHEN 1 THEN round(p_base * public.ascend_miss_multiplier(p_misses, coalesce(p_season_points, 0))::numeric)::int
-    ELSE ceil(p_base * public.ascend_miss_multiplier(p_misses, coalesce(p_season_points, 0))::numeric
-              * public.ascend_miss_rank_share(p_season_points))::int
+  SELECT CASE
+    WHEN coalesce(p_base, 0) <= 0 THEN 0
+    -- Beginner: a flat 1 point, whatever the base or the misses in a row.
+    WHEN coalesce(p_season_points, 0) < 200 THEN 1
+    -- Starter to Trainer: half of the full penalty, rounded up.
+    WHEN coalesce(p_season_points, 0) < 1400 THEN
+      ceil(p_base * public.ascend_miss_multiplier(p_misses, coalesce(p_season_points, 0))::numeric * 0.5)::int
+    ELSE round(p_base * public.ascend_miss_multiplier(p_misses, coalesce(p_season_points, 0))::numeric)::int
   END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.ascend_miss_rank_share(integer) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.ascend_miss_effective_multiplier(integer, integer) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.ascend_miss_effective_multiplier(numeric, integer, integer) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.ascend_miss_penalty(numeric, integer, integer) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.ascend_miss_rank_share(integer) TO service_role;
-GRANT EXECUTE ON FUNCTION public.ascend_miss_effective_multiplier(integer, integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.ascend_miss_effective_multiplier(numeric, integer, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION public.ascend_miss_penalty(numeric, integer, integer) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.ascend_process_penalties(p_user uuid, p_tz text, p_from date, p_to date, p_apply boolean)
@@ -174,8 +172,8 @@ BEGIN
         END IF;
       END LOOP;
 
-      -- Rank band (2026-11-24): Beginner 0, Starter to Trainer half rounded up, Achiever+ as before.
-      v_mult := public.ascend_miss_effective_multiplier(v_misses, v_season);
+      -- Rank band (2026-11-24): Beginner a flat 1, Starter to Trainer half rounded up, Achiever+ as before.
+      v_mult := public.ascend_miss_effective_multiplier((v_habit.data->>'points')::numeric, v_misses, v_season);
       v_penalty := public.ascend_miss_penalty((v_habit.data->>'points')::numeric, v_misses, v_season);
       v_entry_id := 'habit_missed_' || v_habit.id || '_' || v_key;
 
@@ -263,8 +261,8 @@ BEGIN
                    OR l.id = 'no_report_' || h.id || '_' || v_key))
       ), candidate AS (
         SELECT 'no_report'::text AS what, 1 AS what_order, m.id AS bh_id, m.data, m.at, m.id AS tie_id, m.occ,
-          public.ascend_miss_effective_multiplier(m.occ, v_season) AS mult,
-          -- Rank band: a Beginner no-report costs 0, so it is no candidate (penalty > 0 below).
+          public.ascend_miss_effective_multiplier(public.ascend_bad_habit_points(m.data), m.occ, v_season) AS mult,
+          -- Rank band: a Beginner no-report costs a flat 1.
           public.ascend_miss_penalty(public.ascend_bad_habit_points(m.data), m.occ, v_season) AS penalty,
           NULL::text AS entry_id
         FROM missed m
@@ -517,11 +515,11 @@ BEGIN
             p_user, s.bh_id, p_day, public.ascend_local_date(s.habit_created, p_tz)) AS occ
         FROM slip s
       ), priced AS (
-        SELECT c.*, public.ascend_miss_effective_multiplier(c.occ, v_season) AS mult
+        SELECT c.*, public.ascend_miss_effective_multiplier(public.ascend_bad_habit_points(c.bh_data), c.occ, v_season) AS mult
         FROM counted c
       )
-      -- Rank band (2026-11-24): a Beginner slip costs 0 and gets no row; Starter to Trainer half,
-      -- rounded up; Achiever+ as before (ascend_miss_penalty).
+      -- Rank band (2026-11-24): a Beginner slip costs a flat 1; Starter to Trainer half, rounded up;
+      -- Achiever+ as before (ascend_miss_penalty).
       SELECT p.bh_id, p.name, p.logged_at, p.mult, p.kept_penalty IS NOT NULL AS kept,
         coalesce(p.kept_penalty,
                  public.ascend_miss_penalty(public.ascend_bad_habit_points(p.bh_data), p.occ, v_season)) AS penalty
