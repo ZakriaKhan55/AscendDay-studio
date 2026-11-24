@@ -889,6 +889,9 @@ export interface AppState {
   /** Id of the newest release note already shown (lib/whatsNew); null until the first one shows. */
   lastSeenRelease?: number | null;
 
+  /** Newest league result already shown per league (lib/leagues/leagueResults); null until set. */
+  leagueResultsSeen?: LeagueResultsSeen | null;
+
   /** The user's own order of lists (table list_orders, one row per list; lib/listOrder.ts). */
   listOrders?: ListOrder[];
 
@@ -916,6 +919,12 @@ export interface RankCelebrated {
   season: number;
   tierIndex: number;
 }
+
+/**
+ * League results memory: per league type, the archive period id (W:/M:/S:, optionally @S<n>) of the
+ * newest result already shown, or null when none was shown yet.
+ */
+export type LeagueResultsSeen = Record<LeagueType, string | null>;
 
 export interface TimeTrackerActivity {
   id: string;
@@ -1150,6 +1159,7 @@ export const DEFAULT_STATE: AppState = {
   themePreference: 'system',
   rankCelebrated: null,
   lastSeenRelease: null,
+  leagueResultsSeen: null,
   listOrders: [],
   recoveryCheckins: [],
 };

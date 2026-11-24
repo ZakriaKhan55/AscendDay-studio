@@ -2,8 +2,9 @@
 // marks, profile switches), moved out of store.ts unchanged. useAppState calls this hook once, at the same
 // place, and destructures the members (their places in its return object are not side by side).
 import { useCallback } from 'react';
-import type { AppState, NotificationPreferenceKey, RankCelebrated } from '@/types';
+import type { AppState, LeagueResultsSeen, NotificationPreferenceKey, RankCelebrated } from '@/types';
 import { mergeRankCelebrated } from '../leagues/rankCelebration';
+import { mergeLeagueResultsSeen } from '../leagues/leagueResults';
 import { mergeLastSeenRelease } from '../content/whatsNew';
 import { dispatchToastError } from '../store/storeShared';
 import type { ProfileSwitchKey } from '../store/storeShared';
@@ -96,6 +97,14 @@ export function useProfileActions(setState: StoreSetState, get: () => AppState, 
     [setState]
   );
 
+  /** League results memory (lib/leagues/leagueResults), saved at once so a reload or another device never shows them again. */
+  const setLeagueResultsSeen = useCallback(
+    (memory: LeagueResultsSeen) => {
+      setState((prev) => ({ ...prev, leagueResultsSeen: mergeLeagueResultsSeen(prev.leagueResultsSeen, memory) }), { immediate: true });
+    },
+    [setState]
+  );
+
   // Flips one on/off profile setting: the switch moves at once, and if the profile write fails
   // it moves back and says so, so a switch never shows a setting the server does not hold.
   const flipProfileSwitch = useCallback(
@@ -144,6 +153,7 @@ export function useProfileActions(setState: StoreSetState, get: () => AppState, 
   return {
     setRankCelebrated,
     setLastSeenRelease,
+    setLeagueResultsSeen,
     setUsername,
     updateProfileUsername,
     updateProfileAvatar,

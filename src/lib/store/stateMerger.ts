@@ -31,6 +31,7 @@ import { isWeeklyGoalSeasonSplitEntryId } from '../leagues/weeklyGoalSeasons';
 import { computeStateDataWeight, type UserDataWeight } from './dataWeight';
 import { trustedNow, trustedNowMs } from '../time/clock';
 import { mergeRankCelebrated } from '../leagues/rankCelebration';
+import { mergeLeagueResultsSeen } from '../leagues/leagueResults';
 import { normalizeThemePreference } from '../ui/theme';
 import { mergeLastSeenRelease } from '../content/whatsNew';
 
@@ -1373,6 +1374,7 @@ function mergeAppStateInternal(
     ...mergeThemePreference(baseState, incomingState),
     rankCelebrated: mergeRankCelebrated(baseState.rankCelebrated, incomingState.rankCelebrated),
     lastSeenRelease: mergeLastSeenRelease(baseState.lastSeenRelease, incomingState.lastSeenRelease),
+    leagueResultsSeen: mergeLeagueResultsSeen(baseState.leagueResultsSeen, incomingState.leagueResultsSeen),
     // Per list, the later reorder wins (without this the final spread let incoming win whole).
     listOrders: mergeEntityArrays(baseState.listOrders || [], incomingState.listOrders || [], tombstoneSet),
     // Check-ins are only ever added (one per day): keep every day either side has.
