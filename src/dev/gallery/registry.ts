@@ -126,6 +126,7 @@ export const GALLERY_GROUPS: GalleryGroupInfo[] = [
       { id: 'league-countdown', title: 'League countdown' },
       { id: 'member-card', title: 'Member card', note: 'CompetitorProfileModal in each state, with fake members (no fetch).' },
       { id: 'rank-up', title: 'Rank up', note: 'The real overlay with its fanfare (sound plays even if your tick choice is vibration). Starter to Trainer clean, Achiever to Expert richer, Leader and Master the full show; a jump is one level grander. Try both themes and reduced motion.' },
+      { id: 'league-results', title: 'League results', note: 'The real results overlay with its stings, from fake server archives: 1st the full show, 2nd/3rd a medal, 4th+ and alone calm, a tie, the season finale, and 2 or 3 leagues ending together (Next, Skip all). Reduced motion switch; sound plays even if your tick choice is vibration unless you turn that off.' },
     ],
   },
   {

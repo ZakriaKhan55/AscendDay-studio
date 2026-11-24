@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { ChevronRight, Play } from 'lucide-react';
-import { Button, cx } from '@/components/ui/primitives';
+import { Button, Switch, cx } from '@/components/ui/primitives';
 import { RankUpCelebration } from '@/components/ui/RankUpCelebration';
+import { LeagueResultsOverlay } from '@/components/ui/LeagueResultsOverlay';
+import { buildLeagueResultCard, type LeagueResultCard } from '@/lib/leagues/leagueResults';
 import { TierBadge } from '@/components/ui/TierBadge';
 import { RankChip } from '@/components/ui/RankChip';
 import { LeagueCountdown } from '@/components/ui/LeagueCountdown';
@@ -9,7 +11,7 @@ import { CompetitorProfileModal } from '@/components/ui/CompetitorProfileModal';
 import { RankNumber, YouTag } from './appCopies';
 import { TIERS, getCurrentTier } from '@/lib/leagues/tiers';
 import type { MemberDetails } from '@/lib/leagues/useMemberDetails';
-import type { LeagueCompetitor, MemberCard } from '@/types';
+import type { LeagueArchive, LeagueCompetitor, LeagueType, MemberCard } from '@/types';
 import { Caption, Section } from './shared';
 
 // Every single step plus the jumps Zakria asked for; points shown are the new rank's exact threshold.
@@ -42,6 +44,101 @@ function RankUpDemo() {
           seasonPoints={TIERS[playing[1]].minPoints}
           onClose={() => setPlaying(null)}
           forceSound
+        />
+      )}
+    </div>
+  );
+}
+
+const RESULT_NAMES: Array<[string, string]> = [
+  ['sara_k', '🦊'], ['yahya', '🐺'], ['hamza', '🦁'], ['ali_r', '🐯'], ['noor', '🦉'], ['bilal', '🐻'], ['a_member_with_a_really_long_username', '🐢'],
+  ['fatima', '🐼'], ['umar', '🐨'], ['ayesha', '🐸'], ['khan', '🐙'], ['zain', '🐬'], ['maryam', '🦋'], ['hassan', '🐝'],
+];
+
+/**
+ * A fake server archive (as ascend_league_archive_rows writes it): `points` best first, you at
+ * `place`. Turned into a card by the real buildLeagueResultCard, with `previous` for the delta line.
+ */
+function fakeResult(type: LeagueType, id: string, place: number, points: number[], previous?: { place: number; points: number }): LeagueResultCard {
+  const archive = (rank: number, pts: number[]): LeagueArchive => ({
+    id,
+    type,
+    periodLabel: '',
+    competitors: pts.map((p, i) => {
+      const [name, avatar] = i === rank - 1 ? ['zakria', '🦅'] : RESULT_NAMES[i % RESULT_NAMES.length];
+      return { id: `c${i}`, name, avatar, points: p, totalPoints: 0, isRealUser: true, ...(i === rank - 1 ? { isUser: true } : {}) };
+    }),
+    userRank: rank,
+    userPoints: pts[rank - 1],
+    archivedAt: '2026-11-23T00:15:00.000Z',
+    source: 'server',
+  });
+  const prev = previous ? { ...archive(previous.place, points), userPoints: previous.points } : null;
+  return buildLeagueResultCard(archive(place, points), prev);
+}
+
+const BOARD_14 = [612, 540, 498, 455, 401, 377, 342, 300, 251, 198, 150, 96, 40, 12];
+const WEEK = 'W:2026-W47';
+const MONTH = 'M:2026-11';
+const SEASON = 'S:1';
+
+const RESULT_DEMOS: Array<{ label: string; note?: string; cards: LeagueResultCard[] }> = [
+  { label: 'Week · 1st', cards: [fakeResult('weekly', WEEK, 1, BOARD_14, { place: 3, points: 480 })] },
+  { label: 'Week · 2nd', cards: [fakeResult('weekly', WEEK, 2, BOARD_14, { place: 2, points: 560 })] },
+  { label: 'Week · 3rd', cards: [fakeResult('weekly', WEEK, 3, BOARD_14)] },
+  { label: 'Week · 4th+', note: '#7 of 14', cards: [fakeResult('weekly', WEEK, 7, BOARD_14, { place: 5, points: 410 })] },
+  { label: 'Week · alone', note: 'only you scored', cards: [fakeResult('weekly', WEEK, 1, [120])] },
+  { label: 'Week · tie', note: '464 vs 464, server put you 2nd', cards: [fakeResult('weekly', WEEK, 2, [464, 464, 461, 300])] },
+  { label: 'Season · 1st', note: 'finale', cards: [fakeResult('ninetyDay', SEASON, 1, [5400, 3100, 1840, 900])] },
+  { label: 'Season · 5th', cards: [fakeResult('ninetyDay', SEASON, 5, [5400, 3100, 2600, 2000, 1840, 900])] },
+  {
+    label: '2 cards',
+    note: 'week 2nd + month 1st',
+    cards: [fakeResult('weekly', WEEK, 2, BOARD_14), fakeResult('monthly', MONTH, 1, [2210, 1980, 1500, 1200, 800])],
+  },
+  {
+    label: '3 cards',
+    note: 'week 4th + month 2nd + season 1st',
+    cards: [
+      fakeResult('weekly', WEEK, 4, BOARD_14, { place: 6, points: 350 }),
+      fakeResult('monthly', MONTH, 2, [2210, 1980, 1500, 1200, 800]),
+      fakeResult('ninetyDay', SEASON, 1, [5400, 3100, 1840, 900]),
+    ],
+  },
+];
+
+function LeagueResultsDemo() {
+  const [playing, setPlaying] = useState<number | null>(null);
+  const [reduced, setReduced] = useState(false);
+  const [forceSound, setForceSound] = useState(true);
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
+        <span className="flex items-center gap-2 text-sm text-content-secondary">
+          <Switch checked={reduced} onChange={() => setReduced((v) => !v)} label="Reduced motion" />
+          Reduced motion
+        </span>
+        <span className="flex items-center gap-2 text-sm text-content-secondary">
+          <Switch checked={forceSound} onChange={() => setForceSound((v) => !v)} label="Always play sound" />
+          Always play sound (off: follow my tick feedback choice, as in the app)
+        </span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {RESULT_DEMOS.map((demo, i) => (
+          <Button key={demo.label} variant="secondary" onClick={() => setPlaying(i)} className="justify-start">
+            <Play size={14} aria-hidden="true" />
+            {demo.label}
+            {demo.note && <span className="text-2xs font-medium text-content-muted">{demo.note}</span>}
+          </Button>
+        ))}
+      </div>
+      {playing !== null && (
+        <LeagueResultsOverlay
+          key={`${playing}-${reduced}`}
+          cards={RESULT_DEMOS[playing].cards}
+          onClose={() => setPlaying(null)}
+          forceSound={forceSound}
+          forceReducedMotion={reduced}
         />
       )}
     </div>
@@ -317,6 +414,10 @@ export function LeaguesGroup() {
 
       <Section id="rank-up">
         <RankUpDemo />
+      </Section>
+
+      <Section id="league-results">
+        <LeagueResultsDemo />
       </Section>
     </>
   );
