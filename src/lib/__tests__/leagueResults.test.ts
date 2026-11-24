@@ -24,6 +24,8 @@ const eq = (a: unknown, b: unknown, msg: string) =>
 const NOW = Date.UTC(2026, 10, 24, 6);
 // Mon 2027-02-01: Season 1 (from 2026-11-01, 90 days) has ended too.
 const AFTER_SEASON = Date.UTC(2027, 1, 1, 6);
+// Sat 2027-01-30 06:00 UTC: Season 1 ended six hours ago.
+const SEASON_END = Date.UTC(2027, 0, 30, 6);
 
 function archive(type: LeagueType, id: string, userRank: number, points: number[], extra: Partial<LeagueArchive> = {}): LeagueArchive {
   return {
@@ -92,13 +94,34 @@ const s1 = archive('ninetyDay', 'S:1', 4, [5000, 4000, 3000, 2000, 10]);
 
 // 5. Several at once: one list in order week, month, season, whatever the archive order.
 {
-  const d = decideLeagueResults(seen('W:2026-W46', 'M:2026-09', 'S:0'), [s1, oct, w47, w46], AFTER_SEASON);
+  // Season 1 ends Sat 2027-01-30 00:00 UTC and cuts the running week and month there too.
+  const weekPart = archive('weekly', 'W:2027-W04@S1', 2, [80, 70]);
+  const monthPart = archive('monthly', 'M:2027-01@S1', 1, [600, 300]);
+  const d = decideLeagueResults(seen('W:2026-W46', 'M:2026-09', 'S:0'), [s1, monthPart, weekPart, w46], SEASON_END);
   assert(d.kind === 'celebrate', 'three leagues ended');
-  // Only W47 exists among the weeks here, so it is the newest ended one.
   eq(d.kind === 'celebrate' && d.cards.map((c) => c.type), ['weekly', 'monthly', 'ninetyDay'], 'week, month, then season');
-  eq(d.kind === 'celebrate' && d.memory, seen('W:2026-W47', 'M:2026-10', 'S:1'), 'all three remembered');
+  eq(d.kind === 'celebrate' && d.memory, seen('W:2027-W04@S1', 'M:2027-01@S1', 'S:1'), 'all three remembered');
   const season = d.kind === 'celebrate' ? d.cards[2] : null;
   eq(season?.seasonNumber, 1, 'season card knows its season');
+}
+
+// 5b. Only the period that just ended shows; someone back after a longer break gets no stale card.
+{
+  // Back on Tue 2026-12-08: W47 (Nov 16-22) and October are long over; marked seen silently.
+  const later = Date.UTC(2026, 11, 8, 6);
+  eq(
+    decideLeagueResults(seen('W:2026-W46', 'M:2026-09', null), [w46, w47, oct], later),
+    { kind: 'baseline', memory: seen('W:2026-W47', 'M:2026-10', null) },
+    'stale week and month: no card, memory moves on'
+  );
+  // Week stale but November just ended (Dec 1-2): only the month card.
+  const nov = archive('monthly', 'M:2026-11', 1, [1500, 900]);
+  const d = decideLeagueResults(seen('W:2026-W46', 'M:2026-10', null), [w47, nov], Date.UTC(2026, 11, 2, 6));
+  eq(d.kind === 'celebrate' && d.cards.map((c) => c.periodId), ['M:2026-11'], 'only the just-ended month shows');
+  eq(d.kind === 'celebrate' && d.memory, seen('W:2026-W47', 'M:2026-11', null), 'the stale week is marked seen too');
+  // A season result stays fresh for the whole next season.
+  const s = decideLeagueResults(seen(null, null, 'S:0'), [s1], AFTER_SEASON + 60 * 86_400_000);
+  eq(s.kind === 'celebrate' && s.cards.map((c) => c.periodId), ['S:1'], 'season result still shows 60 days into the next season');
 }
 
 // 6. Merge between devices: per league the newer period wins; missing/invalid sides lose.

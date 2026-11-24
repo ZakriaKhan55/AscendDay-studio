@@ -1,11 +1,19 @@
 import type { LeagueArchive, LeagueCompetitor, LeagueResultsSeen, LeagueType } from '@/types';
-import { compareArchivesNewestFirst, getArchivePeriodEnd, getArchivePeriodLabel, getArchivePeriodStart } from './leagues';
+import {
+  compareArchivesNewestFirst,
+  getArchivePeriodEnd,
+  getArchivePeriodLabel,
+  getArchivePeriodStart,
+  getLeaguePeriodStart,
+} from './leagues';
 
 /*
  * League results memory (settings doc `leagueResultsSeen`): per league type, the period id of the
  * newest result already shown. A result shows once, as soon as the server's first archive for an
  * ended period is in (provisional is fine); a later recompute of that archive never shows it again.
  * Only the newest unseen result per type shows; older missed ones stay in the Leagues history.
+ * It shows only while it is the period that just ended (it ends where the running period starts):
+ * someone back after a longer break gets no stale card; it is marked seen silently instead.
  * Missing memory (accounts from before this, new accounts) is filled with the newest existing
  * results silently, so no backlog pops up.
  */
@@ -153,6 +161,7 @@ export function decideLeagueResults(
 
   const cards: LeagueResultCard[] = [];
   const memory = {} as LeagueResultsSeen;
+  let staleMarked = false;
   for (const type of LEAGUE_RESULT_ORDER) {
     const [latest, ...older] = newest[type];
     // The part of the same week or month on the other side of a season start is not "last week".
@@ -160,8 +169,11 @@ export function decideLeagueResults(
     const seen = seenId(stored, type);
     memory[type] = seen;
     if (!latest?.id || (seen !== null && comparePeriods(latest.id, seen) <= 0)) continue;
-    cards.push(buildLeagueResultCard(latest, previous ?? null));
     memory[type] = latest.id;
+    const justEnded = getArchivePeriodEnd(latest) >= getLeaguePeriodStart(type, new Date(nowMs)).getTime();
+    if (justEnded) cards.push(buildLeagueResultCard(latest, previous ?? null));
+    else staleMarked = true;
   }
-  return cards.length ? { kind: 'celebrate', cards, memory } : { kind: 'none' };
+  if (cards.length) return { kind: 'celebrate', cards, memory };
+  return staleMarked ? { kind: 'baseline', memory } : { kind: 'none' };
 }
