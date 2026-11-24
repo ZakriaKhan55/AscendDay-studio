@@ -52,7 +52,7 @@ export const RELEASE_NOTE: ReleaseNote | null = {
   releasedAt: '2026-11-24T11:50:00+05:00',
   title: "What's new in 1.8.0",
   changed: [
-    'At Beginner, missed habits, slips and unlogged bad-habit days no longer cost points.',
+    'At Beginner, each missed habit, slip or unlogged bad-habit day now costs just 1 point, even many in a row.',
     'From Starter to Trainer they cost half, rounded up. From Achiever up, nothing changes.',
     'Points already lost stay as they are.',
   ],
