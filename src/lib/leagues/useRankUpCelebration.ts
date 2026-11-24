@@ -12,8 +12,9 @@ const SHOW_DELAY_MS = 900;
  * signed-in account's server data is applied (`isServerDataApplied`), never on a device cache, so
  * a stale cache cannot fake a climb; a rank reached while the app was closed shows on the next
  * open. The memory is saved before the overlay opens, so a reload or another device never repeats it.
+ * A climb while `blocked` (the league results overlay is open) waits until it closes.
  */
-export function useRankUpCelebration(store: AppStore, seasonPoints: number) {
+export function useRankUpCelebration(store: AppStore, seasonPoints: number, blocked = false) {
   const ready = store.isServerDataApplied && !store.isSessionLoading && Boolean(store.state.currentUser);
   const season = getSeasonNumber(leagueNow());
   const tierIndex = getTierIndex(seasonPoints);
@@ -42,13 +43,15 @@ export function useRankUpCelebration(store: AppStore, seasonPoints: number) {
   }, [ready, queued, storedSeason, storedTier, season, tierIndex, setRankCelebrated]);
 
   useEffect(() => {
-    if (!queued || open) return;
+    if (!queued || open || blocked) return;
     const timer = setTimeout(() => setOpen(true), SHOW_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [queued, open]);
+  }, [queued, open, blocked]);
 
   return {
     celebration: open ? queued : null,
+    /** A climb is decided and waiting for its delay, or showing. */
+    rankUpPending: queued !== null,
     closeCelebration: () => {
       setOpen(false);
       setQueued(null);

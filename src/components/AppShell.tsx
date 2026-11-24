@@ -32,6 +32,8 @@ import { cx, FOCUS_RING } from '@/components/ui/primitives/shared';
 import { RankChip } from './ui/RankChip';
 import { RankUpCelebration } from './ui/RankUpCelebration';
 import { useRankUpCelebration } from '@/lib/leagues/useRankUpCelebration';
+import { useLeagueResults } from '@/lib/leagues/useLeagueResults';
+import { LeagueResultsOverlay } from './ui/LeagueResultsOverlay';
 import { useWhatsNew } from '@/lib/content/useWhatsNew';
 import { RELEASE_NOTE } from '@/lib/releaseNote';
 import { WhatsNewDialog } from './ui/WhatsNewDialog';
@@ -223,7 +225,9 @@ export function AppShell({ currentView, navigationKind, pendingView = null, onVi
   const username = store.state.username;
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `minute` follows the season clock
   const seasonPoints = useMemo(() => getLeagueData('ninetyDay').userPoints, [getLeagueData, minute]);
-  const { celebration, closeCelebration } = useRankUpCelebration(store, seasonPoints);
+  // Set once the league results below exist; a climb waits while their overlay is open.
+  const [leagueResultsOpen, setLeagueResultsOpen] = useState(false);
+  const { celebration, closeCelebration, rankUpPending } = useRankUpCelebration(store, seasonPoints, leagueResultsOpen);
   const userAvatar = currentUser?.avatar || '🧑';
   // A new Google account picks its username and avatar once (its name came from the email).
   const [profileSetupFor, setProfileSetupFor] = useState<string | null>(null);
@@ -232,7 +236,16 @@ export function AppShell({ currentView, navigationKind, pendingView = null, onVi
     if (id && !currentUser?.isAnonymous && isProfileSetupDue(id)) setProfileSetupFor(id);
   }, [currentUser?.id, currentUser?.isAnonymous]);
   // The release note pops up once, after profile setup and any rank-up.
-  const { whatsNewOpen, closeWhatsNew } = useWhatsNew(store, Boolean(profileSetupFor) || Boolean(celebration));
+  const { whatsNewOpen, closeWhatsNew, whatsNewPending } = useWhatsNew(
+    store,
+    Boolean(profileSetupFor) || Boolean(celebration) || leagueResultsOpen
+  );
+  // League results come last: after profile setup, any rank-up and the release note; never stacked.
+  const { leagueResults, closeLeagueResults } = useLeagueResults(
+    store,
+    Boolean(profileSetupFor) || rankUpPending || whatsNewPending
+  );
+  if (leagueResultsOpen !== Boolean(leagueResults)) setLeagueResultsOpen(Boolean(leagueResults));
 
   const handleLogoutClick = () => {
     if (currentUser?.isAnonymous) {
@@ -445,6 +458,8 @@ export function AppShell({ currentView, navigationKind, pendingView = null, onVi
       {celebration && (
         <RankUpCelebration from={celebration.from} to={celebration.to} seasonPoints={seasonPoints} onClose={closeCelebration} />
       )}
+
+      {leagueResults && <LeagueResultsOverlay cards={leagueResults} onClose={closeLeagueResults} />}
 
       {RELEASE_NOTE && <WhatsNewDialog open={whatsNewOpen} onClose={closeWhatsNew} note={RELEASE_NOTE} />}
 

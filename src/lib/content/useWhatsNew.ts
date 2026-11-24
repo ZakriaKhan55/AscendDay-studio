@@ -35,6 +35,8 @@ export function useWhatsNew(store: AppStore, blocked: boolean) {
 
   return {
     whatsNewOpen: open && RELEASE_NOTE !== null,
+    /** The note is due (not shown yet) or open. */
+    whatsNewPending: (due && RELEASE_NOTE !== null) || open,
     closeWhatsNew: () => setOpen(false),
   };
 }
