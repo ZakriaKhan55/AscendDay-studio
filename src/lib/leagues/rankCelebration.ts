@@ -1,5 +1,5 @@
 import type { RankCelebrated } from '@/types';
-import { TIERS } from './tiers';
+import { PENALTY_TIERS, TIERS } from './tiers';
 
 /*
  * Rank-up memory (settings doc `rankCelebrated`): the highest rank already celebrated in a season.
@@ -45,4 +45,19 @@ export function decideRankUp(stored: RankCelebrated | null | undefined, season: 
   const celebrated = stored.season === season ? stored.tierIndex : 0;
   if (tierIndex > celebrated) return { kind: 'celebrate', from: celebrated, to: tierIndex, memory };
   return stored.season === season ? { kind: 'none' } : { kind: 'baseline', memory: { season, tierIndex: 0 } };
+}
+
+/**
+ * The rank-up's extra line when the climb leaves Beginner, the free band (missPenalty.ts): from now
+ * on misses cost points, half until Achiever. Null for any other climb (and for a jump straight to
+ * Achiever or above, the line drops the "half" part).
+ */
+export function rankUpPenaltyNote(from: number, to: number): string | null {
+  const before = TIERS[from];
+  const after = TIERS[to];
+  if (!before || !after) return null;
+  if (before.minPoints >= PENALTY_TIERS.half.minPoints || after.minPoints < PENALTY_TIERS.half.minPoints) return null;
+  return after.minPoints < PENALTY_TIERS.full.minPoints
+    ? `Misses now cost points (half until ${PENALTY_TIERS.full.name}).`
+    : 'Misses now cost points.';
 }

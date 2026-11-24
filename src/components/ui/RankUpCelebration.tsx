@@ -4,6 +4,7 @@ import { Compass } from 'lucide-react';
 import { Button } from './primitives';
 import { TIER_ICONS } from './TierBadge';
 import { TIERS } from '@/lib/leagues/tiers';
+import { rankUpPenaltyNote } from '@/lib/leagues/rankCelebration';
 import { useReducedMotion } from '@/lib/ui/motion';
 import { celebrationFeedback } from '@/lib/ui/actionFeedback';
 import { playRankUpFanfare, rankUpVibration } from '@/lib/leagues/rankUpSound';
@@ -12,6 +13,8 @@ import { playRankUpFanfare, rankUpVibration } from '@/lib/leagues/rankUpSound';
  * Full-screen rank-up moment: the app blurs, the old rank's badge gathers, (a jump rolls quickly
  * through the ranks in between,) bursts into the new rank's badge and colour, then the
  * congratulations and Continue. Esc or Continue closes; focus stays inside.
+ *
+ * Leaving Beginner adds one line: misses now cost points (rankUpPenaltyNote).
  *
  * Intensity follows the new rank: Starter to Trainer clean, Achiever to Expert with rings and
  * sparks, Leader and Master the full show (light rays, orbit, sheen, longer). A jump of two or more
@@ -97,6 +100,7 @@ export function RankUpCelebration({ from, to, seasonPoints, onClose, forceSound 
   const [exiting, setExiting] = useState(false);
   const titleId = useId();
   const descId = useId();
+  const noteId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
@@ -159,6 +163,8 @@ export function RankUpCelebration({ from, to, seasonPoints, onClose, forceSound 
   const toTier = TIERS[to];
   const isMaster = to === TIERS.length - 1;
   const jump = to - from;
+  // Leaving Beginner: misses start to cost points (rankUpPenaltyNote).
+  const penaltyNote = rankUpPenaltyNote(from, to);
 
   const sparks = Array.from({ length: SPARKS[level] }, (_, i) => {
     const angle = ((i + noise(i, 1) * 0.6) / SPARKS[level]) * Math.PI * 2;
@@ -185,7 +191,7 @@ export function RankUpCelebration({ from, to, seasonPoints, onClose, forceSound 
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      aria-describedby={descId}
+      aria-describedby={penaltyNote ? `${descId} ${noteId}` : descId}
       tabIndex={-1}
       className={`fixed inset-0 flex justify-center overflow-x-hidden overflow-y-auto overscroll-contain outline-none px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] ${
         exiting ? 'rankup-exit pointer-events-none' : ''
@@ -285,6 +291,15 @@ export function RankUpCelebration({ from, to, seasonPoints, onClose, forceSound 
             {seasonPoints.toLocaleString()} points this season
             {jump >= 2 && ` · up ${jump} ranks`}
           </p>
+          {penaltyNote && (
+            <p
+              id={noteId}
+              className={`mt-2 text-sm text-content-secondary ${phase === 'settled' && !isReduced ? 'rankup-rise' : ''}`}
+              style={{ '--ru-delay': '180ms' } as CSSProperties}
+            >
+              {penaltyNote}
+            </p>
+          )}
           <div
             className={`mt-7 w-full flex justify-center ${phase === 'settled' && !isReduced ? 'rankup-rise' : ''}`}
             style={{ '--ru-delay': '220ms' } as CSSProperties}

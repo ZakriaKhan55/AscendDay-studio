@@ -4,7 +4,9 @@
 //   CR-03-13 the rank-up overlay scrolls on a screen too short for it (a phone on its side), so
 //            Continue stays reachable: the overlay scrolls vertically, its content centres with
 //            auto margins (top reachable when it overflows), and the backdrop stays fixed.
-import { container, find, propsOf, type El } from './domTree';
+//   1.8.0    leaving Beginner adds the line "Misses now cost points (half until Achiever).", read
+//            with the description; other climbs have no such line.
+import { container, find, findAll, propsOf, textOf, type El } from './domTree';
 
 function assert(condition: boolean, msg: string) {
   if (!condition) throw new Error(`Assertion failed: ${msg}`);
@@ -50,6 +52,20 @@ const { RankUpCelebration } = await import('../ui/RankUpCelebration');
   assert(classes(content).includes('my-auto'), 'the content centres with auto margins');
   const backdrop = find((el) => classes(el).includes('rankup-backdrop'), 'the backdrop');
   assert(classes(backdrop).includes('fixed'), 'the backdrop stays fixed while the content scrolls');
+  const note = find((el) => textOf(el) === 'Misses now cost points (half until Achiever).' && el.tagName === 'P', 'the Beginner -> Starter penalty line');
+  const describedBy = String(overlay.getAttribute('aria-describedby') ?? '').split(' ');
+  assert(describedBy.length === 2 && describedBy[1] === note.getAttribute('id'), 'the penalty line is part of the overlay description');
+  flushSync(() => root.unmount());
+}
+
+// --- 1.8.0: no penalty line for a climb that does not leave Beginner -------------------------
+{
+  const root = createRoot(container());
+  flushSync(() => root.render(h(RankUpCelebration, { from: 1, to: 2, seasonPoints: 520, onClose: () => undefined })));
+  await wait();
+  const overlay = find((el) => el.getAttribute('role') === 'dialog', 'the rank-up overlay');
+  assert(findAll((el) => el.tagName === 'P' && textOf(el).startsWith('Misses now cost points')).length === 0, 'Starter -> Learner: no penalty line');
+  assert(String(overlay.getAttribute('aria-describedby') ?? '').split(' ').length === 1, 'Starter -> Learner: description only');
   flushSync(() => root.unmount());
 }
 
