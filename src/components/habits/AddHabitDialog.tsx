@@ -6,6 +6,7 @@ import { PRESET_HABIT_POINTS } from '@/lib/points/pointsConfig';
 import { CUSTOM_HABIT_POINTS } from '@/lib/points/habitAwards';
 import { ptsText } from '@/lib/leagues/leagues';
 import { PENALTY_TIERS } from '@/lib/leagues/tiers';
+import { BEGINNER_MISS_PENALTY } from '@/lib/points/missPenalty';
 import { useUnsavedChanges } from '@/lib/ui/unsavedChanges';
 import { nameTaken, sameName } from '@/lib/items/uniqueNames';
 import { Dialog, Form, Input, StaticTabPanel, Tabs } from '@/components/ui/primitives';
@@ -111,8 +112,9 @@ export function AddHabitDialog({ open, onClose, habits, onAddPreset, onAddCustom
                 Preset habits earn the points shown, daily custom habits{' '}
                 <span className="figure">{ptsText(CUSTOM_HABIT_POINTS, true)}</span>, up to{' '}
                 <span className="figure">{ptsText(PRESET_HABIT_POINTS.dailyCap)}</span> a day for all of them together. The ones
-                you tick first count first. A library habit you leave unticked costs its points from the day you add it: none
-                at {PENALTY_TIERS.free.name}, half (rounded up) until {PENALTY_TIERS.full.name}.
+                you tick first count first. A library habit you leave unticked costs points from the day you add it:{' '}
+                <span className="figure">{ptsText(-BEGINNER_MISS_PENALTY)}</span> at {PENALTY_TIERS.flat.name}, half its points
+                (rounded up) until {PENALTY_TIERS.full.name}, then its full points.
               </p>
               {PRESET_CATEGORIES.map((category) => (
                 <section key={category.name} aria-labelledby={`preset-cat-${category.name}`}>

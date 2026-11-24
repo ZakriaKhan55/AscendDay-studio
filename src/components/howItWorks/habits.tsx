@@ -33,11 +33,11 @@ export const habitsGuide: HowItWorksGuide = {
     </>,
     'Weekly custom habits earn no points.',
     <>
-      A library habit left unticked for a day <Loss>costs its points</Loss>, from the day you add it. Each further miss in a row costs{' '}
+      A library habit left unticked for a day <Loss>costs its points</Loss>, from the day you add it. From {missRule.half}, each further miss in a row costs{' '}
       <Fig>×{missRule.again}</Fig>; from {missRule.rank} rank, <Fig>×{missRule.second}</Fig> for the 2nd and <Fig>×{missRule.third}</Fig> from
       the 3rd (rounded). Ticking it resets the count.
     </>,
-    `By rank: at ${missRule.free} a miss costs nothing. From ${missRule.half} it costs half (rounded up), from ${missRule.full} the full amount.`,
+    `By rank: at ${missRule.flat} every miss costs just ${missRule.flatCost} point, even in a row. From ${missRule.half} it costs half (rounded up), from ${missRule.full} the full amount.`,
     'Custom habits have no penalty. The Reading habit earns no points and has no penalty.',
   ],
 };

@@ -14,7 +14,7 @@ import { playRankUpFanfare, rankUpVibration } from '@/lib/leagues/rankUpSound';
  * through the ranks in between,) bursts into the new rank's badge and colour, then the
  * congratulations and Continue. Esc or Continue closes; focus stays inside.
  *
- * Leaving Beginner adds one line: misses now cost points (rankUpPenaltyNote).
+ * Leaving Beginner adds one line: misses now cost more (rankUpPenaltyNote).
  *
  * Intensity follows the new rank: Starter to Trainer clean, Achiever to Expert with rings and
  * sparks, Leader and Master the full show (light rays, orbit, sheen, longer). A jump of two or more
@@ -163,7 +163,7 @@ export function RankUpCelebration({ from, to, seasonPoints, onClose, forceSound 
   const toTier = TIERS[to];
   const isMaster = to === TIERS.length - 1;
   const jump = to - from;
-  // Leaving Beginner: misses start to cost points (rankUpPenaltyNote).
+  // Leaving Beginner: misses start to cost more than the flat 1 point (rankUpPenaltyNote).
   const penaltyNote = rankUpPenaltyNote(from, to);
 
   const sparks = Array.from({ length: SPARKS[level] }, (_, i) => {
