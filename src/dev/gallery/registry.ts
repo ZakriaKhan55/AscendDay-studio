@@ -103,6 +103,8 @@ export const GALLERY_GROUPS: GalleryGroupInfo[] = [
       { id: 'toasts', title: 'Toasts', note: "For list and page actions and successes; never for a form's errors." },
       { id: 'banners', title: 'Banners', note: 'The one banner slot above the shell: Offline > Back online > New version > Timezone wait (one at a time).' },
       { id: 'push-prompt', title: 'Push prompt', note: "A static copy of PushPromptCard: the real card's Turn on subscribes this browser and saves it to the account." },
+      { id: 'install-prompt', title: 'Install prompt', note: "A static copy of InstallPromptCard (browser install, iPhone guide, in-app browser): the real card opens the browser's install dialog and counts Not now on this device. Shares the Dashboard slot with the push prompt, one at a time." },
+      { id: 'install-guide', title: 'Install guide (iPhone)', note: "InstallGuideDialog's steps, with the guest line. Opened from the install card, Settings › App info and Settings › Notifications on iPhone and iPad." },
       { id: 'error-boundary', title: 'Error boundary', note: 'Throw inside a local ErrorBoundary to see the fallback (section and page variants).' },
       { id: 'sounds', title: 'Sound & vibration', note: 'The two sounds in use; the other candidates are folded away.' },
       { id: 'loaders', title: 'Loaders', note: 'The Streak loader everywhere; growth trace along the bottom of loading screens.' },

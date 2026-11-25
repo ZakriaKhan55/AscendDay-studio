@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Bell, X } from 'lucide-react';
+import { Bell, Download, X } from 'lucide-react';
 import { Button, Disclosure, Switch } from '@/components/ui/primitives';
 import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { UpdateBanner } from '@/components/ui/UpdateBanner';
 import { TimezoneWaitBanner } from '@/components/ui/TimezoneWaitBanner';
 import { GuestSaveBanner } from '@/components/ui/GuestSaveBanner';
+import { InstallGuideBody, InstallGuideDialog } from '@/components/ui/InstallGuideDialog';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { trustedNowMs } from '@/lib/time/clock';
 import { AscendLoadingIndicator, AscendLoadingOverlay, OVERLAY_EXIT_MS } from '@/components/ui/AscendLoadingIndicator';
@@ -288,9 +289,9 @@ function BannersDemo() {
   );
 }
 
-/** Static copy of PushPromptCard's markup. The real card checks this browser's push state on mount
- *  and its Turn on subscribes the browser and saves it to the account, so it never renders here. */
-function PushPromptCopy({ offer }: { offer: 'push' | 'home-screen' }) {
+/** Static copy of PushPromptCard's markup. The real card's Turn on subscribes the browser and
+ *  saves it to the account, so it never renders here. */
+function PushPromptCopy() {
   const { showInfoToast } = useToast();
   const stub = () => showInfoToast('Not wired', 'The Gallery copy changes nothing.');
   return (
@@ -301,26 +302,55 @@ function PushPromptCopy({ offer }: { offer: 'push' | 'home-screen' }) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium text-content-secondary">Turn on notifications on this device</p>
-          <p className="text-xs text-content-muted">
-            {offer === 'home-screen'
-              ? 'To get notifications on iPhone, add AscendDay to your Home Screen (Share → Add to Home Screen).'
-              : 'Get partner nudges and your evening reminder even when AscendDay is closed.'}
-          </p>
+          <p className="text-xs text-content-muted">Get partner nudges and your evening reminder even when AscendDay is closed.</p>
         </div>
         <Button variant="ghost" size="icon" onClick={stub} aria-label="Dismiss" title="Not now" className="-mr-2 -mt-2 sm:hidden">
           <X size={16} aria-hidden="true" />
         </Button>
       </div>
-      <div className={`w-full shrink-0 items-center gap-1 sm:w-auto ${offer === 'push' ? 'flex' : 'hidden sm:flex'}`}>
-        {offer === 'push' && (
-          <Button onClick={stub} className="min-h-11 flex-1 text-xs sm:flex-none">
-            Turn on
-          </Button>
-        )}
+      <div className="flex w-full shrink-0 items-center gap-1 sm:w-auto">
+        <Button onClick={stub} className="min-h-11 flex-1 text-xs sm:flex-none">
+          Turn on
+        </Button>
         <Button variant="ghost" size="icon" onClick={stub} aria-label="Dismiss" title="Not now" className="hidden sm:inline-flex">
           <X size={16} aria-hidden="true" />
         </Button>
       </div>
+    </div>
+  );
+}
+
+/** Static copy of InstallPromptCard's markup. The real card opens the browser's install dialog and
+ *  counts "Not now" on this device, so it never renders here. The iPhone variant opens the real
+ *  guide (it only shows steps). */
+function InstallPromptCopy({ kind }: { kind: 'prompt' | 'ios' | 'in-app' }) {
+  const { showInfoToast } = useToast();
+  const [guideOpen, setGuideOpen] = useState(false);
+  const stub = () => showInfoToast('Not wired', 'The Gallery copy changes nothing.');
+  return (
+    <div className="flex flex-col items-start justify-between gap-3 rounded-xl border border-primary-500/20 p-4 sm:flex-row sm:items-center">
+      <div className="flex w-full items-start gap-3 sm:w-auto">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-500/15 text-brand-text">
+          <Download size={18} aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium text-content-secondary">Get the AscendDay app</p>
+          <p className="text-xs text-content-muted">
+            {kind === 'in-app' ? 'Open AscendDay in Safari or Chrome to install it.' : 'Open AscendDay in one tap and get reminders.'}
+          </p>
+        </div>
+      </div>
+      <div className="flex w-full shrink-0 items-center gap-1 sm:w-auto">
+        {kind !== 'in-app' && (
+          <Button onClick={kind === 'ios' ? () => setGuideOpen(true) : stub} className="min-h-11 flex-1 text-xs sm:flex-none">
+            Install
+          </Button>
+        )}
+        <Button variant="ghost" onClick={stub} className="min-h-11 text-xs">
+          Not now
+        </Button>
+      </div>
+      {kind === 'ios' && <InstallGuideDialog open={guideOpen} onClose={() => setGuideOpen(false)} />}
     </div>
   );
 }
@@ -373,9 +403,20 @@ export function FeedbackGroup() {
       </Section>
 
       <Section id="push-prompt">
+        <PushPromptCopy />
+      </Section>
+
+      <Section id="install-prompt">
         <div className="space-y-3">
-          <PushPromptCopy offer="push" />
-          <PushPromptCopy offer="home-screen" />
+          <InstallPromptCopy kind="prompt" />
+          <InstallPromptCopy kind="ios" />
+          <InstallPromptCopy kind="in-app" />
+        </div>
+      </Section>
+
+      <Section id="install-guide">
+        <div className="card max-w-md p-5">
+          <InstallGuideBody guest />
         </div>
       </Section>
 
