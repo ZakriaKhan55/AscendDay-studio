@@ -14,6 +14,7 @@ import { startDeviceTimezoneSync } from './lib/time/timezoneStatus';
 import { installAssetRecovery } from './lib/app/assetRecovery';
 import { installErrorReporting } from './lib/app/errorReporting';
 import { installAnalytics } from './lib/app/analytics';
+import { installInstallPromptCapture } from './lib/app/installPrompt';
 import { installPageVisibilityFlag, installWindowFocusFlag } from './lib/ui/motion';
 import { installScrollRise } from './lib/ui/scrollRise';
 import { installCardSpotlight } from './lib/ui/cardSpotlight';
@@ -34,6 +35,8 @@ installAnalytics();
 startTrustedClock();
 // The server's "today" follows the device timezone (sign-in, app start, back to the tab, online).
 startDeviceTimezoneSync();
+// Before the app renders: the browser's install offer can arrive on page load and is kept for a tap.
+installInstallPromptCapture();
 installPageVisibilityFlag();
 installWindowFocusFlag();
 installScrollRise();

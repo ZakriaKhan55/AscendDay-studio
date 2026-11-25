@@ -1,8 +1,10 @@
 {
   "name": "AscendDay",
   "short_name": "AscendDay",
+  "description": "AscendDay is a gamified self-improvement app. Step up every day.",
   "id": "/",
   "start_url": "/dashboard",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#07110E",
   "theme_color": "#0a0b0f",

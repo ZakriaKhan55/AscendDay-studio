@@ -43,6 +43,65 @@ export function appDisplayMode(): AppDisplayMode {
   return isStandalone() ? 'standalone' : 'browser';
 }
 
+// In-app browsers (Instagram, Facebook, TikTok, Snapchat, LinkedIn, X, Line, the Google app on iOS,
+// Android WebViews) cannot install a site. Chrome Custom Tabs look like Chrome and need no rule.
+const IN_APP_BROWSER = /FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|TikTok|musical_ly|BytedanceWebview|LinkedInApp|Twitter|GSA\/|; wv\)/;
+
+export function isInAppBrowser(): boolean {
+  return IN_APP_BROWSER.test(userAgent());
+}
+
+/**
+ * How AscendDay can be installed here, for Settings and the Dashboard card:
+ * - 'app': already open as the installed app;
+ * - 'prompt': the browser offered its install dialog (beforeinstallprompt), one tap away;
+ * - 'installed': installed from this browser (appinstalled), no new offer since;
+ * - 'in-app': an in-app browser, which cannot install: open it in Safari or Chrome;
+ * - 'ios': iPhone/iPad, Share → Add to Home Screen (no install API);
+ * - 'firefox-desktop': Firefox on a computer cannot install sites;
+ * - 'safari-mac': Safari on a Mac, File → Add to Dock;
+ * - 'menu': anything else (no offer yet): the browser menu's install item.
+ */
+export type InstallKind = 'app' | 'prompt' | 'installed' | 'in-app' | 'ios' | 'firefox-desktop' | 'safari-mac' | 'menu';
+
+export function installKind({ canPrompt, installedMark }: { canPrompt: boolean; installedMark: boolean }): InstallKind {
+  if (isStandalone()) return 'app';
+  if (canPrompt) return 'prompt';
+  if (installedMark) return 'installed';
+  if (isInAppBrowser()) return 'in-app';
+  if (isAppleMobile()) return 'ios';
+  const ua = userAgent();
+  if (appPlatform() === 'desktop') {
+    if (/Firefox\//.test(ua)) return 'firefox-desktop';
+    if (/Macintosh/.test(ua) && /Safari\//.test(ua) && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox/.test(ua)) return 'safari-mac';
+  }
+  return 'menu';
+}
+
+/** Settings → App info's line per install state. */
+export function installRowText(kind: InstallKind, platform = appPlatform()): string {
+  switch (kind) {
+    case 'app':
+      return 'You’re using the installed app.';
+    case 'prompt':
+      return 'Open AscendDay in one tap, like any other app.';
+    case 'installed':
+      return 'Installed. Open it from your home screen or app list.';
+    case 'in-app':
+      return 'Open AscendDay in Safari or Chrome to install it.';
+    case 'ios':
+      return 'Add AscendDay to your Home Screen to open it like an app.';
+    case 'firefox-desktop':
+      return 'This browser can’t install apps. Chrome or Edge can.';
+    case 'safari-mac':
+      return 'In Safari, choose File → Add to Dock.';
+    case 'menu':
+      return platform === 'android'
+        ? 'Open your browser menu (⋮) and tap Install app or Add to Home screen.'
+        : 'Open your browser menu and choose Install AscendDay.';
+  }
+}
+
 // Per account: `<UTC day>|<mode>|<platform>` last recorded from this device.
 const appOpenKey = (userId: string) => `ascend_app_open_${userId}`;
 const appOpenInFlight = new Set<string>();

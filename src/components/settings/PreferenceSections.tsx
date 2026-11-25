@@ -10,6 +10,7 @@ import { resolveTheme } from '@/lib/ui/theme';
 import { toggleThemeWithReveal } from '@/lib/ui/themeTransition';
 import { pillLayout, setBlockPillEnabled, setBlockPillPosition, useBlockPillPrefs } from '@/lib/timeTracker/blockPill';
 import { SettingRow, SettingsCard } from './SettingRow';
+import { InstallAppRow } from './InstallAppRow';
 
 export function PrivacySection({ store }: { store: AppStore }) {
   const currentUser = store.state.currentUser;
@@ -144,9 +145,12 @@ const GROUP_INFO: Record<NavGroup['id'], string> = {
   play: 'Earn points, climb the ranks, compete in leagues each season, and pair up with partners who keep you on track.',
 };
 
-export function AppInfoSection({ onNavigate }: { onNavigate: (view: View) => void }) {
+export function AppInfoSection({ onNavigate, guest }: { onNavigate: (view: View) => void; guest: boolean }) {
   return (
     <SettingsCard title="App info">
+      <div className="-mt-3.5 border-b border-overlay-subtle">
+        <InstallAppRow guest={guest} />
+      </div>
       <div>
         <p className="text-sm font-medium text-content-primary">AscendDay</p>
         <p className="mt-0.5 text-xs text-content-muted tabular-nums">

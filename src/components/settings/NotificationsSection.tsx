@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { BellOff } from 'lucide-react';
 import { AppStore } from '@/lib/store/store';
 import { NotificationPreferenceKey } from '@/types';
-import { Switch } from '@/components/ui/primitives';
+import { cx, FOCUS_RING, Switch } from '@/components/ui/primitives';
+import { InstallGuideDialog } from '@/components/ui/InstallGuideDialog';
+import { isAppleMobile, isStandalone } from '@/lib/app/install';
 import { useAsyncAction, useAsyncActionKey } from '@/lib/actions/useAsyncAction';
 import { toUserMessage } from '@/lib/app/userMessage';
 import { useToast } from '@/components/ui/Toast';
@@ -49,6 +51,7 @@ export function NotificationsSection({ store }: { store: AppStore }) {
 
   const [focusAlerts, setFocusAlerts] = useState(readFocusAlerts);
   const [permission, setPermission] = useState<NotificationPermission>(browserPermission);
+  const [installGuideOpen, setInstallGuideOpen] = useState(false);
   const { isLoading: isPushSaving, executeFn: executePushToggle } = useAsyncAction();
 
   const userId = currentUser?.id;
@@ -115,9 +118,23 @@ export function NotificationsSection({ store }: { store: AppStore }) {
         <SettingRow
           title="Push notifications on this device"
           description={
-            pushStatus === 'unsupported'
-              ? "This browser can't get push notifications. On iPhone, add AscendDay to your Home Screen first."
-              : 'Get your notifications even when AscendDay is closed.'
+            pushStatus === 'unsupported' ? (
+              <>
+                <p>This browser can&apos;t get push notifications. On iPhone, add AscendDay to your Home Screen first.</p>
+                {isAppleMobile() && !isStandalone() && (
+                  <button
+                    type="button"
+                    onClick={() => setInstallGuideOpen(true)}
+                    aria-haspopup="dialog"
+                    className={cx('mt-1 inline-flex min-h-9 items-center rounded-lg text-xs font-medium text-brand-text hover:underline underline-offset-2', FOCUS_RING)}
+                  >
+                    How to install
+                  </button>
+                )}
+              </>
+            ) : (
+              'Get your notifications even when AscendDay is closed.'
+            )
           }
           control={
             <Switch
@@ -161,6 +178,7 @@ export function NotificationsSection({ store }: { store: AppStore }) {
         Penalty notices and partner invites and replies always show in your inbox. Penalty notices are never
         pushed.
       </p>
+      <InstallGuideDialog open={installGuideOpen} onClose={() => setInstallGuideOpen(false)} guest={Boolean(currentUser?.isAnonymous)} />
     </SettingsCard>
   );
 }

@@ -155,7 +155,7 @@ export function SettingsView({ store, onOpenAuth, onNavigate }: SettingsViewProp
             {section === 'privacy' && <PrivacySection store={store} />}
             {section === 'appearance' && <AppearanceSection store={store} />}
             {section === 'sound' && <SoundVibrationSection />}
-            {section === 'app' && <AppInfoSection onNavigate={onNavigate} />}
+            {section === 'app' && <AppInfoSection onNavigate={onNavigate} guest={isGuest} />}
             {section === 'about-us' && <AboutUsSection onNavigate={onNavigate} />}
             {section === 'support' && <SupportSection onNavigate={onNavigate} />}
             {section === 'feedback' && <FeedbackSection onNavigate={onNavigate} />}
