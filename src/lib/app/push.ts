@@ -10,6 +10,7 @@
  * to cleanup, an account switch or a browser-rotated endpoint comes back without a tap.
  */
 import { supabase } from '../auth/supabase';
+import { isAppleMobile, isStandalone } from './install';
 
 // Public half of the VAPID key pair (the private half is a send-push secret). Safe to ship.
 const VAPID_PUBLIC_KEY = 'BCm0FKHm8dST6fMA1txExLaijZvgYrl20Zy_jmS9oCDazA7lyEVVsnrYiNxXTw829zeFvaDoEl_VzMSgkP8ydGU';
@@ -142,11 +143,7 @@ export async function shouldOfferPush(): Promise<boolean> {
  */
 export function shouldOfferHomeScreenHint(): boolean {
   if (typeof window === 'undefined' || isPushSupported()) return false;
-  const ua = navigator.userAgent;
-  const appleMobile = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-  const standalone =
-    window.matchMedia?.('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
-  return appleMobile && !standalone && !pushPromptAnswered();
+  return isAppleMobile() && !isStandalone() && !pushPromptAnswered();
 }
 
 /** The card is answered on this device and not offered again. */

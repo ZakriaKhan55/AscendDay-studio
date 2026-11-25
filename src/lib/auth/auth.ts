@@ -862,6 +862,7 @@ export function clearLocalUserData(userId: string): void {
       localStorage.removeItem(`ascend_user_cache_${userId}`);
       localStorage.removeItem(`ascend_dirty_${userId}`);
       localStorage.removeItem(`ascend_uid_${userId}`);
+      localStorage.removeItem(`ascend_app_open_${userId}`);
     } catch {
       /* ignore */
     }

@@ -9,6 +9,7 @@ import type { View } from '@/lib/app/views';
 import { isSupabaseConfigured, storedAuthSession } from '@/lib/auth/supabase';
 import { reloadOnceForStaleChunk } from '@/lib/app/chunkReload';
 import { syncPushSubscription } from '@/lib/app/push';
+import { noteAppOpen } from '@/lib/app/install';
 import { WEEK_PARAM } from '@/lib/time/weekParam';
 import { setPendingFeedbackStart } from '@/lib/app/feedback';
 import { isFeedbackView } from '@/components/nav/navConfig';
@@ -253,6 +254,18 @@ function App() {
     };
     navigator.serviceWorker.addEventListener('message', onMessage);
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, [pushUserId]);
+
+  // Browser or installed app: recorded once per account per UTC day (app_open_days), on each
+  // signed-in start and on coming back to the tab (a long-open app crossing midnight).
+  useEffect(() => {
+    if (!pushUserId) return;
+    void noteAppOpen(pushUserId);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void noteAppOpen(pushUserId);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [pushUserId]);
 
   // In-app sign-in buttons: a guest saves progress on /signup, anyone else signs in on /login;
