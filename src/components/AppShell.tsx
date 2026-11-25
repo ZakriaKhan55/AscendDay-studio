@@ -56,6 +56,7 @@ import { FloatingDock } from './nav/FloatingDock';
 import { BlockPill } from './nav/BlockPill';
 import { PageSwipeContext, usePageSwipe } from '@/lib/ui/pageSwipe';
 import { PullRefresh } from './ui/PullRefresh';
+import { BootDialogOpenContext } from './ui/bootDialogs';
 
 // Below lg the window scrolls; from lg up the shell is viewport-high and <main> scrolls.
 const DESKTOP_QUERY = '(min-width: 1024px)';
@@ -246,6 +247,8 @@ export function AppShell({ currentView, navigationKind, pendingView = null, onVi
     Boolean(profileSetupFor) || rankUpPending || whatsNewPending
   );
   if (leagueResultsOpen !== Boolean(leagueResults)) setLeagueResultsOpen(Boolean(leagueResults));
+  // The Dashboard's offer cards (install, push) wait while any of these is up or queued.
+  const bootDialogOpen = Boolean(profileSetupFor) || rankUpPending || Boolean(celebration) || whatsNewPending || Boolean(leagueResults);
 
   const handleLogoutClick = () => {
     if (currentUser?.isAnonymous) {
@@ -404,7 +407,7 @@ export function AppShell({ currentView, navigationKind, pendingView = null, onVi
           <div ref={pageAreaRef} className="max-w-[88rem] mx-auto px-4 sm:px-6 xl:px-8 2xl:px-10 py-6 xl:py-8">
             <PageSwipeContext.Provider value={pageSwipe}>
               <ViewEntrance key={currentView}>
-                {children}
+                <BootDialogOpenContext.Provider value={bootDialogOpen}>{children}</BootDialogOpenContext.Provider>
               </ViewEntrance>
             </PageSwipeContext.Provider>
           </div>

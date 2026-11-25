@@ -1,5 +1,8 @@
 // Node has no window/localStorage; the browser pieces push.ts reads are stubbed per case.
-import { disablePush, markPushPromptDone, shouldOfferHomeScreenHint } from '../app/push';
+// The "Turn on notifications" card: offered until answered on this device; logout makes it
+// eligible again for the next account. The install card's device record is not touched by logout.
+import { disablePush, markPushPromptDone, shouldOfferPush } from '../app/push';
+import { INSTALL_OFFER_KEY } from '../app/installPrompt';
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
@@ -15,41 +18,38 @@ g.localStorage = {
   removeItem: (k: string) => void store.delete(k),
 };
 
-function browser(ua: string, opts: { touch?: number; standalone?: boolean } = {}) {
+/** A browser with Web Push (Android Chrome, desktop, the iOS Home Screen app), or without (iOS Safari tab). */
+function browser(opts: { push: boolean; permission?: NotificationPermission }) {
+  const registration = { pushManager: { getSubscription: async () => null } };
   Object.defineProperty(globalThis, 'navigator', {
     configurable: true,
-    value: { userAgent: ua, maxTouchPoints: opts.touch ?? 0, standalone: opts.standalone },
+    value: opts.push ? { userAgent: 'test', serviceWorker: { ready: Promise.resolve(registration) } } : { userAgent: 'test' },
   });
-  // No PushManager / service worker: what iOS Safari exposes outside a Home Screen app.
-  g.window = { isSecureContext: true, matchMedia: () => ({ matches: Boolean(opts.standalone) }) };
+  g.window = opts.push
+    ? { isSecureContext: true, PushManager: class {}, Notification: class {} }
+    : { isSecureContext: true };
+  g.Notification = { permission: opts.permission ?? 'default' };
 }
 
-const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
-const IPAD_DESKTOP = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
-const ANDROID = 'Mozilla/5.0 (Linux; Android 10; LM-G850) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36';
-
 async function main() {
-  // iPhone / iPad Safari outside the Home Screen app: the hint, until answered.
   store.clear();
-  browser(IPHONE);
-  assert(shouldOfferHomeScreenHint(), 'iPhone in Safari gets the hint');
-  browser(IPAD_DESKTOP, { touch: 5 });
-  assert(shouldOfferHomeScreenHint(), 'iPad (desktop-class UA with touch) gets the hint');
-  browser(IPAD_DESKTOP, { touch: 0 });
-  assert(!shouldOfferHomeScreenHint(), 'a real Mac does not');
-  browser(IPHONE, { standalone: true });
-  assert(!shouldOfferHomeScreenHint(), 'already on the Home Screen: no hint');
-  browser(ANDROID);
-  assert(!shouldOfferHomeScreenHint(), 'Android does not get the iPhone hint');
+  browser({ push: true });
+  assert(await shouldOfferPush(), 'push works and nobody answered: offered');
 
-  browser(IPHONE);
   markPushPromptDone();
-  assert(!shouldOfferHomeScreenHint(), '"Not now" hides the hint on this device');
+  assert(!(await shouldOfferPush()), 'answered: not offered again on this device');
 
-  // Logout (disablePush) clears "Not now" even where push was never on or is unsupported, so the
-  // next account on this phone is offered it again.
+  store.set(INSTALL_OFFER_KEY, JSON.stringify({ notNow: 2, lastAt: 5, installed: false }));
   await disablePush();
-  assert(shouldOfferHomeScreenHint(), 'after logout the next account sees the hint again');
+  assert(await shouldOfferPush(), 'after logout the next account is offered it again');
+  assert(store.get(INSTALL_OFFER_KEY) === JSON.stringify({ notNow: 2, lastAt: 5, installed: false }), 'logout keeps the install card record (a device fact)');
+
+  browser({ push: true, permission: 'denied' });
+  assert(!(await shouldOfferPush()), 'blocked in the browser: not offered');
+
+  // iPhone/iPad Safari tab: no Web Push, so no push card (the install card covers it instead).
+  browser({ push: false });
+  assert(!(await shouldOfferPush()), 'no Web Push: no push card');
 
   console.log('pushPrompt fixtures: all passed');
 }

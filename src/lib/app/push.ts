@@ -10,7 +10,6 @@
  * to cleanup, an account switch or a browser-rotated endpoint comes back without a tap.
  */
 import { supabase } from '../auth/supabase';
-import { isAppleMobile, isStandalone } from './install';
 
 // Public half of the VAPID key pair (the private half is a send-push secret). Safe to ship.
 const VAPID_PUBLIC_KEY = 'BCm0FKHm8dST6fMA1txExLaijZvgYrl20Zy_jmS9oCDazA7lyEVVsnrYiNxXTw829zeFvaDoEl_VzMSgkP8ydGU';
@@ -134,16 +133,6 @@ export async function shouldOfferPush(): Promise<boolean> {
   if (!isPushSupported() || Notification.permission === 'denied' || readOwner()) return false;
   if (pushPromptAnswered()) return false;
   return !(await currentSubscription());
-}
-
-/**
- * iPhone and iPad browsers offer Web Push only to a site added to the Home Screen (iOS 16.4+), so
- * outside it there is no push to turn on. True there (not yet answered on this device): the card
- * shows how to add Ascend instead of a Turn on button. iPadOS reports itself as a Mac with touch.
- */
-export function shouldOfferHomeScreenHint(): boolean {
-  if (typeof window === 'undefined' || isPushSupported()) return false;
-  return isAppleMobile() && !isStandalone() && !pushPromptAnswered();
 }
 
 /** The card is answered on this device and not offered again. */

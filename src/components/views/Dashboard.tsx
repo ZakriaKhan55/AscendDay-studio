@@ -34,7 +34,7 @@ import { JOURNAL_POINTS } from '@/lib/points/pointsConfig';
 import { AutoNum, CountUp, Reveal } from '@/components/ui/Motion';
 import { LeagueCountdown } from '@/components/ui/LeagueCountdown';
 import { GuestSaveBanner } from '@/components/ui/GuestSaveBanner';
-import { PushPromptCard } from '@/components/ui/PushPromptCard';
+import { DashboardOffers } from '@/components/ui/DashboardOffers';
 import { isSupabaseConfigured } from '@/lib/auth/supabase';
 import { useLeaguePeriodRollover } from '@/lib/leagues/useLeaguePeriodRollover';
 import { useLeagueStandingsRefresh } from '@/lib/leagues/useLeagueStandingsRefresh';
@@ -284,10 +284,10 @@ export function Dashboard({ store, onViewChange, onOpenAuth }: DashboardProps) {
         />
       )}
 
-      {/* Push is opt-in per device: a one-time offer for a signed-in account (a guest gets the
-          save-progress banner above instead). */}
+      {/* One offer at a time for a signed-in account: install AscendDay as an app, or turn on push
+          (opt-in per device). A guest gets the save-progress banner above instead. */}
       {isSupabaseConfigured && store.state.currentUser && !store.state.currentUser.isAnonymous && (
-        <PushPromptCard userId={store.state.currentUser.id} />
+        <DashboardOffers userId={store.state.currentUser.id} />
       )}
 
       {/* Hero: today, the season, and where you stand on the climb */}
