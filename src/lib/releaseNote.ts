@@ -48,12 +48,11 @@ export function releaseNoteGroups(note: ReleaseNote): { key: ReleaseNoteGroupKey
 }
 
 export const RELEASE_NOTE: ReleaseNote | null = {
-  id: 7,
-  releasedAt: '2026-11-24T11:50:00+05:00',
-  title: "What's new in 1.8.0",
-  changed: [
-    'At Beginner, each missed habit, slip or unlogged bad-habit day now costs just 1 point, even many in a row.',
-    'From Starter to Trainer they cost half, rounded up. From Achiever up, nothing changes.',
-    'Points already lost stay as they are.',
+  id: 8,
+  releasedAt: '2026-11-25T17:59:00+05:00',
+  title: "What's new in 1.9.0",
+  new: [
+    'Install AscendDay as an app: open it in one tap from your home screen. Find it in Settings → App info.',
+    'On iPhone and iPad, the installed app can also send you reminders and partner nudges.',
   ],
 };
