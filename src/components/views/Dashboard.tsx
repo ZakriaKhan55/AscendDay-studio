@@ -266,13 +266,18 @@ export function Dashboard({ store, onViewChange, onOpenAuth }: DashboardProps) {
         <h1 className="page-title">{greeting()}</h1>
         <p className="page-subtitle">{formatDateLong(today)}</p>
         {/* Quote of the day: follows the same local day key as the date line, so it changes at local midnight.
-            Small card, upright text (Geist has no real italic loaded, so no fake slant), soft emerald quote mark. */}
-        <figure className="card mt-4 max-w-prose px-4 pt-3 pb-3" aria-label="Quote of the day">
-          <span aria-hidden="true" className="block h-5 text-4xl leading-none text-brand-mark opacity-60 select-none">“</span>
-          <blockquote className="text-base leading-relaxed text-content-primary [text-wrap:pretty]">
+            Set apart from the plain cards below (friends kept skipping it): emerald left rule, a light
+            emerald tint over the card colour, a small sentence-case label and slightly larger text.
+            Upright text (Geist has no real italic loaded, so no fake slant). */}
+        <figure
+          className="card mt-4 max-w-prose rounded-l-md border-l-[3px] border-l-brand-mark bg-[color-mix(in_srgb,var(--color-brand-mark)_7%,var(--color-bg-800))] px-4 pt-3 pb-3"
+          aria-label="Quote of the day"
+        >
+          <figcaption className="mb-1.5 text-xs font-semibold text-brand-text">Today’s quote</figcaption>
+          <blockquote className="text-lg font-medium leading-relaxed text-content-primary [text-wrap:pretty]">
             <p>{quote.text}</p>
           </blockquote>
-          <figcaption className="mt-1.5 text-xs text-content-muted">{quote.author}</figcaption>
+          <p className="mt-1.5 text-xs text-content-muted">— {quote.author}</p>
         </figure>
       </div>
 
