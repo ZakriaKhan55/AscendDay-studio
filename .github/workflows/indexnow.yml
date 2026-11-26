@@ -17,7 +17,7 @@ jobs:
   ping:
     name: Ping IndexNow
     if: >-
-      github.repository == 'zakyprojects/Ascend' &&
+      github.repository == 'zakyprojects/AscendDay' &&
       github.event.deployment_status.state == 'success' &&
       startsWith(github.event.deployment.environment, 'Production')
     # On the job, not the workflow: only a production ping that actually runs takes the slot and

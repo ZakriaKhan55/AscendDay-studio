@@ -5,7 +5,7 @@
  * Runs on the server (a Vercel Function; `npm run dev` serves it through vite.config.ts), so the
  * GitHub token never reaches the browser. Environment:
  * - GITHUB_FEEDBACK_TOKEN: fine-grained token for that one repo, Issues + Contents read/write.
- * - GITHUB_FEEDBACK_REPO: "owner/name", defaults to zakyprojects/Ascend-Feedback.
+ * - GITHUB_FEEDBACK_REPO: "owner/name", defaults to zakyprojects/AscendDay-Feedback.
  * - SUPABASE_URL + SUPABASE_PUBLISHABLE_KEY (or the app's VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY):
  *   to check the sender's session.
  * - TURNSTILE_SECRET_KEY: Cloudflare Turnstile secret, only for signed-out senders (the public
@@ -28,7 +28,7 @@
 
 declare const process: { env: Record<string, string | undefined> };
 
-const DEFAULT_REPO = 'zakyprojects/Ascend-Feedback';
+const DEFAULT_REPO = 'zakyprojects/AscendDay-Feedback';
 const MAX_BODY_BYTES = 4_000_000; // Vercel rejects request bodies over 4.5 MB
 const MAX_IMAGES = 3;
 const MAX_IMAGE_BYTES = 1_500_000; // per image, after the browser has shrunk it
