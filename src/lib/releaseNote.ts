@@ -55,4 +55,5 @@ export const RELEASE_NOTE: ReleaseNote | null = {
     'Install AscendDay as an app: open it in one tap from your home screen. Find it in Settings → App info.',
     'On iPhone and iPad, the installed app can also send you reminders and partner nudges.',
   ],
+  improved: ["Today's quote on the Dashboard now stands out, so it's easier to spot."],
 };
