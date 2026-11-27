@@ -270,14 +270,14 @@ export function Dashboard({ store, onViewChange, onOpenAuth }: DashboardProps) {
             emerald tint over the card colour, a small sentence-case label and slightly larger text.
             Upright text (Geist has no real italic loaded, so no fake slant). */}
         <figure
-          className="card mt-4 max-w-prose rounded-l-md border-l-[3px] border-l-brand-mark bg-[color-mix(in_srgb,var(--color-brand-mark)_7%,var(--color-bg-800))] px-4 pt-3 pb-3"
+          className="card mt-4 max-w-prose rounded-l-md border-l-[3px] border-l-brand-mark bg-[color-mix(in_srgb,var(--color-brand-mark)_7%,var(--color-bg-800))] px-4 py-2.5"
           aria-label="Quote of the day"
         >
-          <figcaption className="mb-1.5 text-xs font-semibold text-brand-text">Today’s quote</figcaption>
-          <blockquote className="text-lg font-medium leading-relaxed text-content-primary [text-wrap:pretty]">
+          <figcaption className="mb-1 text-xs font-semibold text-brand-text">Today’s quote</figcaption>
+          <blockquote className="text-base font-medium leading-relaxed text-content-primary [text-wrap:pretty]">
             <p>{quote.text}</p>
           </blockquote>
-          <p className="mt-1.5 text-xs text-content-muted">— {quote.author}</p>
+          <p className="mt-1 text-xs text-content-muted">— {quote.author}</p>
         </figure>
       </div>
 
