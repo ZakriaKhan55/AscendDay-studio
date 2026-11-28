@@ -231,7 +231,7 @@ export const leagues: FeatureContent = {
     },
     {
       q: 'What happens if two people have the same points?',
-      a: 'The one with more active days goes first. An active day is a day you earned at least one point. If that is the same, fewer penalty points win: points lost to missed habits or bad-habit days you didn’t log. A slip you report yourself doesn’t count here. If that is the same too, whoever reached that score first goes higher. In the rare case everything matches, a fixed order for that week, month or season decides. Names never decide.',
+      a: 'The one with more active days goes first. An active day is a day you earned at least one point. If that is the same, fewer penalty points win: points lost to missed habits, bad-habit days you didn’t log, and slips you report. If that is the same too, whoever reached that score first goes higher. In the rare case everything matches, a fixed order for that week, month or season decides. Names never decide.',
     },
     {
       q: 'What do other members see about me?',
